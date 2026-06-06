@@ -823,6 +823,10 @@ h2 {
   animation: overlay-in 0.18s ease;
 }
 
+.modal-overlay.hidden {
+  display: none;
+}
+
 @keyframes overlay-in {
   from {
     opacity: 0;
