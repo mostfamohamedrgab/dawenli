@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>دوّنلي — يومياتي</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand brand-sm">
+          <span class="brand-mark">✍️</span>
+          <span class="brand-name">دوّنلي</span>
+        </div>
+        <button id="logoutBtn" class="ghost-btn">خروج</button>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="stats" class="stats">
+        <div class="stat-card">
+          <span class="stat-num" id="statJournal">—</span>
+          <span class="stat-label">تدوينات</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="statStreak">—</span>
+          <span class="stat-label">أيام متتالية</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="statMood">—</span>
+          <span class="stat-label">المزاج الغالب</span>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="journal">
+        <div class="panel analyze-panel">
+          <div class="panel-head">
+            <h2>تحليل أيامك</h2>
+            <div class="analyze-controls">
+              <select id="days" class="select">
+                <option value="7">آخر ٧ أيام</option>
+                <option value="14">آخر ١٤ يوم</option>
+                <option value="30">آخر شهر</option>
+              </select>
+              <button id="analyzeBtn" class="primary-btn">حلّلي</button>
+            </div>
+          </div>
+          <div id="analysis" class="analysis-result hidden"></div>
+        </div>
+        <h2 class="section-title">يومياتك</h2>
+        <div id="entries" class="entries">
+          <p class="muted center">بحمّل اليوميات...</p>
+        </div>
+      </section>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>دوّنلي — تسجيل الدخول</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="auth-body">
+    <main class="auth-card">
+      <div class="brand">
+        <div class="brand-mark">✍️</div>
+        <h1>دوّنلي</h1>
+      </div>
+      <p class="auth-sub">يومياتك في مكان واحد — سجّل دخولك للوحة التحكم</p>
+
+      <form id="loginForm" class="auth-form" autocomplete="off">
+        <label for="password">كلمة السر</label>
+        <div class="field">
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="••••••••"
+            required
+          />
+        </div>
+        <label class="remember">
+          <input type="checkbox" id="remember" checked />
+          <span>فكّرني (سيبني داخل ٣٠ يوم)</span>
+        </label>
+        <button type="submit" id="submitBtn">دخول</button>
+        <p id="error" class="auth-error" hidden></p>
+      </form>
+
+      <footer class="auth-foot">دوّنلي — مساعد اليوميات الشخصي</footer>
+    </main>
+    <script src="/login.js"></script>
+  </body>
+</html>
