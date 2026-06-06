@@ -2,11 +2,17 @@ import { Telegraf } from "telegraf";
 import { config } from "./config.js";
 import {
   transcribe,
-  classifyJournal,
+  classifyMessage,
   analyzeEntries,
   reflectOnEntry,
 } from "./openai.js";
-import { upsertJournalForDay, entriesSince, listEntries } from "./db.js";
+import {
+  upsertJournalForDay,
+  entriesSince,
+  listEntries,
+  listGoals,
+  applyGoal,
+} from "./db.js";
 
 export function startBot() {
   const bot = new Telegraf(config.telegramToken);
@@ -183,18 +189,37 @@ async function processEntry(ctx, text) {
     const today = new Date().toISOString().slice(0, 10);
     // سياق الذاكرة: آخر تدوينات قبل ما نحفظ الجديدة
     const memoryContext = listEntries(6).filter((e) => e.entry_date !== today);
-    const it = await classifyJournal(text, today);
-    const r = upsertJournalForDay({ ...it, transcript: text });
-    const tags = it.tags?.length ? " · 🏷️ " + it.tags.join("، ") : "";
+    const existingGoals = listGoals();
+    const { journal, goals } = await classifyMessage(text, today, existingGoals);
 
-    await ctx.reply(
-      `اتسجّلت ✅\n📝 ${r.merged ? "اتضافت لنفس اليوم" : "تدوينة"} (${it.entryDate}) — ${it.mood || "—"}${tags}`
-    );
+    const r = upsertJournalForDay({ ...journal, transcript: text });
+    const tags = journal.tags?.length ? " · 🏷️ " + journal.tags.join("، ") : "";
+    const lines = [
+      `📝 ${r.merged ? "اتضافت لنفس اليوم" : "تدوينة"} (${journal.entryDate}) — ${journal.mood || "—"}${tags}`,
+    ];
 
-    // الرد التأمّلي الفوري
+    // الأهداف: نطبّقها (إنشاء أو زيادة تقدّم) ونجمّع التحديثات للرد التأمّلي
+    const goalUpdates = [];
+    for (const g of goals) {
+      const applied = applyGoal(g);
+      if (!applied) continue;
+      goalUpdates.push({ ...applied, unit: g.unit });
+      const pct = applied.target
+        ? ` (${Math.min(100, Math.round((applied.current / applied.target) * 100))}%)`
+        : "";
+      const tgt = applied.target ? `/${fmtNum(applied.target)}` : "";
+      const unit = g.unit ? " " + g.unit : "";
+      lines.push(
+        `🎯 ${applied.created ? "هدف جديد" : "تقدّم في هدف"}: ${applied.title} — ${fmtNum(applied.current)}${tgt}${unit}${pct}`
+      );
+    }
+
+    await ctx.reply(`اتسجّلت ✅\n${lines.join("\n")}`);
+
+    // الرد التأمّلي الفوري (بيهنّي على الأهداف كمان)
     try {
       await ctx.sendChatAction("typing");
-      const reflection = await reflectOnEntry(text, memoryContext);
+      const reflection = await reflectOnEntry(text, memoryContext, goalUpdates);
       if (reflection) await ctx.reply(reflection);
     } catch (err) {
       console.error("reflect error:", err); // مش هنوقّف الحفظ لو التأمّل فشل
@@ -203,4 +228,8 @@ async function processEntry(ctx, text) {
     console.error("process error:", err);
     await ctx.reply("حصل خطأ أثناء المعالجة، جرّب تاني.");
   }
+}
+
+function fmtNum(n) {
+  return Number(n).toLocaleString("en-US");
 }

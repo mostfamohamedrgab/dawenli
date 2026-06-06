@@ -37,8 +37,18 @@
           <span class="stat-num" id="statMood">—</span>
           <span class="stat-label">المزاج الغالب</span>
         </div>
+        <div class="stat-card">
+          <span class="stat-num" id="statGoals">—</span>
+          <span class="stat-label">أهداف</span>
+        </div>
       </section>
 
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="journal">📝 يوميات</button>
+        <button class="tab" data-tab="goals">🎯 أهداف</button>
+      </nav>
+
+      <!-- ========== يوميات ========== -->
       <section class="tab-panel" data-panel="journal">
         <div class="panel analyze-panel">
           <div class="panel-head">
@@ -58,6 +68,24 @@
         <div id="entries" class="entries">
           <p class="muted center">بحمّل اليوميات...</p>
         </div>
+      </section>
+
+      <!-- ========== أهداف ========== -->
+      <section class="tab-panel hidden" data-panel="goals">
+        <div class="panel">
+          <div class="panel-head"><h2>أضف هدف</h2></div>
+          <form id="goalForm" class="goal-form">
+            <input id="goalTitle" class="select gf" placeholder="اسم الهدف (مثلاً: أوصل ٥٠٠ ألف)" required />
+            <input id="goalTarget" class="select gf" type="number" placeholder="الرقم المستهدف" />
+            <input id="goalUnit" class="select gf" placeholder="الوحدة (جنيه)" />
+            <button type="submit" class="primary-btn">إضافة</button>
+          </form>
+          <p class="muted" style="margin-top: 10px">
+            أو قول للبوت بصوتك: «عايز أوصل ٥٠٠ ألف، عملت منهم ١٠ آلاف» — وكل ما تحقّق
+            تقدّم قوله «النهاردة عملت ٥ آلاف» وهيزوّدهم لوحده.
+          </p>
+        </div>
+        <div id="goals" class="goals-grid"></div>
       </section>
     </div>
 
