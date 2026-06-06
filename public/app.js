@@ -43,8 +43,38 @@ async function api(path, opts) {
   return res;
 }
 
+/* ===================== Confirm Modal ===================== */
+const confirmOverlay = document.getElementById("confirmOverlay");
+const confirmOk = document.getElementById("confirmOk");
+const confirmCancel = document.getElementById("confirmCancel");
+let confirmResolver = null;
+
+function askConfirm() {
+  confirmOverlay.classList.remove("hidden");
+  return new Promise((resolve) => {
+    confirmResolver = resolve;
+  });
+}
+
+function closeConfirm(result) {
+  confirmOverlay.classList.add("hidden");
+  if (confirmResolver) {
+    confirmResolver(result);
+    confirmResolver = null;
+  }
+}
+
+confirmOk.addEventListener("click", () => closeConfirm(true));
+confirmCancel.addEventListener("click", () => closeConfirm(false));
+confirmOverlay.addEventListener("click", (e) => {
+  if (e.target === confirmOverlay) closeConfirm(false);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !confirmOverlay.classList.contains("hidden")) closeConfirm(false);
+});
+
 async function del(kind, id) {
-  if (!confirm("متأكد إنك عايز تمسحها؟")) return;
+  if (!(await askConfirm())) return;
   await api(`/api/${kind}/${id}`, { method: "DELETE" });
   loadAll();
 }
