@@ -74,6 +74,9 @@ export function startServer() {
   const app = express();
   app.use(express.json());
 
+  // أصول ثابتة عامة (شعارات ورسومات SVG للصفحة الترويجية والداشبورد) — مفيهاش بيانات
+  app.use("/assets", express.static(join(publicDir, "assets")));
+
   app.post("/api/login", (req, res) => {
     const { password, remember } = req.body || {};
     if (password && password === config.dashboardPassword) {

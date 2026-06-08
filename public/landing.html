@@ -1,657 +1,373 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>دوّنلي — مساحتك الشخصية لحياتك كلها</title>
-    <meta
-      name="description"
-      content="دوّنلي: بوت تليجرام بيحوّل كلامك العادي لتدوين منظّم — صحتك، عاداتك، أهدافك، وفلوسك. كله في مكان واحد، وتقرير جاهز لأي دكتور في ثانية."
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      :root {
-        --bg: #0a0a0f;
-        --surface: #14121f;
-        --surface-2: #1a1530;
-        --text: #f5f5f7;
-        --muted: #9a96ad;
-        --violet: #8b5cf6;
-        --purple: #a855f7;
-        --grad: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
-        --grad-line: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
-        --border: rgba(168, 85, 247, 0.16);
-        --border-strong: rgba(168, 85, 247, 0.34);
-        --soft: rgba(139, 92, 246, 0.12);
-        --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
-        --shadow-lg: 0 18px 50px rgba(88, 40, 160, 0.28);
-        --radius: 18px;
-      }
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-      html {
-        scroll-behavior: smooth;
-      }
-      body {
-        font-family: "Cairo", system-ui, -apple-system, sans-serif;
-        background: var(--bg);
-        color: var(--text);
-        line-height: 1.8;
-        -webkit-font-smoothing: antialiased;
-        overflow-x: hidden;
-      }
-      a {
-        color: inherit;
-        text-decoration: none;
-      }
-      .bg-canvas {
-        position: fixed;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        z-index: -1;
-        pointer-events: none;
-      }
-      .wrap {
-        max-width: 1080px;
-        margin: 0 auto;
-        padding: 0 22px;
-      }
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>دوّنلي — احكيلي يومك وأنا أرتّبه</title>
+<meta name="description" content="دوّنلي — مساعدك الشخصي لتدوين حياتك. كلّمه على تيليجرام بالعامية، صوت أو كتابة، وهو يرتّب صحتك وعاداتك وأهدافك وفلوسك." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Lemonada:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --paper:#f6f1e4; --paper-deep:#efe8d6; --surface:#fffcf5; --raised:#fff;
+  --ink:#34302a; --ink-muted:#6e665a; --ink-faint:#9a9082;
+  --hairline:#dfd7c4; --hairline-strong:#c9bfa8;
+  --brand:#5c8a6b; --brand-deep:#426b52; --brand-tint:#bcd4c2; --brand-wash:#e4eee6;
+  --health:#e0705c; --health-deep:#c4543f; --health-tint:#f6d5cd; --health-wash:#fbeae5;
+  --habits:#e3a24a; --habits-deep:#c07f25; --habits-tint:#f6e1be; --habits-wash:#fbf0d9;
+  --goals:#5285a6; --goals-deep:#3a647f; --goals-tint:#c3dae7; --goals-wash:#e3eef4;
+  --finances:#6fa84a; --finances-deep:#527f35; --finances-tint:#cfe3bd; --finances-wash:#eaf2e1;
+  --on-accent:#fffcf5;
+  --font-display:"Lemonada","Tajawal",system-ui,sans-serif;
+  --font-body:"Tajawal","Lemonada",system-ui,sans-serif;
+  --radius-md:20px; --radius-lg:28px; --radius-pill:999px;
+  --radius-sketch:255px 15px 225px 15px / 15px 225px 15px 255px;
+  --radius-sketch-2:15px 225px 15px 255px / 255px 15px 225px 15px;
+  --shadow-sm:0 2px 8px rgba(52,48,42,.06);
+  --shadow-md:0 4px 16px rgba(52,48,42,.08);
+  --shadow-lg:0 10px 30px rgba(52,48,42,.12);
+  --ease-soft:cubic-bezier(.33,1,.68,1);
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+*,*::before,*::after{box-sizing:border-box}
+html{direction:rtl;scroll-behavior:smooth}
+body{
+  margin:0;font-family:var(--font-body);color:var(--ink);line-height:1.7;
+  background-color:var(--paper);background-image:var(--grain);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:var(--font-display);font-weight:700;line-height:1.2;margin:0}
+p{margin:0}
+a{color:inherit;text-decoration:none}
+img{max-width:100%}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:clamp(20px,5vw,64px)}
 
-      /* ===== Nav ===== */
-      .nav {
-        position: sticky;
-        top: 0;
-        z-index: 20;
-        backdrop-filter: blur(14px);
-        background: rgba(10, 10, 15, 0.6);
-        border-bottom: 1px solid var(--border);
-      }
-      .nav-inner {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 14px 22px;
-        max-width: 1080px;
-        margin: 0 auto;
-      }
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 11px;
-      }
-      .brand-mark {
-        width: 42px;
-        height: 42px;
-        display: grid;
-        place-items: center;
-        font-size: 21px;
-        background: var(--grad);
-        border-radius: 13px;
-        box-shadow: 0 8px 22px rgba(139, 92, 246, 0.4);
-      }
-      .brand-name {
-        font-size: 1.3rem;
-        font-weight: 900;
-      }
-      .btn {
-        display: inline-block;
-        font-family: inherit;
-        font-weight: 700;
-        font-size: 0.98rem;
-        color: #fff;
-        background: var(--grad);
-        border: none;
-        border-radius: 12px;
-        padding: 11px 24px;
-        cursor: pointer;
-        box-shadow: 0 10px 26px rgba(139, 92, 246, 0.38);
-        transition: transform 0.12s, filter 0.15s;
-      }
-      .btn:hover {
-        transform: translateY(-2px);
-        filter: brightness(1.08);
-      }
-      .btn.ghost {
-        background: transparent;
-        color: var(--text);
-        border: 1.5px solid var(--border-strong);
-        box-shadow: none;
-      }
-      .btn.ghost:hover {
-        background: var(--soft);
-        border-color: var(--violet);
-      }
-      .btn.lg {
-        font-size: 1.08rem;
-        padding: 15px 36px;
-      }
+.squiggle{position:relative;display:inline-block}
+.squiggle::after{
+  content:"";position:absolute;inset-inline:-2px;bottom:-.30em;height:.42em;
+  background:no-repeat center/100% 100%
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 12' fill='none' stroke='%235C8A6B' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M2 7c14-6 28 4 42-1s28-6 42-1 26 3 32 1'/%3E%3C/svg%3E");
+}
 
-      /* ===== Hero ===== */
-      .hero {
-        text-align: center;
-        padding: 86px 0 64px;
-      }
-      .pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.86rem;
-        font-weight: 700;
-        color: #d6bbff;
-        background: var(--soft);
-        border: 1px solid var(--border-strong);
-        padding: 7px 16px;
-        border-radius: 999px;
-        margin-bottom: 26px;
-      }
-      .hero h1 {
-        font-size: clamp(2.1rem, 6vw, 3.6rem);
-        font-weight: 900;
-        line-height: 1.25;
-        letter-spacing: -0.01em;
-        margin-bottom: 20px;
-      }
-      .hero h1 .grad {
-        background: var(--grad);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-      .hero p.lead {
-        font-size: clamp(1.02rem, 2.5vw, 1.25rem);
-        color: var(--muted);
-        max-width: 660px;
-        margin: 0 auto 34px;
-      }
-      .hero-cta {
-        display: flex;
-        gap: 14px;
-        justify-content: center;
-        flex-wrap: wrap;
-      }
-      .hero-note {
-        margin-top: 18px;
-        font-size: 0.86rem;
-        color: #6f6a85;
-      }
+.btn{
+  display:inline-flex;align-items:center;gap:9px;cursor:pointer;
+  font-family:var(--font-body);font-weight:700;font-size:1rem;
+  border-radius:var(--radius-pill);padding:13px 26px;border:2px solid transparent;
+  transition:transform .12s var(--ease-soft),filter .15s,background .15s;
+}
+.btn:hover{transform:translateY(-2px)}
+.btn-primary{background:var(--brand);color:var(--on-accent);box-shadow:var(--shadow-md)}
+.btn-primary:hover{filter:brightness(1.06)}
+.btn-secondary{background:var(--surface);color:var(--ink);border-color:var(--ink)}
+.btn-ghost{background:transparent;color:var(--ink-muted)}
+.btn-ghost:hover{color:var(--brand-deep);background:var(--brand-wash)}
+.btn-lg{font-size:1.08rem;padding:15px 30px}
+.btn-sm{font-size:.92rem;padding:9px 18px}
 
-      /* ===== Section ===== */
-      section {
-        padding: 56px 0;
-      }
-      .sec-head {
-        text-align: center;
-        max-width: 640px;
-        margin: 0 auto 44px;
-      }
-      .sec-head h2 {
-        font-size: clamp(1.6rem, 4vw, 2.3rem);
-        font-weight: 900;
-        margin-bottom: 12px;
-      }
-      .sec-head p {
-        color: var(--muted);
-        font-size: 1.05rem;
-      }
+.pill{
+  display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:.85rem;
+  color:var(--brand-deep);background:var(--brand-wash);border-radius:var(--radius-pill);
+  padding:7px 16px;margin-bottom:22px;
+}
 
-      /* ===== Pillars ===== */
-      .pillars {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 16px;
-      }
-      .pcard {
-        background: linear-gradient(180deg, var(--surface-2), var(--surface));
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        padding: 26px 22px;
-        transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-      }
-      .pcard:hover {
-        transform: translateY(-5px);
-        border-color: var(--border-strong);
-        box-shadow: var(--shadow-lg);
-      }
-      .pcard .ico {
-        width: 54px;
-        height: 54px;
-        display: grid;
-        place-items: center;
-        font-size: 26px;
-        background: var(--soft);
-        border: 1px solid var(--border);
-        border-radius: 15px;
-        margin-bottom: 16px;
-      }
-      .pcard h3 {
-        font-size: 1.2rem;
-        font-weight: 800;
-        margin-bottom: 8px;
-      }
-      .pcard p {
-        color: var(--muted);
-        font-size: 0.96rem;
-      }
+/* ---------- header ---------- */
+.header{
+  position:sticky;top:0;z-index:30;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px clamp(20px,5vw,64px);
+  background:color-mix(in srgb,var(--paper) 86%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--hairline);
+}
+.header nav{display:flex;gap:26px}
+.header nav a{font-weight:700;color:var(--ink-muted);transition:color .15s}
+.header nav a:hover{color:var(--brand-deep)}
+.header .actions{display:flex;gap:10px;align-items:center}
 
-      /* ===== How it works ===== */
-      .steps {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 18px;
-      }
-      .step {
-        position: relative;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        padding: 30px 24px 26px;
-      }
-      .step .num {
-        position: absolute;
-        top: -18px;
-        right: 22px;
-        width: 44px;
-        height: 44px;
-        display: grid;
-        place-items: center;
-        font-size: 1.2rem;
-        font-weight: 900;
-        color: #fff;
-        background: var(--grad);
-        border-radius: 13px;
-        box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
-      }
-      .step h3 {
-        font-size: 1.12rem;
-        font-weight: 800;
-        margin: 10px 0 8px;
-      }
-      .step p {
-        color: var(--muted);
-        font-size: 0.96rem;
-      }
-      .chat-demo {
-        margin-top: 14px;
-        display: grid;
-        gap: 8px;
-      }
-      .msg {
-        font-size: 0.9rem;
-        padding: 9px 14px;
-        border-radius: 13px;
-        max-width: 92%;
-      }
-      .msg.me {
-        align-self: flex-start;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid var(--border);
-      }
-      .msg.bot {
-        align-self: flex-end;
-        background: var(--soft);
-        border: 1px solid var(--border-strong);
-      }
+/* ---------- hero ---------- */
+.hero{
+  display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,64px);
+  align-items:center;padding:clamp(48px,7vw,96px) 0 clamp(40px,5vw,72px);position:relative;
+}
+.hero-copy{position:relative;z-index:1}
+.h1{font-size:clamp(38px,5.4vw,60px);line-height:1.12;margin:0 0 22px}
+.lead{font-size:1.15rem;color:var(--ink-muted);max-width:40ch;margin:0 0 28px}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.trust{display:flex;gap:18px;flex-wrap:wrap;color:var(--ink-faint);font-size:.9rem;font-weight:500}
 
-      /* ===== Highlight (doctor report) ===== */
-      .highlight {
-        display: grid;
-        grid-template-columns: 1.1fr 0.9fr;
-        gap: 34px;
-        align-items: center;
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.14), rgba(168, 85, 247, 0.08));
-        border: 1px solid var(--border-strong);
-        border-radius: 24px;
-        box-shadow: var(--shadow-lg);
-        padding: 42px;
-        overflow: hidden;
-      }
-      .highlight h2 {
-        font-size: clamp(1.5rem, 3.5vw, 2.1rem);
-        font-weight: 900;
-        margin-bottom: 14px;
-      }
-      .highlight p {
-        color: var(--muted);
-        font-size: 1.04rem;
-        margin-bottom: 18px;
-      }
-      .check-list {
-        display: grid;
-        gap: 11px;
-      }
-      .check-list li {
-        list-style: none;
-        display: flex;
-        align-items: center;
-        gap: 11px;
-        font-weight: 600;
-      }
-      .check-list .ck {
-        width: 26px;
-        height: 26px;
-        display: grid;
-        place-items: center;
-        font-size: 0.85rem;
-        color: #fff;
-        background: var(--grad);
-        border-radius: 8px;
-        flex: none;
-      }
-      .report-mock {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        padding: 22px;
-      }
-      .report-mock .rm-h {
-        font-weight: 800;
-        color: var(--purple);
-        margin-bottom: 10px;
-        font-size: 0.95rem;
-      }
-      .report-mock .rm-line {
-        height: 9px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.07);
-        margin-bottom: 9px;
-      }
-      .report-mock .rm-line.s {
-        width: 62%;
-      }
-      .report-mock .rm-tl {
-        margin-top: 14px;
-        display: grid;
-        gap: 7px;
-      }
-      .report-mock .rm-row {
-        display: flex;
-        gap: 10px;
-        font-size: 0.82rem;
-        color: var(--muted);
-        padding: 7px 10px;
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 9px;
-        border-right: 2px solid var(--border-strong);
-      }
+.splitter{position:relative}
+.splitter .pot{position:absolute;top:-46px;width:64px;inset-inline-start:6px;opacity:.9}
+.splitter-box{
+  background:var(--surface);border:2px solid var(--ink);
+  border-radius:var(--radius-sketch);box-shadow:var(--shadow-lg);padding:26px 24px;
+}
+.transcript{
+  background:var(--surface);border:1.5px solid var(--hairline-strong);
+  border-radius:18px 18px 18px 6px;padding:18px 20px;
+  font-size:1.05rem;line-height:1.8;color:var(--ink);margin-bottom:20px;
+}
+.split-arrow{text-align:center;color:var(--ink-faint);font-size:1.2rem;margin-bottom:14px}
+.chips4{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.wchip{border-radius:14px;padding:12px 14px;border:1.5px solid;display:flex;flex-direction:column;gap:2px;animation:rise .5s var(--ease-soft) both}
+.wchip b{font-weight:700;font-size:.95rem}
+.wchip span{font-size:.82rem;color:var(--ink-muted)}
+.wchip.h{background:var(--health-wash);border-color:var(--health)} .wchip.h b{color:var(--health-deep)}
+.wchip.b{background:var(--habits-wash);border-color:var(--habits)} .wchip.b b{color:var(--habits-deep)}
+.wchip.g{background:var(--goals-wash);border-color:var(--goals)} .wchip.g b{color:var(--goals-deep)}
+.wchip.f{background:var(--finances-wash);border-color:var(--finances)} .wchip.f b{color:var(--finances-deep)}
+.wchip:nth-child(1){animation-delay:.1s}.wchip:nth-child(2){animation-delay:.22s}
+.wchip:nth-child(3){animation-delay:.34s}.wchip:nth-child(4){animation-delay:.46s}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
-      /* ===== Final CTA ===== */
-      .cta {
-        text-align: center;
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(168, 85, 247, 0.1));
-        border: 1px solid var(--border-strong);
-        border-radius: 24px;
-        padding: 56px 30px;
-        box-shadow: var(--shadow-lg);
-      }
-      .cta h2 {
-        font-size: clamp(1.6rem, 4vw, 2.4rem);
-        font-weight: 900;
-        margin-bottom: 14px;
-      }
-      .cta p {
-        color: var(--muted);
-        max-width: 540px;
-        margin: 0 auto 28px;
-        font-size: 1.05rem;
-      }
+.float{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.float img{position:absolute;filter:saturate(.9)}
 
-      footer {
-        text-align: center;
-        color: #6f6a85;
-        font-size: 0.86rem;
-        padding: 36px 22px 44px;
-        border-top: 1px solid var(--border);
-        margin-top: 30px;
-      }
+/* ---------- section ---------- */
+.section{padding:clamp(52px,8vw,100px) 0}
+.section-head{text-align:center;margin-bottom:clamp(38px,6vw,60px)}
+.kicker{font-size:.78rem;font-weight:700;letter-spacing:.04em;color:var(--ink-faint)}
+.h2{font-size:clamp(28px,4.4vw,44px);margin:8px 0 10px}
+.sublead{font-size:1.1rem;color:var(--ink-muted);max-width:46ch;margin:0 auto}
 
-      .reveal {
-        opacity: 0;
-        transform: translateY(22px);
-        transition: opacity 0.6s ease, transform 0.6s ease;
-      }
-      .reveal.in {
-        opacity: 1;
-        transform: none;
-      }
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:clamp(20px,3vw,36px)}
+.step{
+  background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-md);padding:clamp(26px,3vw,36px) clamp(24px,3vw,32px);position:relative;
+  transition:transform .25s var(--ease-soft),box-shadow .25s;
+}
+.step:nth-child(odd){transform:rotate(-.5deg)}
+.step:nth-child(even){transform:rotate(.5deg)}
+.step:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.stepnum{
+  position:absolute;inset-inline-start:28px;top:-24px;width:52px;height:52px;
+  border-radius:var(--radius-sketch);color:var(--on-accent);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-weight:700;font-size:24px;
+  border:2px solid var(--ink);box-shadow:var(--shadow-sm);
+}
+.step:nth-child(1) .stepnum{background:var(--goals)}
+.step:nth-child(2) .stepnum{background:var(--habits)}
+.step:nth-child(3) .stepnum{background:var(--health)}
+.step .ico{font-size:30px;margin:14px 0 10px}
+.step h3{font-size:1.4rem;margin:0 0 8px}
+.step p{color:var(--ink-muted)}
 
-      @media (max-width: 860px) {
-        .pillars {
-          grid-template-columns: repeat(2, 1fr);
-        }
-        .steps {
-          grid-template-columns: 1fr;
-        }
-        .highlight {
-          grid-template-columns: 1fr;
-          padding: 30px;
-        }
-      }
-      @media (max-width: 520px) {
-        .pillars {
-          grid-template-columns: 1fr;
-        }
-        .nav .btn {
-          padding: 9px 16px;
-          font-size: 0.9rem;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <canvas id="bgCanvas" class="bg-canvas" aria-hidden="true"></canvas>
+.proof{background:var(--paper-deep);border-block:1px solid var(--hairline)}
+.proof-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:clamp(14px,2vw,24px)}
+.proof-cell{text-align:center;padding:22px 14px}
+.proof-cell:not(:last-child){border-inline-end:1px dashed var(--hairline-strong)}
+.proof-v{font-family:var(--font-display);font-weight:700;font-size:clamp(24px,3vw,34px);margin-bottom:6px}
+.proof-cell.goals .proof-v{color:var(--goals-deep)}
+.proof-cell.habits .proof-v{color:var(--habits-deep)}
+.proof-cell.health .proof-v{color:var(--health-deep)}
+.proof-cell.finances .proof-v{color:var(--finances-deep)}
+.proof-l{color:var(--ink-muted)}
 
-    <!-- ===== Nav ===== -->
-    <nav class="nav">
-      <div class="nav-inner">
-        <div class="brand">
-          <span class="brand-mark">✍️</span>
-          <span class="brand-name">دوّنلي</span>
-        </div>
-        <a href="/login" class="btn">ابدأ دلوقتي</a>
+.worlds-bento{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.3fr;grid-auto-rows:1fr;gap:clamp(16px,2vw,24px)}
+.world-tile{
+  border:2px solid;border-radius:var(--radius-sketch);box-shadow:var(--shadow-md);
+  padding:clamp(22px,2.5vw,30px);display:flex;gap:18px;min-height:230px;position:relative;overflow:hidden;
+  transition:transform .25s var(--ease-soft),box-shadow .25s;
+}
+.world-tile:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.world-tile img{flex:none;filter:drop-shadow(0 6px 14px rgba(52,48,42,.12));transition:transform .5s var(--ease-soft)}
+.world-tile:hover img{transform:translateY(-6px) rotate(-3deg) scale(1.04)}
+.world-tile.big{grid-column:span 2;flex-direction:row;align-items:center}
+.world-tile.big img{width:150px;height:150px}
+.world-tile.small{grid-column:span 1;flex-direction:column;align-items:flex-start;border-radius:var(--radius-sketch-2)}
+.world-tile.small img{width:110px;height:110px}
+.world-tile h3{font-size:1.6rem;margin:0 0 8px}
+.world-tile.small h3{font-size:1.4rem}
+.world-tile p{color:var(--ink);margin:0 0 14px;max-width:32ch}
+.wt-tag{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:.85rem;border-radius:var(--radius-pill);padding:5px 14px}
+.world-tile.health{background:var(--health-wash);border-color:var(--health)}
+.world-tile.health h3{color:var(--health-deep)} .world-tile.health .wt-tag{background:var(--health-tint);color:var(--health-deep)}
+.world-tile.habits{background:var(--habits-wash);border-color:var(--habits)}
+.world-tile.habits h3{color:var(--habits-deep)} .world-tile.habits .wt-tag{background:var(--habits-tint);color:var(--habits-deep)}
+.world-tile.goals{background:var(--goals-wash);border-color:var(--goals)}
+.world-tile.goals h3{color:var(--goals-deep)} .world-tile.goals .wt-tag{background:var(--goals-tint);color:var(--goals-deep)}
+.world-tile.finances{background:var(--finances-wash);border-color:var(--finances)}
+.world-tile.finances h3{color:var(--finances-deep)} .world-tile.finances .wt-tag{background:var(--finances-tint);color:var(--finances-deep)}
+
+.peek{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,64px);align-items:center}
+.peek-art{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.peek-card{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:22px}
+.peek-card.tall{grid-row:span 2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.stat-label{font-size:.85rem;color:var(--ink-muted)}
+.stat-value{font-family:var(--font-display);font-weight:700;font-size:2rem;line-height:1}
+.stat-unit{font-size:.85rem;color:var(--ink-muted)}
+.stat-delta{font-size:.82rem;font-weight:700;color:var(--finances-deep)}
+.ring{--p:65;width:130px;height:130px;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(var(--goals) calc(var(--p)*1%),var(--goals-wash) 0)}
+.ring i{width:96px;height:96px;border-radius:50%;background:var(--surface);display:grid;place-items:center;
+  font-family:var(--font-display);font-weight:700;font-size:1.5rem;color:var(--goals-deep);font-style:normal}
+
+.closing{
+  background:var(--brand);color:var(--on-accent);border:2px solid var(--brand-deep);
+  border-radius:var(--radius-sketch);box-shadow:var(--shadow-lg);padding:clamp(32px,5vw,68px);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:clamp(32px,4vw,52px);align-items:center;
+}
+.closing h2{font-size:clamp(30px,4.4vw,48px);color:var(--on-accent);margin:0 0 16px}
+.closing p{font-size:1.15rem;opacity:.94;margin:0 0 28px}
+.checklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.checklist li{display:flex;align-items:center;gap:12px;font-size:1.1rem}
+.tick{width:30px;height:30px;flex:none;border-radius:50%;background:var(--on-accent);color:var(--brand-deep);display:flex;align-items:center;justify-content:center;font-weight:700}
+.btn-on-brand{background:var(--surface);color:var(--brand-deep);border-color:var(--surface)}
+
+.footer{border-top:1px solid var(--hairline);padding:32px 0}
+.footer .wrap{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.footer span{color:var(--ink-muted)}
+
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr}
+  .splitter{order:-1;max-width:460px}
+  .peek{grid-template-columns:1fr}
+  .worlds-bento{grid-template-columns:1fr 1fr}
+  .world-tile.big{grid-column:span 2;flex-direction:column;align-items:flex-start}
+  .world-tile.big img{width:110px;height:110px}
+}
+@media(max-width:680px){
+  .header nav{display:none}
+  .worlds-bento{grid-template-columns:1fr}
+  .world-tile.big,.world-tile.small{grid-column:span 1}
+  .proof-cell:not(:last-child){border-inline-end:none;border-bottom:1px dashed var(--hairline-strong)}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <img src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" style="height:40px" />
+  <nav>
+    <a href="#how">إزاي بيشتغل</a>
+    <a href="#worlds">العوالم</a>
+    <a href="#peek">الداشبورد</a>
+  </nav>
+  <div class="actions">
+    <a class="btn btn-ghost btn-sm" href="/">افتح الداشبورد</a>
+    <a class="btn btn-primary btn-sm" href="https://t.me/dawenli_bot" target="_blank" rel="noopener">✈ ابدأ على تيليجرام</a>
+  </div>
+</header>
+
+<main>
+<section class="wrap hero">
+  <div class="float" aria-hidden="true">
+    <img src="/assets/illustrations/world-finances.svg" alt="" style="top:6%;left:2%;width:92px;opacity:.45;transform:rotate(-8deg)" />
+    <img src="/assets/illustrations/world-habits.svg" alt="" style="top:66%;right:4%;width:88px;opacity:.4;transform:rotate(-12deg)" />
+  </div>
+  <div class="hero-copy">
+    <span class="pill">✎ دفترك الشخصي، بيرتّب نفسه</span>
+    <h1 class="h1">احكيلي يومك…<br /><span class="squiggle">وأنا أرتّبه</span>.</h1>
+    <p class="lead">كلّم دوّنلي على تيليجرام بالعامية — صوت أو كتابة — وهو يفهم كلامك ويحطّه في مكانه: صحتك، عاداتك، أهدافك، وفلوسك. من غير فورم ولا خانات.</p>
+    <div class="cta">
+      <a class="btn btn-primary btn-lg" href="https://t.me/dawenli_bot" target="_blank" rel="noopener">✈ ابدأ على تيليجرام</a>
+      <a class="btn btn-secondary btn-lg" href="/">شوف الداشبورد</a>
+    </div>
+    <div class="trust"><span>✦ مجاناً للأبد</span><span>✦ بالعامية المصرية</span><span>✦ خصوصيتك أوّلاً</span></div>
+  </div>
+
+  <div class="splitter">
+    <img class="pot" src="/assets/illustrations/world-finances.svg" alt="" />
+    <div class="splitter-box">
+      <div class="transcript">النهاردة صحيت بدري، جريت نص ساعة، وصرفت ٨٠ جنيه على الفطار، ولسه فاضل ١٠ دروس في كورس الإنجليزي.</div>
+      <div class="split-arrow">↓ دوّنلي قسّمها لـ</div>
+      <div class="chips4">
+        <div class="wchip h"><b>الصحة</b><span>جري ٣٠ دقيقة · نوم كويس</span></div>
+        <div class="wchip b"><b>العادات</b><span>التزام بالجري 🔥</span></div>
+        <div class="wchip g"><b>الأهداف</b><span>كورس الإنجليزي ٧٠٪</span></div>
+        <div class="wchip f"><b>الفلوس</b><span>٨٠ جنيه فطار</span></div>
       </div>
-    </nav>
+    </div>
+  </div>
+</section>
 
-    <!-- ===== Hero ===== -->
-    <header class="hero">
-      <div class="wrap">
-        <span class="pill">🤖 بوت تليجرام + داشبورد ذكية</span>
-        <h1>
-          كل حياتك متدوّنة ومنظّمة<br />
-          من غير ما تكتب <span class="grad">حرف واحد</span>
-        </h1>
-        <p class="lead">
-          كلّم دوّنلي على تليجرام بصوتك أو رسالة عادية، وهو يفهمك ويرتّبلك صحتك،
-          عاداتك، أهدافك، وفلوسك في داشبورد واحدة احترافية — ويطلّعلك تقرير جاهز لأي
-          دكتور في ثانية.
-        </p>
-        <div class="hero-cta">
-          <a href="/login" class="btn lg">ادخل على مساحتك</a>
-          <a href="#how" class="btn ghost lg">إزاي بيشتغل؟</a>
-        </div>
-        <p class="hero-note">كلامك بالعامية يكفي — مفيش فورمات ولا خانات تملاها.</p>
-      </div>
-    </header>
+<section id="how" class="wrap section">
+  <div class="section-head">
+    <div class="kicker">إزاي بيشتغل</div>
+    <h2 class="h2">تلات خطوات <span class="squiggle">وبس</span></h2>
+    <p class="sublead">مفيش تعلّم، مفيش إعداد. تفتح تيليجرام وتبدأ تحكي.</p>
+  </div>
+  <div class="steps">
+    <div class="step"><div class="stepnum">١</div><div class="ico">✈</div><h3>كلّمه عادي</h3><p>ابعت رسالة صوتية أو مكتوبة بالعامية على تيليجرام، زي ما بتكلّم صاحبك.</p></div>
+    <div class="step"><div class="stepnum">٢</div><div class="ico">✎</div><h3>دوّنلي يفهم ويرتّب</h3><p>الذكاء الاصطناعي يقسّم كلامك على أربع عوالم ويطلّع منه الأرقام والتفاصيل لوحده.</p></div>
+    <div class="step"><div class="stepnum">٣</div><div class="ico">📊</div><h3>شوف حياتك مرتّبة</h3><p>افتح الداشبورد تلاقي صحتك وعاداتك وأهدافك وفلوسك في صورة واضحة وجميلة.</p></div>
+  </div>
+</section>
 
-    <!-- ===== Pillars ===== -->
-    <section id="pillars">
-      <div class="wrap">
-        <div class="sec-head reveal">
-          <h2>٤ محاور بتشتغل لوحدها</h2>
-          <p>بتتكلم عادي، ودوّنلي يعرف الكلام ده بيخص أنهي محور ويسجّله في مكانه.</p>
-        </div>
-        <div class="pillars">
-          <div class="pcard reveal">
-            <div class="ico">🩺</div>
-            <h3>الصحة والعلاج</h3>
-            <p>أي عرض أو دوا أو متابعة بيتسجّل على خريطة جسمك، ومنه تطلّع تقرير للدكتور.</p>
-          </div>
-          <div class="pcard reveal">
-            <div class="ico">🔁</div>
-            <h3>العادات</h3>
-            <p>«بلعب رياضة» أو «ببطّل سجاير» — يتعرف عليها ويعدّلك الـ streak كل يوم تعملها.</p>
-          </div>
-          <div class="pcard reveal">
-            <div class="ico">🎯</div>
-            <h3>الأهداف</h3>
-            <p>حدّد هدفك زي «أوصل ٥٠٠ ألف» ودوّنلي يتابع تقدّمك أول بأول.</p>
-          </div>
-          <div class="pcard reveal">
-            <div class="ico">💰</div>
-            <h3>الماليات</h3>
-            <p>كسبت كام وصرفت كام وفي إيه — كله متبوّب وواضح برسوم بيانية.</p>
-          </div>
-        </div>
-      </div>
-    </section>
+<section class="proof">
+  <div class="wrap" style="padding-block:clamp(40px,5vw,64px)">
+    <div class="proof-grid">
+      <div class="proof-cell goals"><div class="proof-v">بالعامية</div><div class="proof-l">كلّمه زي ما إنت — صوت أو كتابة</div></div>
+      <div class="proof-cell habits"><div class="proof-v">٠ فورم</div><div class="proof-l">مفيش خانات تملاها ولا إعداد</div></div>
+      <div class="proof-cell health"><div class="proof-v">٤ عوالم</div><div class="proof-l">صحة · عادات · أهداف · فلوس</div></div>
+      <div class="proof-cell finances"><div class="proof-v">خصوصية</div><div class="proof-l">بياناتك ليك إنت بس</div></div>
+    </div>
+  </div>
+</section>
 
-    <!-- ===== How it works ===== -->
-    <section id="how">
-      <div class="wrap">
-        <div class="sec-head reveal">
-          <h2>بيشتغل في ٣ خطوات</h2>
-          <p>من غير تطبيق جديد تتعلّمه — كله من على تليجرام اللي بتستخدمه أصلاً.</p>
-        </div>
-        <div class="steps">
-          <div class="step reveal">
-            <div class="num">١</div>
-            <h3>كلّم دوّنلي</h3>
-            <p>ابعتله رسالة أو فويس بأي حاجة حصلت في يومك.</p>
-            <div class="chat-demo">
-              <div class="msg me">النهاردة لعبت رياضة وكان عندي حرقان في معدتي وصرفت ٢٠٠ جنيه أكل</div>
-            </div>
-          </div>
-          <div class="step reveal">
-            <div class="num">٢</div>
-            <h3>هو يفهم ويرتّب</h3>
-            <p>الذكاء الاصطناعي يفكّك كلامك ويوزّعه على المحاور صح.</p>
-            <div class="chat-demo">
-              <div class="msg bot">✅ عادة اتعملت: رياضة<br />🩺 اتسجّل عرض: حرقان (معدة)<br />💰 صرف: ٢٠٠ جنيه — أكل</div>
-            </div>
-          </div>
-          <div class="step reveal">
-            <div class="num">٣</div>
-            <h3>راجع داشبوردك</h3>
-            <p>افتح المساحة وشوف كل حاجة منظّمة برسوم وإحصائيات.</p>
-            <div class="chat-demo">
-              <div class="msg bot">📊 streak الرياضة: ٥ أيام · صافي الرصيد محدّث · تقرير الصحة جاهز</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+<section id="worlds" class="wrap section">
+  <div class="section-head">
+    <div class="kicker">العوالم الأربعة</div>
+    <h2 class="h2">أربع عوالم <span class="squiggle">لحياتك</span></h2>
+    <p class="sublead">كل جزء من حياتك له عالمه الخاص — بمشهده المرسوم ولونه الدافي.</p>
+  </div>
+  <div class="worlds-bento">
+    <article class="world-tile health big">
+      <img src="/assets/illustrations/world-health.svg" alt="الصحة" />
+      <div><h3>الصحة</h3><p>جسمك وأعراضك ونومك — وتقرير دكتور بضغطة واحدة.</p><span class="wt-tag">● نومك تحسّن ٤٠ دقيقة</span></div>
+    </article>
+    <article class="world-tile habits small">
+      <img src="/assets/illustrations/world-habits.svg" alt="العادات" />
+      <div><h3>العادات</h3><p>ستريك بيكبر كل يوم تكمّل فيه عادتك.</p><span class="wt-tag">● ٥ أيام جري 🔥</span></div>
+    </article>
+    <article class="world-tile goals small">
+      <img src="/assets/illustrations/world-goals.svg" alt="الأهداف" />
+      <div><h3>الأهداف</h3><p>هدفك قدّامك، والدايرة بتمتلي وانت بتقرّب.</p><span class="wt-tag">● ٦٥٪ من هدفك</span></div>
+    </article>
+    <article class="world-tile finances big">
+      <img src="/assets/illustrations/world-finances.svg" alt="الفلوس" />
+      <div><h3>الفلوس</h3><p>مصاريفك ومدّخراتك، ونبتة بتكبر مع كل جنيه توفّره.</p><span class="wt-tag">● وفّرت ١٬٨٠٠ جنيه 🌱</span></div>
+    </article>
+  </div>
+</section>
 
-    <!-- ===== Highlight: doctor report ===== -->
-    <section>
-      <div class="wrap">
-        <div class="highlight reveal">
-          <div>
-            <h2>تقرير جاهز لأي دكتور في ثانية</h2>
-            <p>
-              بدل ما تفتكر امتى بدأ العرض وكان شكله إيه، دوّنلي بيجمّع كل أعراضك في
-              فترة المتابعة ويطلّعلك تلخيص طبّي مرتّب + خط زمني — توريه لأي دكتور
-              تروحله.
-            </p>
-            <ul class="check-list">
-              <li><span class="ck">✓</span> متابعة ٣٠ يوم تتفتح أوتوماتيك</li>
-              <li><span class="ck">✓</span> تجميع كل الأعراض المرتبطة بالحالة</li>
-              <li><span class="ck">✓</span> تلخيص بالذكاء الاصطناعي + خط زمني</li>
-            </ul>
-          </div>
-          <div class="report-mock" aria-hidden="true">
-            <div class="rm-h">📋 تقرير الحالة — ارتجاع مريئي</div>
-            <div class="rm-line"></div>
-            <div class="rm-line"></div>
-            <div class="rm-line s"></div>
-            <div class="rm-tl">
-              <div class="rm-row"><span>٢ يونيو</span><span>حرقان بعد الأكل</span></div>
-              <div class="rm-row"><span>٤ يونيو</span><span>تحسّن مع الدوا</span></div>
-              <div class="rm-row"><span>٧ يونيو</span><span>رجع خفيف بالليل</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+<section id="peek" class="wrap section peek">
+  <div>
+    <span class="pill">داشبورد هادي</span>
+    <h2 class="h2" style="text-align:right">حياتك كلها… <span class="squiggle">في صفحة واحدة</span></h2>
+    <p class="lead" style="max-width:42ch">كل اللي حكيته بيتحوّل لأرقام ومخططات مرسومة بإيد — نومك، ستريكك، أهدافك، وفلوسك. هادية، دافية، وسهلة تقراها.</p>
+    <a class="btn btn-primary btn-lg" href="/">افتح الداشبورد ←</a>
+  </div>
+  <div class="peek-art">
+    <div class="peek-card"><div class="stat-label">وفّرت الشهر ده</div><div class="stat-value" style="color:var(--finances-deep)">١٬٨٠٠</div><div class="stat-unit">جنيه · <span class="stat-delta">+٣٠٠</span></div></div>
+    <div class="peek-card tall"><div class="ring"><i>٦٥٪</i></div><div class="stat-label">كورس الإنجليزي</div></div>
+    <div class="peek-card"><div class="stat-label">متوسط النوم</div><div class="stat-value" style="color:var(--health-deep)">٧.٢</div><div class="stat-unit">ساعة · <span class="stat-delta">اتحسّن</span></div></div>
+  </div>
+</section>
 
-    <!-- ===== Final CTA ===== -->
-    <section>
-      <div class="wrap">
-        <div class="cta reveal">
-          <h2>ابدأ تدوّن من غير مجهود</h2>
-          <p>مساحتك الشخصية مستنياك — صحتك وعاداتك وأهدافك وفلوسك في مكان واحد.</p>
-          <a href="/login" class="btn lg">ادخل على دوّنلي</a>
-        </div>
-      </div>
-    </section>
+<section class="wrap section" style="padding-top:0">
+  <div class="closing">
+    <div>
+      <h2>دفترك مستنّيك.</h2>
+      <p>ابدأ تدوّن حياتك النهاردة — مجاناً، على تيليجرام.</p>
+      <a class="btn btn-on-brand btn-lg" href="https://t.me/dawenli_bot" target="_blank" rel="noopener">✈ افتح دوّنلي على تيليجرام</a>
+    </div>
+    <ul class="checklist">
+      <li><span class="tick">✓</span>بالعامية المصرية — تكلّم زي ما إنت</li>
+      <li><span class="tick">✓</span>مفيش فورم ولا خانات تملاها</li>
+      <li><span class="tick">✓</span>كله في مكان واحد، واضح وجميل</li>
+      <li><span class="tick">✓</span>خصوصيتك أوّلاً — بياناتك ليك</li>
+    </ul>
+  </div>
+</section>
+</main>
 
-    <footer>دوّنلي · مساحتك الشخصية لحياتك كلها</footer>
+<footer class="footer">
+  <div class="wrap">
+    <img src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" style="height:30px" />
+    <span>دوّنلي © ٢٠٢٦ — دفترك الشخصي، بيرتّب نفسه</span>
+  </div>
+</footer>
 
-    <script>
-      // reveal on scroll
-      const io = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((e) => {
-            if (e.isIntersecting) {
-              e.target.classList.add("in");
-              io.unobserve(e.target);
-            }
-          });
-        },
-        { threshold: 0.12 }
-      );
-      document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
-
-      // ambient floating orbs
-      (function () {
-        const c = document.getElementById("bgCanvas");
-        const ctx = c.getContext("2d");
-        let w, h, dpr;
-        const orbs = [
-          { x: 0.15, y: 0.2, r: 320, col: "99,102,241", vx: 0.02, vy: 0.015 },
-          { x: 0.8, y: 0.15, r: 280, col: "168,85,247", vx: -0.018, vy: 0.02 },
-          { x: 0.5, y: 0.7, r: 360, col: "139,92,246", vx: 0.015, vy: -0.018 },
-          { x: 0.85, y: 0.8, r: 240, col: "236,72,153", vx: -0.02, vy: -0.012 },
-        ];
-        function resize() {
-          dpr = Math.min(window.devicePixelRatio || 1, 2);
-          w = c.width = innerWidth * dpr;
-          h = c.height = innerHeight * dpr;
-          c.style.width = innerWidth + "px";
-          c.style.height = innerHeight + "px";
-        }
-        resize();
-        addEventListener("resize", resize);
-        function frame() {
-          ctx.clearRect(0, 0, w, h);
-          orbs.forEach((o) => {
-            o.x += o.vx / 100;
-            o.y += o.vy / 100;
-            if (o.x < -0.1 || o.x > 1.1) o.vx *= -1;
-            if (o.y < -0.1 || o.y > 1.1) o.vy *= -1;
-            const px = o.x * w,
-              py = o.y * h,
-              pr = o.r * dpr;
-            const g = ctx.createRadialGradient(px, py, 0, px, py, pr);
-            g.addColorStop(0, "rgba(" + o.col + ",0.16)");
-            g.addColorStop(1, "rgba(" + o.col + ",0)");
-            ctx.fillStyle = g;
-            ctx.fillRect(px - pr, py - pr, pr * 2, pr * 2);
-          });
-          requestAnimationFrame(frame);
-        }
-        frame();
-      })();
-    </script>
-  </body>
+</body>
 </html>

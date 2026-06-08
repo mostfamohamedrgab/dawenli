@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" role="img" aria-label="عالم العادات">
+  
+  <g stroke="#C07F25" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <path class="s" d="M100 26c-4 12-18 18-18 38 0 22 16 34 18 34s18-12 18-34c0-12-6-18-10-26-2 6-6 8-8 6-2-2 0-12 0-18Z" fill="#F6E1BE"></path>
+    <path class="f c0" d="M100 64c-5 6-8 12-8 20 0 10 6 16 8 16s8-6 8-16c0-6-4-12-8-12Z" fill="#E3A24A" stroke="#E3A24A"></path>
+  </g>
+  <g stroke="#C07F25" stroke-width="2.4" stroke-linejoin="round">
+    <rect class="f c0" x="22" y="138" width="22" height="26" rx="5" fill="#F6E1BE"></rect>
+    <rect class="f c1" x="50" y="138" width="22" height="26" rx="5" fill="#F6E1BE"></rect>
+    <rect class="f c2" x="78" y="138" width="22" height="26" rx="5" fill="#E3A24A"></rect>
+    <rect class="f c3" x="106" y="138" width="22" height="26" rx="5" fill="#E3A24A"></rect>
+    <rect class="f c4" x="134" y="138" width="22" height="26" rx="5" fill="#E3A24A"></rect>
+  </g>
+  <g stroke="#FFFCF5" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path class="f c2" d="M83 151l4 5 7-9"></path><path class="f c3" d="M111 151l4 5 7-9"></path><path class="f c4" d="M139 151l4 5 7-9"></path>
+  </g>
+</svg>

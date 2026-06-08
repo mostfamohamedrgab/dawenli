@@ -1,23 +1,40 @@
+/* ===========================================================================
+   Daftar design system — warm paper aesthetic (light mode).
+   The existing dashboard is fully token-driven, so remapping these variable
+   names re-themes the whole app at once. Four "world" accents added below.
+   =========================================================================== */
 :root {
-  --bg: #0a0a0f;
-  --surface: #14121f;
-  --surface-2: #1a1530;
-  --text: #f5f5f7;
-  --muted: #9a96ad;
-  --indigo: #6366f1;
-  --violet: #8b5cf6;
-  --purple: #a855f7;
-  --pink: #ec4899;
-  --grad: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
-  --grad-line: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
-  --border: rgba(168, 85, 247, 0.16);
-  --border-strong: rgba(168, 85, 247, 0.34);
-  --soft: rgba(139, 92, 246, 0.12);
-  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 18px 50px rgba(88, 40, 160, 0.28);
-  --radius: 16px;
-  --pos: #34d399;
-  --neg: #fb7185;
+  /* paper & surfaces */
+  --bg: #f6f1e4;          /* warm cream — app background */
+  --surface: #fffcf5;     /* card / sheet surface */
+  --surface-2: #ffffff;   /* raised */
+  /* ink */
+  --text: #34302a;
+  --muted: #6e665a;
+  /* brand = calm sage green (maps the old indigo/violet/purple roles) */
+  --indigo: #5c8a6b;
+  --violet: #5c8a6b;
+  --purple: #426b52;      /* brand-deep — used for accent text */
+  --pink: #e0705c;        /* coral — used by the body-map "picked" */
+  --grad: linear-gradient(135deg, #5c8a6b 0%, #6fa84a 100%);
+  --grad-line: linear-gradient(90deg, #e0705c, #e3a24a, #5285a6, #6fa84a);
+  --border: #dfd7c4;          /* hairline */
+  --border-strong: #c9bfa8;   /* heavier sketch stroke */
+  --soft: #e4eee6;            /* sage wash */
+  --shadow: 0 2px 8px rgba(52, 48, 42, 0.06);
+  --shadow-lg: 0 10px 30px rgba(52, 48, 42, 0.12);
+  --radius: 20px;
+  --pos: #6fa84a;        /* leaf green */
+  --neg: #e0705c;        /* coral */
+
+  /* the four worlds */
+  --health: #e0705c;   --health-deep: #c4543f;   --health-wash: #fbeae5;
+  --habits: #e3a24a;   --habits-deep: #c07f25;   --habits-wash: #fbf0d9;
+  --goals:  #5285a6;   --goals-deep:  #3a647f;   --goals-wash:  #e3eef4;
+  --finances: #6fa84a; --finances-deep: #527f35; --finances-wash: #eaf2e1;
+  --on-accent: #fffcf5;
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  --radius-sketch: 255px 15px 225px 15px / 15px 225px 15px 255px;
 }
 
 * {
@@ -27,23 +44,20 @@
 }
 
 body {
-  font-family: "Cairo", system-ui, -apple-system, sans-serif;
+  font-family: "Tajawal", "Cairo", system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
-  background-image: radial-gradient(
-      900px 500px at 85% -8%,
-      rgba(124, 92, 246, 0.16),
-      transparent 60%
-    ),
-    radial-gradient(800px 500px at -5% 105%, rgba(99, 102, 241, 0.12), transparent 55%);
+  background-image: var(--paper-grain);
   background-attachment: fixed;
 }
 
 h1,
-h2 {
-  font-weight: 800;
+h2,
+h3 {
+  font-family: "Lemonada", "Tajawal", system-ui, sans-serif;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -1701,3 +1715,114 @@ h2 {
 .danger-btn:hover {
   filter: brightness(1.07);
 }
+
+/* ===========================================================================
+   DAFTAR RETHEME — light-mode overrides
+   These fix the handful of rules that hard-coded dark/white colors (so they
+   couldn't follow the token swap), plus add the warm "sketch" finishing touches
+   and the four world accents. Loaded last so they win by source order.
+   =========================================================================== */
+
+/* the ambient dark particle canvas doesn't suit warm paper — hide it */
+.bg-canvas { display: none !important; }
+
+/* display face on the brand + numbers */
+.brand-name, .page-title, .ring-center span, .stat-num, .fc-num,
+.fin-num, .goal-title, .habit-title, .cond-title, .entry-date, .hero-text h2 {
+  font-family: "Lemonada", "Tajawal", sans-serif;
+}
+
+/* gradient/coloured text needs darker stops on light paper */
+.stat-num, .ring-center span, .fin-card.net .fin-num {
+  background: linear-gradient(135deg, var(--purple), var(--finances-deep));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* brand mark: warm sage tile instead of glossy violet */
+.brand-mark {
+  background: var(--soft) !important;
+  border: 2px solid var(--border-strong);
+  box-shadow: var(--shadow) !important;
+}
+
+/* auth card on paper */
+.auth-card { background: var(--surface); }
+.auth-card h1 { font-family: "Lemonada", "Tajawal", sans-serif; }
+.field input, .select { background: #fff; }
+.field input::placeholder, .select::placeholder { color: var(--muted); opacity: .7; }
+
+/* sidebar: cream panel with a hairline, not a translucent dark glass */
+.sidebar {
+  background: linear-gradient(180deg, var(--surface), var(--bg));
+  border-left: 1px solid var(--border);
+  backdrop-filter: none;
+}
+.nav-group { color: var(--muted); }
+
+/* active nav item → soft sage wash + ink-green text + inset bar (per design) */
+.nav-item.active {
+  color: var(--purple);
+  background: var(--soft);
+  border-color: var(--border);
+  box-shadow: inset 3px 0 0 var(--indigo);
+}
+.nav-item:hover { background: var(--bg); }
+
+/* topbar fade matches paper */
+.topbar { background: linear-gradient(180deg, var(--bg) 60%, transparent); }
+
+/* hero card → warm sage wash with a four-world top rule */
+.hero-card {
+  background: linear-gradient(135deg, var(--soft), var(--surface));
+  border: 1px solid var(--border-strong);
+}
+
+/* cards get the soft warm shadow + slightly hand-drawn radius on key surfaces */
+.panel, .hero-card { border-radius: var(--radius); }
+
+/* chips / tags / pills: tint by accent, readable ink-green text */
+.feed-tag, .mood-chip, .hcat, .gen-chip, .kind-chip, .cond-status.active {
+  color: var(--purple);
+  background: var(--soft);
+  border: 1px solid var(--border-strong);
+}
+.tag, .bubble.user { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+.hb-dot { background: var(--bg); }
+.goal-bar { background: var(--bg); border: 1px solid var(--border); }
+.entry-summary { color: var(--text); }
+.lr-note { color: var(--muted); }
+.tl-row { background: var(--bg); }
+
+/* four-world accents on the overview pillar cards */
+.pillar-card { border-top: 3px solid var(--border-strong); }
+.pillar-card[data-go="health"]  { border-top-color: var(--health); }
+.pillar-card[data-go="habits"]  { border-top-color: var(--habits); }
+.pillar-card[data-go="goals"]   { border-top-color: var(--goals); }
+.pillar-card[data-go="finance"] { border-top-color: var(--finances); }
+.pillar-card[data-go="health"]  .pillar-head { color: var(--health-deep); }
+.pillar-card[data-go="habits"]  .pillar-head { color: var(--habits-deep); }
+.pillar-card[data-go="goals"]   .pillar-head { color: var(--goals-deep); }
+.pillar-card[data-go="finance"] .pillar-head { color: var(--finances-deep); }
+
+/* body-map: coral "hot"/"picked" instead of violet/pink on dark */
+.body-svg .body-neutral { fill: var(--bg); }
+.body-svg .bodypart { fill: var(--surface); stroke: var(--border-strong); }
+.body-svg .bodypart.hot {
+  fill: var(--health-wash); stroke: var(--health);
+  filter: drop-shadow(0 0 5px rgba(224, 112, 92, 0.4));
+}
+.body-svg .bodypart.picked { fill: var(--health-tint, #f6d5cd); stroke: var(--health-deep); }
+.body-svg .badge circle { fill: var(--health); stroke: #fff; }
+.body-wrap { background: radial-gradient(circle at 50% 30%, var(--health-wash), transparent 70%); }
+
+/* danger button → warm coral, not neon rose */
+.danger-btn {
+  background: linear-gradient(135deg, var(--health), var(--health-deep));
+  box-shadow: 0 6px 18px rgba(196, 84, 63, 0.28);
+}
+.modal-overlay { background: rgba(52, 48, 42, 0.5); }
+.modal-icon { background: var(--health-wash); border-color: var(--health-tint, #f6d5cd); }
+
+/* sketch corners on the big greeting + analyze panels for that hand-drawn feel */
+.hero-card { border-radius: var(--radius-sketch); }

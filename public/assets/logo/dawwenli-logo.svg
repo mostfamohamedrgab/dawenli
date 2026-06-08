@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 72" fill="none" role="img" aria-label="دوّنلي Dawwenli">
+  
+  <g stroke="#5C8A6B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    
+    <path d="M14 16c14-3 26-3 40 0 1 12 1 28 0 40-14 3-26 3-40 0-1-12-1-28 0-40Z" fill="#FFFCF5"></path>
+    
+    <path d="M34 14c1 14 1 30 0 44"></path>
+    
+    <path d="M20 14v6M27 14v6M14 30h6M14 40h6"></path>
+    
+    <path d="M40 30c4-3 8 4 12 0s8-4 8-1" stroke="#E0705C"></path>
+    <path d="M40 40c5-2 9 3 13-1" stroke="#E0705C"></path>
+  </g>
+  
+  <text x="74" y="46" font-family="Lemonada, sans-serif" font-size="30" font-weight="700" fill="#34302A">دوّنلي</text>
+</svg>

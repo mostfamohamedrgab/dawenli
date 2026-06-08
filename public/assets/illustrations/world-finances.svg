@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" role="img" aria-label="عالم الفلوس">
+  
+  <g stroke="#527F35" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <path class="s" d="M62 132h76l-8 40c-1 4-4 6-8 6H78c-4 0-7-2-8-6l-8-40Z" fill="#CFE3BD"></path>
+    <path class="s" d="M100 132c0-22 0-44 0-66"></path>
+  </g>
+  <g stroke="#527F35" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <path class="f l0" d="M100 96c-16-2-26-12-28-28 16 0 26 8 28 24Z" fill="#6FA84A" stroke="#6FA84A"></path>
+    <path class="f l1" d="M100 78c14-2 24-12 26-26-14 0-24 8-26 22Z" fill="#6FA84A" stroke="#6FA84A"></path>
+  </g>
+  <g stroke="#A2761E" stroke-width="2.2">
+    <ellipse class="f c0" cx="84" cy="134" rx="10" ry="4" fill="#C9962E"></ellipse>
+    <ellipse class="f c1" cx="104" cy="136" rx="10" ry="4" fill="#C9962E"></ellipse>
+    <ellipse class="f c2" cx="120" cy="133" rx="9" ry="3.6" fill="#C9962E"></ellipse>
+  </g>
+</svg>
