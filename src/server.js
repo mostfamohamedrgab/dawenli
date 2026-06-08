@@ -34,6 +34,7 @@ import {
   listTasks,
   addTask,
   setTaskStatus,
+  updateTask,
   deleteTask,
 } from "./db.js";
 import { analyzeEntries, doctorReport } from "./openai.js";
@@ -293,6 +294,11 @@ export function startServer() {
     if (!gate(req, res)) return;
     const { status } = req.body || {};
     res.json({ ok: setTaskStatus(Number(req.params.id), status) });
+  });
+  app.put("/api/tasks/:id", (req, res) => {
+    if (!gate(req, res)) return;
+    const { title, dueDate, dueTime, note } = req.body || {};
+    res.json({ ok: updateTask(Number(req.params.id), { title, dueDate, dueTime, note }) });
   });
 
   // ===== عادات: إنشاء/تسجيل/إلغاء تسجيل من الداشبورد =====

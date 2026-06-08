@@ -110,7 +110,7 @@ function gotoTab(tab, opts = {}) {
     history.replaceState(null, "", "#" + tab);
   }
   if (tab === "overview") renderOverview();
-  if (tab === "tasks") renderTasks();
+  if (tab === "tasks") renderTasksView();
   if (tab === "finance") renderFinance();
   if (tab === "usage") renderUsage();
   if (!opts.noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -390,6 +390,7 @@ function taskRow(t) {
       <span class="task-title">${escapeHtml(t.title)}</span>
     </div>
     <div class="row-actions">${time}
+      <button class="del-btn" onclick="openTaskEdit(${t.id})" title="تعديل الميعاد">✏️</button>
       <button class="del-btn" onclick="del('tasks', ${t.id})" title="حذف">🗑️</button>
     </div>
   </div>`;
@@ -437,6 +438,89 @@ $("taskForm").addEventListener("submit", async (e) => {
   const dueTime = $("taskTime").value || null;
   await api("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, dueDate, dueTime }) });
   e.target.reset(); loadAll();
+});
+
+/* ---- عرض كالندر + التبديل بين القائمة والكالندر ---- */
+const AR_MONTHS = ["يناير", "فبراير", "مارس", "إبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+function renderTasksView() {
+  if ((state.taskView || "list") === "calendar") renderCalendar();
+  else renderTasks();
+}
+function setTaskView(v) {
+  state.taskView = v;
+  $("taskViewList")?.classList.toggle("active", v === "list");
+  $("taskViewCal")?.classList.toggle("active", v === "calendar");
+  $("tasks")?.classList.toggle("hidden", v !== "list");
+  $("taskCalendar")?.classList.toggle("hidden", v !== "calendar");
+  renderTasksView();
+}
+$("taskViewList")?.addEventListener("click", () => setTaskView("list"));
+$("taskViewCal")?.addEventListener("click", () => setTaskView("calendar"));
+
+function renderCalendar() {
+  const el = $("taskCalendar");
+  if (!el) return;
+  if (!state.calRef) { const n = new Date(); state.calRef = { y: n.getFullYear(), m: n.getMonth() }; }
+  const { y, m } = state.calRef;
+  const tasks = state.tasks || [];
+  const byDate = {};
+  for (const t of tasks) if (t.due_date) (byDate[t.due_date] ||= []).push(t);
+  const startCol = (new Date(y, m, 1).getDay() + 1) % 7; // السبت = 0
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const todayISO = TODAY();
+  const dow = ["السبت", "الأحد", "الاتنين", "التلات", "الأربع", "الخميس", "الجمعة"];
+  let cells = "";
+  for (let i = 0; i < startCol; i++) cells += `<div class="cal-cell empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const list = byDate[iso] || [];
+    const chips = list.slice(0, 3).map((t) =>
+      `<span class="cal-task ${t.status === "done" ? "done" : ""}" onclick="openTaskEdit(${t.id})" title="${escapeHtml(t.title)}">${t.due_time ? t.due_time + " " : ""}${escapeHtml(t.title)}</span>`
+    ).join("");
+    const more = list.length > 3 ? `<span class="cal-more">+${list.length - 3}</span>` : "";
+    cells += `<div class="cal-cell ${iso === todayISO ? "today" : ""}"><span class="cal-num">${d}</span>${chips}${more}</div>`;
+  }
+  const noDate = tasks.filter((t) => !t.due_date && t.status !== "done");
+  el.innerHTML = `
+    <div class="cal-head">
+      <button class="ghost-btn sm" onclick="calShift(-1)">‹ السابق</button>
+      <h3 class="cal-title">${AR_MONTHS[m]} ${y}</h3>
+      <button class="ghost-btn sm" onclick="calShift(1)">التالي ›</button>
+    </div>
+    <div class="cal-grid cal-dows">${dow.map((h) => `<div class="cal-dow">${h}</div>`).join("")}</div>
+    <div class="cal-grid cal-days">${cells}</div>
+    ${noDate.length ? `<div class="cal-nodate"><b>من غير موعد:</b> ${noDate.map((t) => `<span class="cal-task" onclick="openTaskEdit(${t.id})">${escapeHtml(t.title)}</span>`).join("")}</div>` : ""}`;
+}
+function calShift(delta) {
+  const r = state.calRef; let m = r.m + delta, yy = r.y;
+  if (m < 0) { m = 11; yy--; }
+  if (m > 11) { m = 0; yy++; }
+  state.calRef = { y: yy, m }; renderCalendar();
+}
+window.calShift = calShift;
+
+/* ---- تعديل المهمة (مودال) ---- */
+let editTaskId = null;
+function openTaskEdit(id) {
+  const t = (state.tasks || []).find((x) => x.id === id);
+  if (!t) return;
+  editTaskId = id;
+  $("teTitle").value = t.title || "";
+  $("teDate").value = t.due_date || "";
+  $("teTime").value = t.due_time || "";
+  $("taskEditOverlay").classList.remove("hidden");
+}
+window.openTaskEdit = openTaskEdit;
+function closeTaskEdit() { $("taskEditOverlay").classList.add("hidden"); editTaskId = null; }
+$("teCancel").addEventListener("click", closeTaskEdit);
+$("taskEditOverlay").addEventListener("click", (e) => { if (e.target === $("taskEditOverlay")) closeTaskEdit(); });
+$("teSave").addEventListener("click", async () => {
+  if (editTaskId == null) return;
+  const title = $("teTitle").value.trim();
+  const dueDate = $("teDate").value || null;
+  const dueTime = $("teTime").value || null;
+  await api(`/api/tasks/${editTaskId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, dueDate, dueTime }) });
+  closeTaskEdit(); loadAll();
 });
 
 /* ===================== Habits ===================== */
@@ -850,7 +934,7 @@ async function loadAll() {
   } catch { return; }
   $("pageDateLabel").textContent = fmtDate(TODAY());
   renderJournal();
-  renderTasks();
+  renderTasksView();
   renderGoals();
   renderHabits();
   renderPage();

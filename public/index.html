@@ -125,7 +125,13 @@
         <!-- ========== المهام ========== -->
         <section class="tab-panel hidden" data-panel="tasks">
           <div class="panel">
-            <div class="panel-head"><h2>أضف مهمة</h2></div>
+            <div class="panel-head">
+              <h2>أضف مهمة</h2>
+              <div class="seg-toggle">
+                <button type="button" class="seg-btn active" id="taskViewList">📋 قائمة</button>
+                <button type="button" class="seg-btn" id="taskViewCal">🗓️ كالندر</button>
+              </div>
+            </div>
             <form id="taskForm" class="inline-form">
               <input id="taskTitle" class="select gf" placeholder="المهمة (أكلم العميل، أدفع الفاتورة...)" required />
               <input id="taskDate" class="select" type="date" />
@@ -135,6 +141,7 @@
             <p class="muted" style="margin-top:10px">أو قول للبوت «عندي تاسك أكلم العميل يوم ٢٠/٦ الساعة ٥» وهيحطّها في الجدول لوحده.</p>
           </div>
           <div id="tasks" class="schedule"></div>
+          <div id="taskCalendar" class="task-calendar hidden"></div>
         </section>
 
         <!-- ========== الصحة ========== -->
@@ -276,6 +283,22 @@
     </div>
 
     <div id="sideScrim" class="side-scrim hidden"></div>
+
+    <div id="taskEditOverlay" class="modal-overlay hidden">
+      <div class="modal" role="dialog" aria-modal="true" style="max-width:380px;text-align:right">
+        <h3 class="modal-title" style="text-align:center;margin-bottom:18px">تعديل المهمة</h3>
+        <label class="te-label">المهمة</label>
+        <input id="teTitle" class="select" style="width:100%;margin-bottom:12px" />
+        <div style="display:flex;gap:10px;margin-bottom:6px">
+          <div style="flex:1"><label class="te-label">التاريخ</label><input id="teDate" type="date" class="select" style="width:100%" /></div>
+          <div style="flex:1"><label class="te-label">الوقت</label><input id="teTime" type="time" class="select" style="width:100%" /></div>
+        </div>
+        <div class="modal-actions" style="margin-top:18px">
+          <button id="teCancel" class="ghost-btn">إلغاء</button>
+          <button id="teSave" class="primary-btn">حفظ</button>
+        </div>
+      </div>
+    </div>
 
     <div id="confirmOverlay" class="modal-overlay hidden">
       <div class="modal" role="dialog" aria-modal="true">

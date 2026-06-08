@@ -703,6 +703,28 @@ export function setTaskStatus(id, status) {
   return setTaskStatusStmt.run(status === "done" ? "done" : "open", id).changes > 0;
 }
 
+const getTaskStmt = db.prepare(`SELECT * FROM tasks WHERE id = ?`);
+export function getTask(id) {
+  return getTaskStmt.get(id);
+}
+
+// تعديل عنوان/موعد المهمة (نسيب أي حقل مش متبعت زي ما هو)
+const updateTaskStmt = db.prepare(
+  `UPDATE tasks SET title = ?, due_date = ?, due_time = ?, note = ? WHERE id = ?`
+);
+export function updateTask(id, { title, dueDate, dueTime, note } = {}) {
+  const t = getTaskStmt.get(id);
+  if (!t) return false;
+  updateTaskStmt.run(
+    title != null && String(title).trim() ? String(title).trim() : t.title,
+    dueDate !== undefined ? dueDate || null : t.due_date,
+    dueTime !== undefined ? dueTime || null : t.due_time,
+    note !== undefined ? note || null : t.note,
+    id
+  );
+  return true;
+}
+
 const delTaskStmt = db.prepare(`DELETE FROM tasks WHERE id = ?`);
 export function deleteTask(id) {
   return delTaskStmt.run(id).changes > 0;
