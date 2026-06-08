@@ -79,9 +79,10 @@ const CLASSIFY_PROMPT = `انت مساعد لتطبيق تدوين شخصي با
 4) لو بيقول إن عنده حالة صحية عايز يتابعها للأيام الجاية ("عندي ارتجاع مريئي"، "عايز أتابع حالتي"، "نفسي أتابع الأعراض وأروح بيها للدكتور") → طلّعها كـ condition (متابعة حالة).
 5) لو بيقول إنه أكل حاجة، طلّع الأكل كـ meals.
 6) العادات (habits): لو بيتكلم عن عادة عايز يبدأها أو يلتزم بيها ("عايز ألعب رياضة كل يوم"، "هبطل سجاير")، أو إنه عمل عادة النهاردة ("النهاردة لعبت رياضة"، "مدخّنتش انهاردة") → طلّعها كـ habit. العادة نوعين: "do" (حاجة بيعملها زي الرياضة/القراءة) و "quit" (حاجة بيبطّلها زي السجاير). و action: "create" لو بس بيعرّف العادة، "done" لو بيقول إنه عملها/التزم بيها النهاردة، "both" لو الاتنين.
-7) الماليات (finance): لو بيقول إنه كسب أو صرف فلوس ("صرفت ٢٠٠ جنيه على أكل"، "كسبت ٥٠٠٠ من شغل") → طلّعها كـ finance مع المبلغ والاتجاه والبند.
+7) الماليات (finance): لو بيقول إنه كسب أو صرف فلوس ("صرفت ٢٠٠ جنيه على أكل"، "كسبت ٥٠٠٠ من شغل") → طلّعها كـ finance مع المبلغ والاتجاه والبند (note) و**التصنيف** (category) زي: شخصي، بيت، عربية، أكل، مواصلات، فواتير، صحة، ترفيه.
+8) المهام (tasks): لو بيقول إن عنده مهمة/تاسك يعملها أو يفتكرها ("عندي تاسك بكره"، "لازم أكلم العميل يوم ٢٠/٦ الساعة ٥"، "افتكّرني أدفع الفاتورة الجمعة") → طلّعها كـ task مع العنوان والموعد (تاريخ ووقت لو اتحددوا).
 
-هيتبعتلك قايمة بالأهداف الموجودة حاليًا. لو المستخدم بيتكلم عن تقدّم في هدف موجود، استخدم نفس عنوان الهدف الموجود بالظبط عشان نعرف نزوّد عليه.
+هيتبعتلك قايمة بالأهداف الموجودة وبالبنود المالية الموجودة حاليًا. لو المستخدم بيتكلم عن تقدّم في هدف موجود، استخدم نفس عنوان الهدف الموجود بالظبط. ولو الصرف بيقع تحت بند موجود، استخدم نفس اسم البند الموجود بالظبط؛ لو مفيش بند مناسب اعمل بند جديد قصير وواضح.
 
 رجّع JSON بالشكل ده بالظبط:
 {
@@ -134,7 +135,15 @@ const CLASSIFY_PROMPT = `انت مساعد لتطبيق تدوين شخصي با
       "direction": "income | expense",  // income=كسب/دخل، expense=صرف
       "amount": رقم,                     // المبلغ
       "currency": "العملة (جنيه افتراضيًا)",
-      "note": "البند/السبب (مثلاً: أكل، مواصلات، شغل)"
+      "category": "التصنيف (شخصي | بيت | عربية | أكل | مواصلات | فواتير...)",
+      "note": "تفصيل قصير للعملية لو فيه" أو null
+    }
+  ],
+  "tasks": [
+    {
+      "title": "عنوان المهمة قصير وواضح (مثلاً: أكلم العميل، أدفع الفاتورة)",
+      "due_date": "YYYY-MM-DD" أو null,  // يوم المهمة لو اتحدد (بكره/الجمعة/٢٠-٦...)
+      "due_time": "HH:MM" أو null        // الساعة لو اتحددت (24 ساعة)
     }
   ]
 }
@@ -145,8 +154,9 @@ const CLASSIFY_PROMPT = `انت مساعد لتطبيق تدوين شخصي با
 - condition: بس لما يبان إنه عايز يتابع حالة صحية للأيام الجاية أو يجمّع أعراض عشان الدكتور. مش كل عرض عابر يبقى متابعة — لازم يكون فيه نية متابعة/تشخيص. صحة حد تاني ماتطلّعهاش خالص.
 - meals: أي أكل أو مشروب قاله إنه تناوله. لو نفس الأكلة اتقالت كـ health (أكل) كمان، طلّعها في meals بردو عادي.
 - habits: خلي عنوان العادة قصير وثابت (مثلاً "رياضة" مش "لعبت رياضة النهاردة في الجيم") عشان نقدر نطابقها لما يكلّمنا تاني. لو بيبطّل حاجة استخدم kind="quit" والعنوان حاجة زي "سجاير" أو "سكر". لو قال إنه عملها النهاردة من غير ما يكون عرّفها قبل كده، استخدم action="both".
-- finance: amount لازم يكون رقم موجب. direction إما income أو expense حسب الكلام. لو مش متأكد إنها معاملة مالية حقيقية، ماتطلّعهاش.
-- "habits" و "finance" ممكن يكونوا [] فاضيين.
+- finance: amount لازم يكون رقم موجب. direction إما income أو expense حسب الكلام. لو مش متأكد إنها معاملة مالية حقيقية، ماتطلّعهاش. لكل صرف لازم category مناسب — استخدم بند موجود لو فيه واحد قريب، أو اعمل بند جديد قصير.
+- tasks: بس للحاجات اللي المستخدم محتاج يعملها/يفتكرها في المستقبل أو ليها موعد. مش أي كلام عن الماضي. حوّل التواريخ النسبية لتاريخ فعلي: "بكره" = النهاردة + يوم، "بعد بكره" = +يومين، أيام الأسبوع لأقرب يوم جاي، "٢٠/٦" أو "يوم ٢٠" = اليوم ده في الشهر ده/الجاي. لو مفيش موعد سيب due_date و due_time = null. "tasks" ممكن تكون [] فاضية.
+- "habits" و "finance" و "tasks" ممكن يكونوا [] فاضيين.
 - لو بيقول "عملت/كسبت/وصلت/حقّقت كذا" عن هدف موجود → استخدم add_amount مع نفس عنوان الهدف الموجود.
 - لو بيقول "الإجمالي بقى كذا" → set_current.
 - لو بيعرّف هدف جديد → املأ target، ولو قال إنه عمل منه كذا املأ add_amount كمان.
@@ -155,7 +165,7 @@ const CLASSIFY_PROMPT = `انت مساعد لتطبيق تدوين شخصي با
 - التواريخ لازم بصيغة YYYY-MM-DD. لو مش متحدد، استخدم تاريخ النهاردة.
 رجّع JSON بس من غير أي كلام تاني.`;
 
-export async function classifyMessage(transcript, todayISO, existingGoals = []) {
+export async function classifyMessage(transcript, todayISO, existingGoals = [], existingCategories = []) {
   const goalsList = existingGoals.length
     ? existingGoals
         .map(
@@ -166,6 +176,9 @@ export async function classifyMessage(transcript, todayISO, existingGoals = []) 
         )
         .join("\n")
     : "مفيش أهداف متسجّلة حاليًا.";
+  const catsList = existingCategories.length
+    ? existingCategories.map((c) => `- ${c}`).join("\n")
+    : "مفيش بنود متسجّلة حاليًا.";
   const res = await client.chat.completions.create({
     model: config.chatModel,
     response_format: { type: "json_object" },
@@ -173,7 +186,7 @@ export async function classifyMessage(transcript, todayISO, existingGoals = []) 
       { role: "system", content: CLASSIFY_PROMPT },
       {
         role: "user",
-        content: `تاريخ النهاردة: ${todayISO}\n\nالأهداف الموجودة:\n${goalsList}\n\nالكلام:\n${transcript}`,
+        content: `تاريخ النهاردة: ${todayISO}\n\nالأهداف الموجودة:\n${goalsList}\n\nالبنود المالية الموجودة:\n${catsList}\n\nالكلام:\n${transcript}`,
       },
     ],
   });
@@ -247,10 +260,21 @@ export async function classifyMessage(transcript, todayISO, existingGoals = []) 
           direction: f.direction === "income" ? "income" : "expense",
           amount: num(f.amount),
           currency: f.currency ? String(f.currency).trim() : "جنيه",
+          category: f.category ? String(f.category).trim() : null,
           note: f.note ? String(f.note).trim() : null,
         }))
     : [];
-  return { journal, goals, health, condition, meals, habits, finance };
+  const isTime = (s) => typeof s === "string" && /^\d{1,2}:\d{2}$/.test(s);
+  const tasks = Array.isArray(parsed.tasks)
+    ? parsed.tasks
+        .filter((t) => t && t.title && String(t.title).trim())
+        .map((t) => ({
+          title: String(t.title).trim(),
+          dueDate: isValidDate(t.due_date) ? t.due_date : null,
+          dueTime: isTime(t.due_time) ? t.due_time.padStart(5, "0") : null,
+        }))
+    : [];
+  return { journal, goals, health, condition, meals, habits, finance, tasks };
 }
 
 const ANALYSIS_PROMPT = `انت مساعد بيحلّل يوميات شخص بيكتبها بالعامي المصري.

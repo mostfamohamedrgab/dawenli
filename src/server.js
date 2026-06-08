@@ -31,6 +31,10 @@ import {
   unlogHabit,
   deleteHabit,
   aiUsageSummary,
+  listTasks,
+  addTask,
+  setTaskStatus,
+  deleteTask,
 } from "./db.js";
 import { analyzeEntries, doctorReport } from "./openai.js";
 
@@ -191,6 +195,10 @@ export function startServer() {
     if (!gate(req, res)) return;
     res.json(listHabits());
   });
+  app.get("/api/tasks", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json(listTasks());
+  });
   app.get("/api/usage", (req, res) => {
     if (!gate(req, res)) return;
     const days = Number(req.query.days) > 0 ? Number(req.query.days) : 30;
@@ -245,6 +253,10 @@ export function startServer() {
     if (!gate(req, res)) return;
     res.json({ ok: deleteHabit(Number(req.params.id)) });
   });
+  app.delete("/api/tasks/:id", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json({ ok: deleteTask(Number(req.params.id)) });
+  });
 
   // إقفال متابعة (خلصت/مش محتاجها)
   app.put("/api/conditions/:id/close", (req, res) => {
@@ -255,7 +267,7 @@ export function startServer() {
   // ===== ماليات: إضافة يدوية من الداشبورد =====
   app.post("/api/finance", (req, res) => {
     if (!gate(req, res)) return;
-    const { entryDate, direction, amount, currency, note } = req.body || {};
+    const { entryDate, direction, amount, currency, category, note } = req.body || {};
     if (amount == null || amount === "" || isNaN(Number(amount)))
       return res.status(400).json({ error: "المبلغ مطلوب" });
     const id = addFinance({
@@ -263,9 +275,24 @@ export function startServer() {
       direction,
       amount,
       currency,
+      category,
       note,
     });
     res.json({ ok: true, id });
+  });
+
+  // ===== مهام: إضافة/إكمال/حذف من الداشبورد =====
+  app.post("/api/tasks", (req, res) => {
+    if (!gate(req, res)) return;
+    const { title, dueDate, dueTime, note } = req.body || {};
+    if (!title) return res.status(400).json({ error: "عنوان المهمة مطلوب" });
+    const task = addTask({ title, dueDate: dueDate || null, dueTime: dueTime || null, note });
+    res.json({ ok: true, task });
+  });
+  app.put("/api/tasks/:id/status", (req, res) => {
+    if (!gate(req, res)) return;
+    const { status } = req.body || {};
+    res.json({ ok: setTaskStatus(Number(req.params.id), status) });
   });
 
   // ===== عادات: إنشاء/تسجيل/إلغاء تسجيل من الداشبورد =====

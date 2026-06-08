@@ -28,6 +28,7 @@
 
         <nav class="side-nav" id="sideNav">
           <button class="nav-item active" data-tab="overview"><span class="ni-ico">🏠</span><span class="ni-label">الرئيسية</span></button>
+          <button class="nav-item" data-tab="tasks"><span class="ni-ico">✅</span><span class="ni-label">المهام</span></button>
           <button class="nav-item" data-tab="journal"><span class="ni-ico">📝</span><span class="ni-label">يوميات</span></button>
           <div class="nav-group">المحاور</div>
           <button class="nav-item" data-tab="health"><span class="ni-ico">🩺</span><span class="ni-label">الصحة</span></button>
@@ -121,6 +122,21 @@
           <div id="entries" class="entries"><p class="muted center">بحمّل اليوميات...</p></div>
         </section>
 
+        <!-- ========== المهام ========== -->
+        <section class="tab-panel hidden" data-panel="tasks">
+          <div class="panel">
+            <div class="panel-head"><h2>أضف مهمة</h2></div>
+            <form id="taskForm" class="inline-form">
+              <input id="taskTitle" class="select gf" placeholder="المهمة (أكلم العميل، أدفع الفاتورة...)" required />
+              <input id="taskDate" class="select" type="date" />
+              <input id="taskTime" class="select" type="time" />
+              <button type="submit" class="primary-btn">إضافة</button>
+            </form>
+            <p class="muted" style="margin-top:10px">أو قول للبوت «عندي تاسك أكلم العميل يوم ٢٠/٦ الساعة ٥» وهيحطّها في الجدول لوحده.</p>
+          </div>
+          <div id="tasks" class="schedule"></div>
+        </section>
+
         <!-- ========== الصحة ========== -->
         <section class="tab-panel hidden" data-panel="health">
           <div class="panel">
@@ -210,7 +226,9 @@
                 <option value="income">دخل ➕</option>
               </select>
               <input id="finAmount" class="select gf" type="number" placeholder="المبلغ" required />
-              <input id="finNote" class="select gf" placeholder="البند (أكل، مواصلات...)" />
+              <input id="finCategory" class="select gf" placeholder="التصنيف (شخصي، بيت، عربية...)" list="finCatList" />
+              <datalist id="finCatList"></datalist>
+              <input id="finNote" class="select gf" placeholder="تفاصيل (اختياري)" />
               <button type="submit" class="primary-btn">إضافة</button>
             </form>
           </div>

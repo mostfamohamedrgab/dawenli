@@ -27,9 +27,21 @@ db.exec(`
     direction   TEXT NOT NULL,   -- expense | income
     amount      REAL NOT NULL,
     currency    TEXT,
+    category    TEXT,            -- بند المصروف (شخصي | بيت | عربية | أكل...)
     note        TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_finance_date ON finance(entry_date);
+
+  CREATE TABLE IF NOT EXISTS tasks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    due_date    TEXT,            -- YYYY-MM-DD أو null (من غير موعد)
+    due_time    TEXT,            -- HH:MM أو null
+    status      TEXT NOT NULL DEFAULT 'open',  -- open | done
+    note        TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
 
   CREATE TABLE IF NOT EXISTS health (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,6 +136,12 @@ if (!healthCols.includes("body_region")) {
   db.exec(`ALTER TABLE health ADD COLUMN body_region TEXT`);
 }
 
+// migration: نضيف category لجدول finance القديم لو مش موجود
+const financeCols = db.prepare(`PRAGMA table_info(finance)`).all().map((c) => c.name);
+if (!financeCols.includes("category")) {
+  db.exec(`ALTER TABLE finance ADD COLUMN category TEXT`);
+}
+
 const now = () => new Date().toISOString();
 
 /* ===================== Journal (يوميات) ===================== */
@@ -193,16 +211,17 @@ export function deleteEntry(id) {
 /* ===================== Finance (ماليات) ===================== */
 
 const insertFinanceStmt = db.prepare(`
-  INSERT INTO finance (created_at, entry_date, direction, amount, currency, note)
-  VALUES (?, ?, ?, ?, ?, ?)
+  INSERT INTO finance (created_at, entry_date, direction, amount, currency, category, note)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
 `);
-export function addFinance({ entryDate, direction, amount, currency, note }) {
+export function addFinance({ entryDate, direction, amount, currency, category, note }) {
   const info = insertFinanceStmt.run(
     now(),
     entryDate,
     direction === "income" ? "income" : "expense",
     Number(amount) || 0,
     currency || "جنيه",
+    category || null,
     note || null
   );
   return Number(info.lastInsertRowid);
@@ -213,6 +232,16 @@ const listFinanceStmt = db.prepare(
 );
 export function listFinance(limit = 500) {
   return listFinanceStmt.all(limit);
+}
+
+// البنود الموجودة (للمساعدة في التصنيف وعدم تكرار بنود متشابهة)
+const financeCatsStmt = db.prepare(
+  `SELECT category, COUNT(*) AS n FROM finance
+   WHERE category IS NOT NULL AND category != '' AND direction = 'expense'
+   GROUP BY category ORDER BY n DESC`
+);
+export function financeCategories() {
+  return financeCatsStmt.all().map((r) => r.category);
 }
 
 const delFinanceStmt = db.prepare(`DELETE FROM finance WHERE id = ?`);
@@ -633,6 +662,50 @@ export function aiUsageSummary(days = 30) {
     byKind: usageByKindStmt.all(),
     daily: usageDailyStmt.all(since),
   };
+}
+
+/* ===================== Tasks (المهام + الجدول) ===================== */
+
+const insertTaskStmt = db.prepare(`
+  INSERT INTO tasks (created_at, title, due_date, due_time, status, note)
+  VALUES (?, ?, ?, ?, 'open', ?)
+`);
+export function addTask({ title, dueDate, dueTime, note }) {
+  if (!title) return null;
+  const info = insertTaskStmt.run(
+    now(),
+    String(title).trim(),
+    dueDate || null,
+    dueTime || null,
+    note || null
+  );
+  return {
+    id: Number(info.lastInsertRowid),
+    title: String(title).trim(),
+    due_date: dueDate || null,
+    due_time: dueTime || null,
+    status: "open",
+  };
+}
+
+// المهام مرتّبة: المفتوحة الأول حسب الموعد، واللي من غير موعد في الآخر، والمتعمّلة تحت
+const listTasksStmt = db.prepare(`
+  SELECT * FROM tasks
+  ORDER BY (status = 'done') ASC, (due_date IS NULL) ASC,
+           due_date ASC, due_time ASC, id DESC
+`);
+export function listTasks() {
+  return listTasksStmt.all();
+}
+
+const setTaskStatusStmt = db.prepare(`UPDATE tasks SET status = ? WHERE id = ?`);
+export function setTaskStatus(id, status) {
+  return setTaskStatusStmt.run(status === "done" ? "done" : "open", id).changes > 0;
+}
+
+const delTaskStmt = db.prepare(`DELETE FROM tasks WHERE id = ?`);
+export function deleteTask(id) {
+  return delTaskStmt.run(id).changes > 0;
 }
 
 /* ===================== helpers ===================== */

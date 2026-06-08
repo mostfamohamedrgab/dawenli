@@ -19,6 +19,8 @@ import {
   findHabitByTitle,
   logHabit,
   addFinance,
+  financeCategories,
+  addTask,
   logConversation,
 } from "./db.js";
 
@@ -199,7 +201,8 @@ async function processEntry(ctx, text, kind = "text") {
     // سياق الذاكرة: آخر تدوينات قبل ما نحفظ الجديدة
     const memoryContext = listEntries(6).filter((e) => e.entry_date !== today);
     const existingGoals = listGoals();
-    const { journal, goals, health, condition, meals, habits, finance } = await classifyMessage(text, today, existingGoals);
+    const existingCategories = financeCategories();
+    const { journal, goals, health, condition, meals, habits, finance, tasks } = await classifyMessage(text, today, existingGoals, existingCategories);
 
     const r = upsertJournalForDay({ ...journal, transcript: text });
     const tags = journal.tags?.length ? " · 🏷️ " + journal.tags.join("، ") : "";
@@ -278,13 +281,27 @@ async function processEntry(ctx, text, kind = "text") {
       savedHabits.push({ title: h.title, kind: h.kind, action: h.action, date: h.date });
     }
 
-    // الماليات: كسب/صرف بالبند
+    // الماليات: كسب/صرف بالبند والتصنيف
     const savedFinance = [];
     for (const f of finance ?? []) {
       addFinance(f);
       savedFinance.push(f);
       const sign = f.direction === "income" ? "➕ دخل" : "➖ صرف";
-      lines.push(`💰 ${sign}: ${fmtNum(f.amount)} ${f.currency}${f.note ? " · " + f.note : ""}`);
+      const cat = f.category ? " · 🏷️ " + f.category : "";
+      const note = f.note ? " · " + f.note : "";
+      lines.push(`💰 ${sign}: ${fmtNum(f.amount)} ${f.currency}${cat}${note}`);
+    }
+
+    // المهام: نسجّلها في الجدول بموعدها
+    const savedTasks = [];
+    for (const t of tasks ?? []) {
+      const saved = addTask(t);
+      if (!saved) continue;
+      savedTasks.push(saved);
+      const when = t.dueDate
+        ? ` — 🗓️ ${t.dueDate}${t.dueTime ? " الساعة " + t.dueTime : ""}`
+        : "";
+      lines.push(`✅ مهمة جديدة: ${saved.title}${when}`);
     }
 
     const confirm = `اتسجّلت ✅\n${lines.join("\n")}`;
@@ -307,7 +324,7 @@ async function processEntry(ctx, text, kind = "text") {
         kind,
         userText: text,
         aiReply: reflection || confirm,
-        meta: { journal, goals: goalUpdates, health: savedHealth, condition: savedCondition, meals: savedMeals, habits: savedHabits, finance: savedFinance },
+        meta: { journal, goals: goalUpdates, health: savedHealth, condition: savedCondition, meals: savedMeals, habits: savedHabits, finance: savedFinance, tasks: savedTasks },
       });
     } catch (err) {
       console.error("log conversation error:", err);

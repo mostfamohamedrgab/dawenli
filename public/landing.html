@@ -165,23 +165,22 @@ img{max-width:100%}
 .proof-cell.finances .proof-v{color:var(--finances-deep)}
 .proof-l{color:var(--ink-muted)}
 
-.worlds-bento{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.3fr;grid-auto-rows:1fr;gap:clamp(16px,2vw,24px)}
+/* الأربع عوالم في صف واحد متساوي */
+.worlds-bento{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(14px,1.6vw,22px)}
 .world-tile{
-  border:2px solid;border-radius:var(--radius-sketch);box-shadow:var(--shadow-md);
-  padding:clamp(22px,2.5vw,30px);display:flex;gap:18px;min-height:230px;position:relative;overflow:hidden;
+  border:2px solid;box-shadow:var(--shadow-md);
+  padding:clamp(20px,2vw,28px);display:flex;flex-direction:column;align-items:center;text-align:center;
+  gap:12px;min-height:300px;position:relative;overflow:hidden;
   transition:transform .25s var(--ease-soft),box-shadow .25s;
 }
-.world-tile:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
-.world-tile img{flex:none;filter:drop-shadow(0 6px 14px rgba(52,48,42,.12));transition:transform .5s var(--ease-soft)}
-.world-tile:hover img{transform:translateY(-6px) rotate(-3deg) scale(1.04)}
-.world-tile.big{grid-column:span 2;flex-direction:row;align-items:center}
-.world-tile.big img{width:150px;height:150px}
-.world-tile.small{grid-column:span 1;flex-direction:column;align-items:flex-start;border-radius:var(--radius-sketch-2)}
-.world-tile.small img{width:110px;height:110px}
-.world-tile h3{font-size:1.6rem;margin:0 0 8px}
-.world-tile.small h3{font-size:1.4rem}
-.world-tile p{color:var(--ink);margin:0 0 14px;max-width:32ch}
-.wt-tag{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:.85rem;border-radius:var(--radius-pill);padding:5px 14px}
+.world-tile:nth-child(odd){border-radius:var(--radius-sketch)}
+.world-tile:nth-child(even){border-radius:var(--radius-sketch-2)}
+.world-tile:hover{transform:translateY(-5px);box-shadow:var(--shadow-lg)}
+.world-tile img{width:100px;height:100px;flex:none;filter:drop-shadow(0 6px 14px rgba(52,48,42,.12));transition:transform .5s var(--ease-soft)}
+.world-tile:hover img{transform:translateY(-6px) rotate(-3deg) scale(1.06)}
+.world-tile h3{font-size:1.4rem;margin:0}
+.world-tile p{color:var(--ink);margin:0;font-size:.96rem;flex:1}
+.wt-tag{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:.82rem;border-radius:var(--radius-pill);padding:5px 14px;margin-top:auto}
 .world-tile.health{background:var(--health-wash);border-color:var(--health)}
 .world-tile.health h3{color:var(--health-deep)} .world-tile.health .wt-tag{background:var(--health-tint);color:var(--health-deep)}
 .world-tile.habits{background:var(--habits-wash);border-color:var(--habits)}
@@ -225,13 +224,12 @@ img{max-width:100%}
   .splitter{order:-1;max-width:460px}
   .peek{grid-template-columns:1fr}
   .worlds-bento{grid-template-columns:1fr 1fr}
-  .world-tile.big{grid-column:span 2;flex-direction:column;align-items:flex-start}
-  .world-tile.big img{width:110px;height:110px}
+  .world-tile{min-height:260px}
 }
-@media(max-width:680px){
+@media(max-width:560px){
   .header nav{display:none}
   .worlds-bento{grid-template-columns:1fr}
-  .world-tile.big,.world-tile.small{grid-column:span 1}
+  .world-tile{min-height:0}
   .proof-cell:not(:last-child){border-inline-end:none;border-bottom:1px dashed var(--hairline-strong)}
 }
 </style>
@@ -314,21 +312,29 @@ img{max-width:100%}
     <p class="sublead">كل جزء من حياتك له عالمه الخاص — بمشهده المرسوم ولونه الدافي.</p>
   </div>
   <div class="worlds-bento">
-    <article class="world-tile health big">
+    <article class="world-tile health">
       <img src="/assets/illustrations/world-health.svg" alt="الصحة" />
-      <div><h3>الصحة</h3><p>جسمك وأعراضك ونومك — وتقرير دكتور بضغطة واحدة.</p><span class="wt-tag">● نومك تحسّن ٤٠ دقيقة</span></div>
+      <h3>الصحة</h3>
+      <p>جسمك وأعراضك ونومك — وتقرير دكتور بضغطة واحدة.</p>
+      <span class="wt-tag">● نومك تحسّن ٤٠ دقيقة</span>
     </article>
-    <article class="world-tile habits small">
+    <article class="world-tile habits">
       <img src="/assets/illustrations/world-habits.svg" alt="العادات" />
-      <div><h3>العادات</h3><p>ستريك بيكبر كل يوم تكمّل فيه عادتك.</p><span class="wt-tag">● ٥ أيام جري 🔥</span></div>
+      <h3>العادات</h3>
+      <p>ستريك بيكبر كل يوم تكمّل فيه عادتك — تحدّي ٣٠ يوم.</p>
+      <span class="wt-tag">● ٥ أيام جري 🔥</span>
     </article>
-    <article class="world-tile goals small">
+    <article class="world-tile goals">
       <img src="/assets/illustrations/world-goals.svg" alt="الأهداف" />
-      <div><h3>الأهداف</h3><p>هدفك قدّامك، والدايرة بتمتلي وانت بتقرّب.</p><span class="wt-tag">● ٦٥٪ من هدفك</span></div>
+      <h3>الأهداف</h3>
+      <p>هدفك قدّامك، والدايرة بتمتلي وانت بتقرّب.</p>
+      <span class="wt-tag">● ٦٥٪ من هدفك</span>
     </article>
-    <article class="world-tile finances big">
+    <article class="world-tile finances">
       <img src="/assets/illustrations/world-finances.svg" alt="الفلوس" />
-      <div><h3>الفلوس</h3><p>مصاريفك ومدّخراتك، ونبتة بتكبر مع كل جنيه توفّره.</p><span class="wt-tag">● وفّرت ١٬٨٠٠ جنيه 🌱</span></div>
+      <h3>الفلوس</h3>
+      <p>مصاريفك ومدّخراتك، ونبتة بتكبر مع كل جنيه توفّره.</p>
+      <span class="wt-tag">● وفّرت ١٬٨٠٠ جنيه 🌱</span>
     </article>
   </div>
 </section>

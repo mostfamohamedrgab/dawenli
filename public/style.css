@@ -1884,3 +1884,45 @@ canvas, img, svg { max-width: 100%; }
 
 /* goal progress bar back to brand→leaf (was an off-palette gradient) */
 .goal-bar span { background: linear-gradient(90deg, var(--goals), var(--goals-deep)); }
+
+/* ===================== المهام (Tasks + schedule) ===================== */
+.schedule { display: flex; flex-direction: column; gap: 18px; }
+.sched-group {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px;
+}
+.sched-group.overdue { border-color: var(--health); background: var(--health-wash); }
+.sched-group.sched-done { opacity: .72; }
+.sched-day {
+  font-family: "Cairo", sans-serif; font-weight: 800; font-size: 1.02rem;
+  margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+}
+.sched-group.overdue .sched-day { color: var(--health-deep); }
+.sched-date { font-size: .8rem; font-weight: 600; color: var(--muted); }
+.task-row { padding: 12px 14px; }
+.task-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.task-check {
+  width: 26px; height: 26px; flex: none; border-radius: 50%;
+  border: 2px solid var(--brand); background: transparent; color: var(--on-accent);
+  cursor: pointer; font-size: 14px; font-weight: 800; display: grid; place-items: center;
+  transition: background .15s, transform .1s;
+}
+.task-check:hover { background: var(--brand-wash); }
+.task-check.on { background: var(--brand); }
+.task-title { font-weight: 600; }
+.task-row.tdone .task-title { text-decoration: line-through; color: var(--muted); }
+.task-time { font-size: .82rem; color: var(--muted); white-space: nowrap; }
+
+/* finance category chip */
+.fin-cat {
+  display: inline-block; font-size: .78rem; font-weight: 700; color: var(--finances-deep);
+  background: var(--finances-wash); border: 1px solid var(--finances-tint);
+  padding: 1px 9px; border-radius: 999px; margin-inline-end: 6px;
+}
+
+/* ===================== العادات — تحدّي ٣٠ يوم ===================== */
+.hb-progress { height: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.hb-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--habits), var(--habits-deep)); border-radius: 999px; transition: width .5s ease; }
+.hb-month { display: grid; grid-template-columns: repeat(15, 1fr); gap: 4px; }
+.hb-cell { aspect-ratio: 1; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); }
+.hb-cell.on { background: var(--habits); border-color: var(--habits); }

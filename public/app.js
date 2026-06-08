@@ -8,6 +8,7 @@ const state = {
   meals: [],
   habits: [],
   finance: [],
+  tasks: [],
   usage: null,
   pageDate: null,
   mealDate: null,
@@ -21,6 +22,7 @@ const TODAY = () => new Date().toISOString().slice(0, 10);
 
 const PAGE_TITLES = {
   overview: "الرئيسية",
+  tasks: "المهام",
   journal: "يوميات",
   health: "الصحة",
   habits: "العادات",
@@ -96,15 +98,22 @@ async function del(kind, id) {
 window.del = del;
 
 /* ===================== Navigation ===================== */
-function gotoTab(tab) {
+const TABS = ["overview", "tasks", "journal", "health", "habits", "goals", "finance", "meals", "chats", "usage"];
+function gotoTab(tab, opts = {}) {
+  if (!TABS.includes(tab)) tab = "overview";
   document.querySelectorAll(".nav-item").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== tab));
   $("pageTitle").textContent = PAGE_TITLES[tab] || "";
   closeSidebar();
+  // نحفظ الصفحة في الـ hash عشان الريلود يفضل واقف في نفس المكان
+  if (location.hash.slice(1) !== tab) {
+    history.replaceState(null, "", "#" + tab);
+  }
   if (tab === "overview") renderOverview();
+  if (tab === "tasks") renderTasks();
   if (tab === "finance") renderFinance();
   if (tab === "usage") renderUsage();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (!opts.noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
 }
 $("sideNav").addEventListener("click", (e) => {
   const btn = e.target.closest(".nav-item");
@@ -136,6 +145,11 @@ function computeStreak(entries) {
 function last7() {
   const out = [];
   for (let i = 6; i >= 0; i--) out.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
+  return out;
+}
+function last30() {
+  const out = [];
+  for (let i = 29; i >= 0; i--) out.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
   return out;
 }
 function greeting() {
@@ -357,6 +371,74 @@ $("goalForm").addEventListener("submit", async (e) => {
   e.target.reset(); loadAll();
 });
 
+/* ===================== Tasks (المهام + الجدول) ===================== */
+function taskDayLabel(dateStr) {
+  if (!dateStr) return "من غير موعد";
+  const today = TODAY();
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  if (dateStr < today) return "فات ميعادها";
+  if (dateStr === today) return "النهاردة";
+  if (dateStr === tomorrow) return "بكره";
+  return fmtDate(dateStr);
+}
+function taskRow(t) {
+  const done = t.status === "done";
+  const time = t.due_time ? `<span class="task-time">🕐 ${t.due_time}</span>` : "";
+  return `<div class="list-row task-row ${done ? "tdone" : ""}">
+    <div class="task-left">
+      <button class="task-check ${done ? "on" : ""}" onclick="toggleTask(${t.id}, ${done})" title="${done ? "رجّعها مفتوحة" : "علّمها خلصت"}">${done ? "✓" : ""}</button>
+      <span class="task-title">${escapeHtml(t.title)}</span>
+    </div>
+    <div class="row-actions">${time}
+      <button class="del-btn" onclick="del('tasks', ${t.id})" title="حذف">🗑️</button>
+    </div>
+  </div>`;
+}
+function renderTasks() {
+  const el = $("tasks");
+  if (!el) return;
+  const data = state.tasks || [];
+  if (!data.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-emoji">🗓️</div><p class="muted">مفيش مهام لسه. ضيف واحدة فوق، أو قول للبوت "عندي تاسك أكلم العميل بكره الساعة ٥".</p></div>`;
+    return;
+  }
+  const open = data.filter((t) => t.status !== "done");
+  const done = data.filter((t) => t.status === "done");
+  const groups = {};
+  for (const t of open) { const k = t.due_date || "__none"; (groups[k] ||= []).push(t); }
+  const keys = Object.keys(groups).sort((a, b) => {
+    if (a === "__none") return 1; if (b === "__none") return -1; return a < b ? -1 : 1;
+  });
+  let html = keys.map((k) => {
+    const dateStr = k === "__none" ? null : k;
+    const overdue = dateStr && dateStr < TODAY();
+    const rows = groups[k]
+      .sort((a, b) => (a.due_time || "99:99") < (b.due_time || "99:99") ? -1 : 1)
+      .map(taskRow).join("");
+    return `<div class="sched-group ${overdue ? "overdue" : ""}">
+      <div class="sched-day">${taskDayLabel(dateStr)}${dateStr ? ` <span class="sched-date">${fmtShort(dateStr)}</span>` : ""}</div>
+      <div class="list">${rows}</div></div>`;
+  }).join("");
+  if (done.length) {
+    html += `<div class="sched-group sched-done"><div class="sched-day">خلصت ✓</div><div class="list">${done.map(taskRow).join("")}</div></div>`;
+  }
+  el.innerHTML = html;
+}
+async function toggleTask(id, done) {
+  await api(`/api/tasks/${id}/status`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: done ? "open" : "done" }) });
+  loadAll();
+}
+window.toggleTask = toggleTask;
+$("taskForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("taskTitle").value.trim();
+  if (!title) return;
+  const dueDate = $("taskDate").value || null;
+  const dueTime = $("taskTime").value || null;
+  await api("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, dueDate, dueTime }) });
+  e.target.reset(); loadAll();
+});
+
 /* ===================== Habits ===================== */
 function renderHabits() {
   const el = $("habits");
@@ -365,22 +447,25 @@ function renderHabits() {
     el.innerHTML = `<div class="empty"><div class="empty-emoji">🔁</div><p class="muted">ضيف عادة فوق، أو قول للبوت "بلعب رياضة كل يوم".</p></div>`;
     return;
   }
-  const days = last7();
+  const days = last30(); // آخر ٣٠ يوم (تحدّي الشهر)
   el.innerHTML = data.map((h) => {
     const logset = new Set(h.logs || []);
-    const dots = days.map((d) => `<span class="hb-dot ${logset.has(d) ? "on" : ""}" title="${fmtShort(d)}"></span>`).join("");
+    const doneInMonth = days.filter((d) => logset.has(d)).length;
+    const pct = Math.round((doneInMonth / 30) * 100);
+    const cells = days.map((d) => `<span class="hb-cell ${logset.has(d) ? "on" : ""}" title="${fmtShort(d)}"></span>`).join("");
     const isQuit = h.kind === "quit";
     return `<div class="habit-card ${h.doneToday ? "done" : ""}">
       <div class="habit-top">
         <span class="habit-emoji">${h.emoji || (isQuit ? "🚭" : "🔁")}</span>
         <div class="habit-info">
           <span class="habit-title">${escapeHtml(h.title)}</span>
-          <span class="habit-kind">${isQuit ? "ببطّلها" : "بعملها"}</span>
+          <span class="habit-kind">${isQuit ? "ببطّلها" : "بعملها"} · تحدّي ٣٠ يوم</span>
         </div>
         <button class="del-btn" onclick="del('habits', ${h.id})" title="حذف">🗑️</button>
       </div>
-      <div class="habit-streak"><span class="hs-fire">🔥</span><b>${h.streak}</b> يوم متتالي · ${h.total} إجمالي</div>
-      <div class="hb-week">${dots}</div>
+      <div class="habit-streak"><span class="hs-fire">🔥</span><b>${h.streak}</b> يوم متتالي · <b>${doneInMonth}</b>/٣٠ في الشهر</div>
+      <div class="hb-progress"><span style="width:${pct}%"></span></div>
+      <div class="hb-month" title="آخر ٣٠ يوم">${cells}</div>
       <button class="habit-check ${h.doneToday ? "checked" : ""}" onclick="toggleHabit(${h.id}, ${h.doneToday})">
         ${h.doneToday ? "✓ اتعملت النهاردة" : "علّمها للنهاردة"}
       </button>
@@ -434,25 +519,34 @@ function renderFinance() {
     el.innerHTML = `<div class="empty"><div class="empty-emoji">💰</div><p class="muted">قول للبوت "صرفت ٢٠٠ على أكل" أو ضيف عملية فوق.</p></div>`;
     return;
   }
-  el.innerHTML = data.map((f) => `
-    <div class="list-row ${f.direction === "income" ? "pos" : "neg"}">
+  // عبّي قايمة البنود الموجودة للـ datalist (للإضافة اليدوية)
+  const cats = [...new Set(data.filter((f) => f.category).map((f) => f.category))];
+  const dl = $("finCatList");
+  if (dl) dl.innerHTML = cats.map((c) => `<option value="${escapeHtml(c)}"></option>`).join("");
+
+  el.innerHTML = data.map((f) => {
+    const catChip = f.category ? `<span class="fin-cat">🏷️ ${escapeHtml(f.category)}</span>` : "";
+    const note = f.note ? ` · ${escapeHtml(f.note)}` : "";
+    return `<div class="list-row ${f.direction === "income" ? "pos" : "neg"}">
       <div class="lr-main">
         <span class="hcat">${f.direction === "income" ? "➕ دخل" : "➖ صرف"} · ${fmtShort(f.entry_date)}</span>
-        <span class="lr-note">${escapeHtml(f.note || "—")}</span>
+        <span class="lr-note">${catChip}${escapeHtml(f.category ? "" : (f.note ? "" : "—"))}${note}</span>
       </div>
       <div class="row-actions">
         <span class="lr-amount">${fmtNum(f.amount)} ${escapeHtml(f.currency || "جنيه")}</span>
         <button class="del-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 $("finForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const direction = $("finDir").value;
   const amount = $("finAmount").value;
+  const category = $("finCategory").value.trim();
   const note = $("finNote").value.trim();
   if (amount === "") return;
-  await api("/api/finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ direction, amount, note }) });
+  await api("/api/finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ direction, amount, category, note }) });
   e.target.reset(); loadAll();
 });
 
@@ -738,7 +832,7 @@ $("refreshBtn").addEventListener("click", loadAll);
 /* ===================== Load ===================== */
 async function loadAll() {
   try {
-    const [j, g, h, c, cond, m, hab, fin, usg] = await Promise.all([
+    const [j, g, h, c, cond, m, hab, fin, usg, tsk] = await Promise.all([
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
       api("/api/health").then((r) => r.json()),
@@ -748,12 +842,15 @@ async function loadAll() {
       api("/api/habits").then((r) => r.json()),
       api("/api/finance").then((r) => r.json()),
       api("/api/usage").then((r) => r.json()),
+      api("/api/tasks").then((r) => r.json()),
     ]);
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
-    state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin; state.usage = usg;
+    state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin;
+    state.usage = usg; state.tasks = tsk;
   } catch { return; }
   $("pageDateLabel").textContent = fmtDate(TODAY());
   renderJournal();
+  renderTasks();
   renderGoals();
   renderHabits();
   renderPage();
@@ -800,5 +897,16 @@ async function loadAll() {
   resize(); init(); tick();
   window.addEventListener("resize", () => { resize(); init(); });
 })();
+
+// نفتح على الصفحة اللي كان واقف فيها (من الـ hash) عشان الريلود يفضل مكانه
+(function restoreTab() {
+  const tab = location.hash.slice(1);
+  if (tab && TABS.includes(tab) && tab !== "overview") gotoTab(tab, { noScroll: true });
+})();
+window.addEventListener("hashchange", () => {
+  const tab = location.hash.slice(1) || "overview";
+  const active = document.querySelector(".nav-item.active")?.dataset.tab;
+  if (tab !== active) gotoTab(tab, { noScroll: true });
+});
 
 loadAll();
