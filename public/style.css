@@ -56,9 +56,9 @@ body {
 h1,
 h2,
 h3 {
-  font-family: "Lemonada", "Tajawal", system-ui, sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-family: "Cairo", "Tajawal", system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.015em;
 }
 
 /* ===================== Auth ===================== */
@@ -1726,10 +1726,11 @@ h3 {
 /* the ambient dark particle canvas doesn't suit warm paper — hide it */
 .bg-canvas { display: none !important; }
 
-/* display face on the brand + numbers */
+/* strong display face on the brand + numbers */
 .brand-name, .page-title, .ring-center span, .stat-num, .fc-num,
 .fin-num, .goal-title, .habit-title, .cond-title, .entry-date, .hero-text h2 {
-  font-family: "Lemonada", "Tajawal", sans-serif;
+  font-family: "Cairo", "Tajawal", sans-serif;
+  font-weight: 800;
 }
 
 /* gradient/coloured text needs darker stops on light paper */
@@ -1750,7 +1751,7 @@ h3 {
 
 /* auth card on paper */
 .auth-card { background: var(--surface); }
-.auth-card h1 { font-family: "Lemonada", "Tajawal", sans-serif; }
+.auth-card h1 { font-family: "Cairo", "Tajawal", sans-serif; font-weight: 800; }
 .field input, .select { background: #fff; }
 .field input::placeholder, .select::placeholder { color: var(--muted); opacity: .7; }
 
@@ -1826,10 +1827,26 @@ h3 {
 .modal-overlay { background: rgba(52, 48, 42, 0.5); }
 .modal-icon { background: var(--health-wash); border-color: var(--health-tint, #f6d5cd); }
 
-/* ---- layout fixes: kill the side scroll + horizontal overflow ---- */
+/* ---- layout fixes: contain the content + kill the overflow/clip ---- */
 html, body { overflow-x: hidden; max-width: 100%; }
-.app-shell { overflow-x: clip; }
 canvas, img, svg { max-width: 100%; }
+
+/* keep the dashboard content inside a centered container (was bleeding off
+   the left edge and getting clipped on wide screens) */
+.main {
+  max-width: 1280px;
+  margin-inline: auto;
+  padding: 0 clamp(20px, 3vw, 40px) 70px;
+  width: 100%;
+}
+.tab-panel { min-width: 0; }
+
+/* the real overflow cause: 1fr columns wouldn't shrink below their content,
+   so the grids spilled past the container. minmax(0,1fr) lets them fit. */
+.stat-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.pillar-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.stat-card, .pillar-card, .fin-card, .step { min-width: 0; }
+.topbar { max-width: 1280px; margin-inline: auto; width: 100%; }
 
 /* the sidebar's own scrollbar (right edge) was the ugly "side scroll" —
    hide it; the nav fits, and it still scrolls if a short viewport needs it */
