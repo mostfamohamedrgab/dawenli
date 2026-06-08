@@ -1826,5 +1826,42 @@ h3 {
 .modal-overlay { background: rgba(52, 48, 42, 0.5); }
 .modal-icon { background: var(--health-wash); border-color: var(--health-tint, #f6d5cd); }
 
-/* sketch corners on the big greeting + analyze panels for that hand-drawn feel */
-.hero-card { border-radius: var(--radius-sketch); }
+/* ---- layout fixes: kill the side scroll + horizontal overflow ---- */
+html, body { overflow-x: hidden; max-width: 100%; }
+.app-shell { overflow-x: clip; }
+canvas, img, svg { max-width: 100%; }
+
+/* the sidebar's own scrollbar (right edge) was the ugly "side scroll" —
+   hide it; the nav fits, and it still scrolls if a short viewport needs it */
+.sidebar { scrollbar-width: none; -ms-overflow-style: none; }
+.sidebar::-webkit-scrollbar { width: 0; height: 0; display: none; }
+/* tighten the sidebar so it comfortably fits one screen */
+.sidebar { gap: 4px; padding: 20px 14px 14px; }
+.nav-item { padding: 9px 13px; font-size: .92rem; }
+.nav-group { padding: 10px 12px 3px; }
+
+/* hero greeting: compact, balanced, gentle hand-drawn corner (not the extreme 255px) */
+.hero-card {
+  border-radius: 26px 22px 26px 22px;
+  padding: 22px 28px;
+  background: linear-gradient(120deg, var(--brand-wash) 0%, var(--surface) 70%);
+  border: 1.5px solid var(--brand-tint);
+}
+.hero-text h2 { font-size: 1.5rem; }
+.hero-card::before { background: var(--brand); height: 4px; opacity: .9; }
+
+/* stat cards: a touch more presence, accent number, comfortable height */
+.stat-grid { gap: 14px; }
+.stat-card { padding: 20px 12px; border-radius: 18px; }
+.stat-num { font-size: 1.7rem; }
+.stat-card:hover { box-shadow: var(--shadow-md); }
+
+/* pillar (world) cards: clearer accent header + roomier chart */
+.pillar-card { border-radius: 18px; }
+.pillar-chart { height: 96px; }
+
+/* feed rows / panels: a little warmer separation */
+.block-title, .section-title { color: var(--ink); }
+
+/* goal progress bar back to brand→leaf (was an off-palette gradient) */
+.goal-bar span { background: linear-gradient(90deg, var(--goals), var(--goals-deep)); }

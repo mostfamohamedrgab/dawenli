@@ -222,10 +222,10 @@ function drawRing(canvas, ratio, color) {
   const { ctx, w, h } = prep(canvas);
   const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 8;
   ctx.lineWidth = 9; ctx.lineCap = "round";
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.strokeStyle = "rgba(52,48,42,0.10)";
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
   const grad = ctx.createLinearGradient(0, 0, w, h);
-  grad.addColorStop(0, cssVar("--indigo")); grad.addColorStop(1, cssVar("--pink"));
+  grad.addColorStop(0, cssVar("--indigo")); grad.addColorStop(1, cssVar("--finances"));
   ctx.strokeStyle = grad;
   ctx.beginPath();
   ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.001, ratio));
@@ -234,17 +234,17 @@ function drawRing(canvas, ratio, color) {
 function drawBars(canvas, values, labels, color, fixedMax) {
   if (!canvas) return;
   const { ctx, w, h } = prep(canvas);
-  if (!values.length) { ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.font = "13px Cairo"; ctx.textAlign = "center"; ctx.fillText("مفيش بيانات", w / 2, h / 2); return; }
+  if (!values.length) { ctx.fillStyle = "rgba(52,48,42,.4)"; ctx.font = "13px Tajawal"; ctx.textAlign = "center"; ctx.fillText("مفيش بيانات", w / 2, h / 2); return; }
   const pad = 18, bw = (w - pad) / values.length;
   const max = fixedMax || Math.max(1, ...values);
   values.forEach((v, i) => {
     const bh = (v / max) * (h - 30);
     const x = i * bw + pad / 2, y = h - 16 - bh;
     const grad = ctx.createLinearGradient(0, y, 0, h);
-    grad.addColorStop(0, color); grad.addColorStop(1, "rgba(139,92,246,0.15)");
+    grad.addColorStop(0, color); grad.addColorStop(1, "rgba(255,252,245,0.04)");
     ctx.fillStyle = grad;
     roundRect(ctx, x + 3, y, bw - 8, Math.max(2, bh), 5); ctx.fill();
-    ctx.fillStyle = "rgba(245,245,247,.55)"; ctx.font = "11px Cairo"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(52,48,42,.62)"; ctx.font = "11px Tajawal"; ctx.textAlign = "center";
     ctx.fillText(String(labels[i]).slice(0, 8), x + bw / 2, h - 3);
   });
 }
@@ -259,7 +259,7 @@ function drawIncomeExpense(canvas, income, expense) {
     const x = i * bw, y = h - 16 - bh;
     ctx.fillStyle = d.c;
     roundRect(ctx, x + bw * 0.2, y, bw * 0.6, Math.max(2, bh), 6); ctx.fill();
-    ctx.fillStyle = "rgba(245,245,247,.6)"; ctx.font = "11px Cairo"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(52,48,42,.62)"; ctx.font = "11px Tajawal"; ctx.textAlign = "center";
     ctx.fillText(d.l, x + bw / 2, h - 3);
   });
 }
@@ -276,7 +276,7 @@ function drawFinChart(canvas, days) {
       const x = x0 + j * bw, y = h - 20 - bh;
       ctx.fillStyle = c; roundRect(ctx, x, y, bw - 3, Math.max(1, bh), 4); ctx.fill();
     });
-    ctx.fillStyle = "rgba(245,245,247,.5)"; ctx.font = "10px Cairo"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(52,48,42,.6)"; ctx.font = "10px Tajawal"; ctx.textAlign = "center";
     ctx.fillText(fmtShort(d.date), x0 + bw, h - 5);
   });
 }
@@ -530,7 +530,7 @@ function drawCostChart(canvas, daily) {
   }
   const max = Math.max(0.0001, ...days.map((d) => d.cost));
   if (max <= 0.0001 && !daily.length) {
-    ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.font = "13px Cairo"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(52,48,42,.4)"; ctx.font = "13px Tajawal"; ctx.textAlign = "center";
     ctx.fillText("مفيش استهلاك لسه", w / 2, h / 2); return;
   }
   const slot = w / days.length;
@@ -538,11 +538,11 @@ function drawCostChart(canvas, daily) {
     const bh = (d.cost / max) * (h - 32);
     const x = i * slot, y = h - 20 - bh;
     const grad = ctx.createLinearGradient(0, y, 0, h);
-    grad.addColorStop(0, cssVar("--violet")); grad.addColorStop(1, "rgba(139,92,246,0.12)");
+    grad.addColorStop(0, cssVar("--violet")); grad.addColorStop(1, "rgba(255,252,245,0.04)");
     ctx.fillStyle = grad;
     roundRect(ctx, x + slot * 0.18, y, slot * 0.64, Math.max(1, bh), 4); ctx.fill();
     if (i % 5 === 0) {
-      ctx.fillStyle = "rgba(245,245,247,.5)"; ctx.font = "10px Cairo"; ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(52,48,42,.6)"; ctx.font = "10px Tajawal"; ctx.textAlign = "center";
       ctx.fillText(fmtShort(d.date), x + slot / 2, h - 5);
     }
   });
