@@ -36,10 +36,22 @@ db.exec(`
     created_at  TEXT NOT NULL,
     entry_date  TEXT NOT NULL,
     at_time     TEXT,
-    category    TEXT,            -- دواء | عرض | ملاحظة
-    detail      TEXT NOT NULL
+    category    TEXT,            -- تمرين | دواء | أكل | عرض | ملاحظة
+    detail      TEXT NOT NULL,
+    body_region TEXT             -- راس | صدر | معدة | بطن | ذراعين | ساقين | عام
   );
   CREATE INDEX IF NOT EXISTS idx_health_date ON health(entry_date);
+
+  CREATE TABLE IF NOT EXISTS conversations (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    chat_id     TEXT,
+    kind        TEXT,            -- voice | text | command
+    user_text   TEXT,
+    ai_reply    TEXT,
+    meta_json   TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_conv_created ON conversations(created_at);
 
   CREATE TABLE IF NOT EXISTS goals (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,7 +63,66 @@ db.exec(`
     unit        TEXT,
     note        TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS conditions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    title       TEXT NOT NULL,   -- اسم الحالة (مثلاً: ارتجاع مريئي)
+    start_date  TEXT NOT NULL,
+    end_date    TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'active', -- active | closed
+    note        TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_conditions_status ON conditions(status);
+
+  CREATE TABLE IF NOT EXISTS meals (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    entry_date  TEXT NOT NULL,
+    at_time     TEXT,
+    items       TEXT NOT NULL,   -- الأكل اللي اتقال
+    note        TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_meals_date ON meals(entry_date);
+
+  CREATE TABLE IF NOT EXISTS habits (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    kind        TEXT NOT NULL DEFAULT 'do',  -- do (عادة أعملها) | quit (عادة أبطلها)
+    emoji       TEXT,
+    status      TEXT NOT NULL DEFAULT 'active', -- active | archived
+    note        TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS habit_logs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    habit_id    INTEGER NOT NULL,
+    log_date    TEXT NOT NULL,
+    UNIQUE(habit_id, log_date)
+  );
+  CREATE INDEX IF NOT EXISTS idx_habit_logs ON habit_logs(habit_id, log_date);
+
+  CREATE TABLE IF NOT EXISTS ai_usage (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at    TEXT NOT NULL,
+    usage_date    TEXT NOT NULL,   -- YYYY-MM-DD
+    kind          TEXT NOT NULL,   -- transcribe | classify | reflect | analyze | doctor
+    model         TEXT NOT NULL,
+    input_tokens  INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    audio_seconds REAL NOT NULL DEFAULT 0,
+    cost_usd      REAL NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_ai_usage_date ON ai_usage(usage_date);
 `);
+
+// migration: نضيف body_region لجدول health القديم لو مش موجود
+const healthCols = db.prepare(`PRAGMA table_info(health)`).all().map((c) => c.name);
+if (!healthCols.includes("body_region")) {
+  db.exec(`ALTER TABLE health ADD COLUMN body_region TEXT`);
+}
 
 const now = () => new Date().toISOString();
 
@@ -152,16 +223,17 @@ export function deleteFinance(id) {
 /* ===================== Health (صحة) ===================== */
 
 const insertHealthStmt = db.prepare(`
-  INSERT INTO health (created_at, entry_date, at_time, category, detail)
-  VALUES (?, ?, ?, ?, ?)
+  INSERT INTO health (created_at, entry_date, at_time, category, detail, body_region)
+  VALUES (?, ?, ?, ?, ?, ?)
 `);
-export function addHealth({ entryDate, atTime, category, detail }) {
+export function addHealth({ entryDate, atTime, category, detail, bodyRegion }) {
   const info = insertHealthStmt.run(
     now(),
     entryDate,
     atTime || null,
     category || "ملاحظة",
-    detail
+    detail,
+    bodyRegion || "عام"
   );
   return Number(info.lastInsertRowid);
 }
@@ -176,6 +248,14 @@ export function listHealth(limit = 500) {
 const delHealthStmt = db.prepare(`DELETE FROM health WHERE id = ?`);
 export function deleteHealth(id) {
   return delHealthStmt.run(id).changes > 0;
+}
+
+const healthBetweenStmt = db.prepare(
+  `SELECT * FROM health WHERE entry_date >= ? AND entry_date <= ?
+   ORDER BY entry_date ASC, id ASC`
+);
+export function healthBetween(startDate, endDate) {
+  return healthBetweenStmt.all(startDate, endDate);
 }
 
 /* ===================== Goals (أهداف) ===================== */
@@ -241,6 +321,318 @@ const updateGoalCurrentStmt = db.prepare(
 );
 export function setGoalCurrent(id, current) {
   return updateGoalCurrentStmt.run(Number(current), now(), id).changes > 0;
+}
+
+/* ===================== Conversations (سجل المحادثات) ===================== */
+
+const insertConvStmt = db.prepare(`
+  INSERT INTO conversations (created_at, chat_id, kind, user_text, ai_reply, meta_json)
+  VALUES (?, ?, ?, ?, ?, ?)
+`);
+export function logConversation({ chatId, kind, userText, aiReply, meta }) {
+  const info = insertConvStmt.run(
+    now(),
+    chatId != null ? String(chatId) : null,
+    kind || "text",
+    userText || null,
+    aiReply || null,
+    meta ? JSON.stringify(meta) : null
+  );
+  return Number(info.lastInsertRowid);
+}
+
+const listConvStmt = db.prepare(
+  `SELECT * FROM conversations ORDER BY id DESC LIMIT ?`
+);
+export function listConversations(limit = 500) {
+  return listConvStmt.all(limit).map((r) => ({
+    ...r,
+    meta: parseJson(r.meta_json, null),
+  }));
+}
+
+const delConvStmt = db.prepare(`DELETE FROM conversations WHERE id = ?`);
+export function deleteConversation(id) {
+  return delConvStmt.run(id).changes > 0;
+}
+
+/* ===================== Conditions (متابعة حالة صحية) ===================== */
+
+const addDays = (dateStr, days) => {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + Number(days || 0));
+  return d.toISOString().slice(0, 10);
+};
+const today = () => new Date().toISOString().slice(0, 10);
+
+const findActiveConditionStmt = db.prepare(
+  `SELECT * FROM conditions WHERE status = 'active' AND title LIKE ? ORDER BY id DESC LIMIT 1`
+);
+const insertConditionStmt = db.prepare(`
+  INSERT INTO conditions (created_at, title, start_date, end_date, status, note)
+  VALUES (?, ?, ?, ?, 'active', ?)
+`);
+
+// لو فيه متابعة شغّالة لنفس الحالة منعملش تانية — نرجّعها زي ما هي
+export function addCondition({ title, startDate, durationDays = 30, note }) {
+  if (!title) return null;
+  const start = startDate || today();
+  const existing = findActiveConditionStmt.get(`%${title.trim()}%`);
+  if (existing) {
+    return { ...existing, created: false };
+  }
+  const end = addDays(start, durationDays);
+  const info = insertConditionStmt.run(now(), title.trim(), start, end, note || null);
+  return {
+    id: Number(info.lastInsertRowid),
+    title: title.trim(),
+    start_date: start,
+    end_date: end,
+    status: "active",
+    note: note || null,
+    created: true,
+  };
+}
+
+const listConditionsStmt = db.prepare(
+  `SELECT * FROM conditions ORDER BY status ASC, id DESC`
+);
+export function listConditions() {
+  return listConditionsStmt.all();
+}
+
+const activeConditionsStmt = db.prepare(
+  `SELECT * FROM conditions WHERE status = 'active' ORDER BY id DESC`
+);
+export function activeConditions() {
+  return activeConditionsStmt.all();
+}
+
+const getConditionStmt = db.prepare(`SELECT * FROM conditions WHERE id = ?`);
+export function getCondition(id) {
+  return getConditionStmt.get(id);
+}
+
+const closeConditionStmt = db.prepare(
+  `UPDATE conditions SET status = 'closed' WHERE id = ?`
+);
+export function closeCondition(id) {
+  return closeConditionStmt.run(id).changes > 0;
+}
+
+const delConditionStmt = db.prepare(`DELETE FROM conditions WHERE id = ?`);
+export function deleteCondition(id) {
+  return delConditionStmt.run(id).changes > 0;
+}
+
+/* ===================== Meals (الأكل) ===================== */
+
+const insertMealStmt = db.prepare(`
+  INSERT INTO meals (created_at, entry_date, at_time, items, note)
+  VALUES (?, ?, ?, ?, ?)
+`);
+export function addMeal({ entryDate, atTime, items, note }) {
+  const info = insertMealStmt.run(
+    now(),
+    entryDate,
+    atTime || null,
+    items,
+    note || null
+  );
+  return Number(info.lastInsertRowid);
+}
+
+const listMealsStmt = db.prepare(
+  `SELECT * FROM meals ORDER BY entry_date DESC, id DESC LIMIT ?`
+);
+export function listMeals(limit = 500) {
+  return listMealsStmt.all(limit);
+}
+
+const delMealStmt = db.prepare(`DELETE FROM meals WHERE id = ?`);
+export function deleteMeal(id) {
+  return delMealStmt.run(id).changes > 0;
+}
+
+/* ===================== Habits (عادات) ===================== */
+
+const findActiveHabitStmt = db.prepare(
+  `SELECT * FROM habits WHERE status = 'active' AND title LIKE ? ORDER BY id DESC LIMIT 1`
+);
+const insertHabitStmt = db.prepare(`
+  INSERT INTO habits (created_at, title, kind, emoji, note)
+  VALUES (?, ?, ?, ?, ?)
+`);
+
+// لو العادة موجودة نرجّعها، لو لأ ننشئها
+export function addHabit({ title, kind = "do", emoji, note }) {
+  if (!title) return null;
+  const existing = findActiveHabitStmt.get(`%${title.trim()}%`);
+  if (existing) return { ...existing, created: false };
+  const info = insertHabitStmt.run(
+    now(),
+    title.trim(),
+    kind === "quit" ? "quit" : "do",
+    emoji || null,
+    note || null
+  );
+  return {
+    id: Number(info.lastInsertRowid),
+    title: title.trim(),
+    kind: kind === "quit" ? "quit" : "do",
+    emoji: emoji || null,
+    status: "active",
+    note: note || null,
+    created: true,
+  };
+}
+
+// نلاقي العادة بالاسم (للتسجيل اليومي من البوت)
+export function findHabitByTitle(title) {
+  if (!title) return null;
+  return findActiveHabitStmt.get(`%${title.trim()}%`) || null;
+}
+
+const insertHabitLogStmt = db.prepare(`
+  INSERT OR IGNORE INTO habit_logs (created_at, habit_id, log_date)
+  VALUES (?, ?, ?)
+`);
+// نسجّل إن العادة اتعملت في يوم معيّن (مفيش تكرار لنفس اليوم)
+export function logHabit(habitId, logDate) {
+  const date = logDate || today();
+  const info = insertHabitLogStmt.run(now(), habitId, date);
+  return { logged: info.changes > 0, date };
+}
+
+const delHabitLogStmt = db.prepare(
+  `DELETE FROM habit_logs WHERE habit_id = ? AND log_date = ?`
+);
+export function unlogHabit(habitId, logDate) {
+  return delHabitLogStmt.run(habitId, logDate).changes > 0;
+}
+
+const habitLogsStmt = db.prepare(
+  `SELECT log_date FROM habit_logs WHERE habit_id = ? ORDER BY log_date DESC`
+);
+function habitStreak(dates) {
+  const set = new Set(dates);
+  let streak = 0;
+  const d = new Date(today() + "T00:00:00Z");
+  // لو النهاردة مش متسجّل، نبدأ نعدّ من امبارح (مايكسرش الستريك بدري)
+  if (!set.has(d.toISOString().slice(0, 10))) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  for (;;) {
+    const iso = d.toISOString().slice(0, 10);
+    if (set.has(iso)) {
+      streak++;
+      d.setUTCDate(d.getUTCDate() - 1);
+    } else break;
+  }
+  return streak;
+}
+
+const listHabitsStmt = db.prepare(
+  `SELECT * FROM habits WHERE status = 'active' ORDER BY id DESC`
+);
+export function listHabits() {
+  return listHabitsStmt.all().map((h) => {
+    const dates = habitLogsStmt.all(h.id).map((r) => r.log_date);
+    const todayISO = today();
+    return {
+      ...h,
+      logs: dates,
+      total: dates.length,
+      streak: habitStreak(dates),
+      doneToday: dates.includes(todayISO),
+    };
+  });
+}
+
+const getHabitStmt = db.prepare(`SELECT * FROM habits WHERE id = ?`);
+export function getHabit(id) {
+  return getHabitStmt.get(id);
+}
+
+const archiveHabitStmt = db.prepare(
+  `UPDATE habits SET status = 'archived' WHERE id = ?`
+);
+export function archiveHabit(id) {
+  return archiveHabitStmt.run(id).changes > 0;
+}
+
+const delHabitStmt = db.prepare(`DELETE FROM habits WHERE id = ?`);
+const delHabitLogsStmt = db.prepare(`DELETE FROM habit_logs WHERE habit_id = ?`);
+export function deleteHabit(id) {
+  delHabitLogsStmt.run(id);
+  return delHabitStmt.run(id).changes > 0;
+}
+
+/* ===================== AI usage (تكلفة OpenAI) ===================== */
+
+const insertAiUsageStmt = db.prepare(`
+  INSERT INTO ai_usage (created_at, usage_date, kind, model, input_tokens, output_tokens, audio_seconds, cost_usd)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`);
+// بنسجّل كل نداء على OpenAI: التوكنز/الثواني والتكلفة بالدولار
+export function recordAiUsage({ kind, model, inputTokens = 0, outputTokens = 0, audioSeconds = 0, costUsd = 0 }) {
+  try {
+    insertAiUsageStmt.run(
+      now(),
+      today(),
+      kind || "other",
+      model || "?",
+      Math.round(Number(inputTokens) || 0),
+      Math.round(Number(outputTokens) || 0),
+      Number(audioSeconds) || 0,
+      Number(costUsd) || 0
+    );
+  } catch {
+    // التتبّع ماينفعش يكسر السير الأساسي
+  }
+}
+
+const usageTotalsStmt = db.prepare(`
+  SELECT COUNT(*) AS calls,
+         COALESCE(SUM(input_tokens), 0)  AS input_tokens,
+         COALESCE(SUM(output_tokens), 0) AS output_tokens,
+         COALESCE(SUM(audio_seconds), 0) AS audio_seconds,
+         COALESCE(SUM(cost_usd), 0)      AS cost_usd,
+         MIN(usage_date)                 AS since
+  FROM ai_usage
+`);
+const usageByKindStmt = db.prepare(`
+  SELECT kind, model,
+         COUNT(*) AS calls,
+         COALESCE(SUM(cost_usd), 0) AS cost_usd,
+         COALESCE(SUM(input_tokens), 0)  AS input_tokens,
+         COALESCE(SUM(output_tokens), 0) AS output_tokens
+  FROM ai_usage GROUP BY kind, model ORDER BY cost_usd DESC
+`);
+const usageDailyStmt = db.prepare(`
+  SELECT usage_date,
+         COALESCE(SUM(cost_usd), 0) AS cost_usd,
+         COUNT(*) AS calls
+  FROM ai_usage WHERE usage_date >= ? GROUP BY usage_date ORDER BY usage_date ASC
+`);
+const usageMonthStmt = db.prepare(`
+  SELECT COALESCE(SUM(cost_usd), 0) AS cost_usd, COUNT(*) AS calls
+  FROM ai_usage WHERE usage_date >= ?
+`);
+
+export function aiUsageSummary(days = 30) {
+  const totals = usageTotalsStmt.get();
+  const since = new Date(Date.now() - (Number(days) - 1) * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const monthStart = today().slice(0, 8) + "01";
+  const month = usageMonthStmt.get(monthStart);
+  return {
+    totals,
+    month,
+    byKind: usageByKindStmt.all(),
+    daily: usageDailyStmt.all(since),
+  };
 }
 
 /* ===================== helpers ===================== */

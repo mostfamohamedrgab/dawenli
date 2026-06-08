@@ -15,8 +15,24 @@ import {
   applyGoal,
   deleteGoal,
   setGoalCurrent,
+  listConversations,
+  deleteConversation,
+  listConditions,
+  getCondition,
+  closeCondition,
+  deleteCondition,
+  healthBetween,
+  listMeals,
+  deleteMeal,
+  addFinance,
+  listHabits,
+  addHabit,
+  logHabit,
+  unlogHabit,
+  deleteHabit,
+  aiUsageSummary,
 } from "./db.js";
-import { analyzeEntries } from "./openai.js";
+import { analyzeEntries, doctorReport } from "./openai.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
@@ -92,6 +108,11 @@ export function startServer() {
     res.sendFile(join(publicDir, "login.html"));
   });
 
+  // صفحة هبوط ترويجية عامة (مفيهاش بيانات)
+  app.get(["/landing", "/landing.html", "/welcome"], (_req, res) =>
+    res.sendFile(join(publicDir, "landing.html"))
+  );
+
   // محمي: السكربت والصفحة والبيانات
   app.get("/app.js", (req, res) =>
     authed(req) ? res.sendFile(join(publicDir, "app.js")) : res.status(401).end()
@@ -146,6 +167,42 @@ export function startServer() {
     if (!gate(req, res)) return;
     res.json(listGoals());
   });
+  app.get("/api/conversations", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json(listConversations(500));
+  });
+  app.get("/api/conditions", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json(listConditions());
+  });
+  app.get("/api/meals", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json(listMeals(500));
+  });
+  app.get("/api/habits", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json(listHabits());
+  });
+  app.get("/api/usage", (req, res) => {
+    if (!gate(req, res)) return;
+    const days = Number(req.query.days) > 0 ? Number(req.query.days) : 30;
+    res.json(aiUsageSummary(days));
+  });
+
+  // تقرير للدكتور: تلخيص AI + خط زمني للأعراض في فترة المتابعة
+  app.get("/api/conditions/:id/report", async (req, res) => {
+    if (!gate(req, res)) return;
+    const condition = getCondition(Number(req.params.id));
+    if (!condition) return res.status(404).json({ error: "المتابعة مش موجودة" });
+    const items = healthBetween(condition.start_date, condition.end_date);
+    try {
+      const summary = await doctorReport(condition, items);
+      res.json({ condition, summary, timeline: items });
+    } catch (err) {
+      console.error("doctor report error:", err);
+      res.status(500).json({ error: "فشل توليد التقرير" });
+    }
+  });
 
   // ===== الحذف =====
   app.delete("/api/entries/:id", (req, res) => {
@@ -163,6 +220,63 @@ export function startServer() {
   app.delete("/api/goals/:id", (req, res) => {
     if (!gate(req, res)) return;
     res.json({ ok: deleteGoal(Number(req.params.id)) });
+  });
+  app.delete("/api/conversations/:id", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json({ ok: deleteConversation(Number(req.params.id)) });
+  });
+  app.delete("/api/conditions/:id", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json({ ok: deleteCondition(Number(req.params.id)) });
+  });
+  app.delete("/api/meals/:id", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json({ ok: deleteMeal(Number(req.params.id)) });
+  });
+  app.delete("/api/habits/:id", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json({ ok: deleteHabit(Number(req.params.id)) });
+  });
+
+  // إقفال متابعة (خلصت/مش محتاجها)
+  app.put("/api/conditions/:id/close", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json({ ok: closeCondition(Number(req.params.id)) });
+  });
+
+  // ===== ماليات: إضافة يدوية من الداشبورد =====
+  app.post("/api/finance", (req, res) => {
+    if (!gate(req, res)) return;
+    const { entryDate, direction, amount, currency, note } = req.body || {};
+    if (amount == null || amount === "" || isNaN(Number(amount)))
+      return res.status(400).json({ error: "المبلغ مطلوب" });
+    const id = addFinance({
+      entryDate: entryDate || new Date().toISOString().slice(0, 10),
+      direction,
+      amount,
+      currency,
+      note,
+    });
+    res.json({ ok: true, id });
+  });
+
+  // ===== عادات: إنشاء/تسجيل/إلغاء تسجيل من الداشبورد =====
+  app.post("/api/habits", (req, res) => {
+    if (!gate(req, res)) return;
+    const { title, kind, emoji, note } = req.body || {};
+    if (!title) return res.status(400).json({ error: "اسم العادة مطلوب" });
+    const habit = addHabit({ title, kind, emoji, note });
+    res.json({ ok: true, habit });
+  });
+  app.post("/api/habits/:id/log", (req, res) => {
+    if (!gate(req, res)) return;
+    const { date } = req.body || {};
+    res.json({ ok: true, ...logHabit(Number(req.params.id), date) });
+  });
+  app.delete("/api/habits/:id/log", (req, res) => {
+    if (!gate(req, res)) return;
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    res.json({ ok: unlogHabit(Number(req.params.id), date) });
   });
 
   // ===== أهداف: إنشاء/تعديل يدوي من الداشبورد =====

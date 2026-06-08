@@ -12,6 +12,14 @@ import {
   listEntries,
   listGoals,
   applyGoal,
+  addHealth,
+  addCondition,
+  addMeal,
+  addHabit,
+  findHabitByTitle,
+  logHabit,
+  addFinance,
+  logConversation,
 } from "./db.js";
 
 export function startBot() {
@@ -69,7 +77,7 @@ export function startBot() {
     if (text.startsWith("/")) {
       return ctx.reply("أمر مش معروف. ابعت voice أو اكتب نص عن يومك، أو /analyze.");
     }
-    return processEntry(ctx, text);
+    return processEntry(ctx, text, "text");
   });
 
   bot.launch().catch((err) => console.error("bot launch error:", err));
@@ -176,21 +184,22 @@ async function handleVoice(ctx, fileId) {
     const transcript = await transcribe(buffer);
     if (!transcript) return ctx.reply("مقدرتش أفهم الصوت، جرّب تاني.");
 
-    await processEntry(ctx, transcript);
+    await processEntry(ctx, transcript, "voice");
   } catch (err) {
     console.error("voice error:", err);
     await ctx.reply("حصل خطأ أثناء المعالجة، جرّب تاني.");
   }
 }
 
-async function processEntry(ctx, text) {
+async function processEntry(ctx, text, kind = "text") {
   if (!text) return ctx.reply("مفيش حاجة أدوّنها، جرّب تاني.");
+  const chatId = ctx.chat?.id;
   try {
     const today = new Date().toISOString().slice(0, 10);
     // سياق الذاكرة: آخر تدوينات قبل ما نحفظ الجديدة
     const memoryContext = listEntries(6).filter((e) => e.entry_date !== today);
     const existingGoals = listGoals();
-    const { journal, goals } = await classifyMessage(text, today, existingGoals);
+    const { journal, goals, health, condition, meals, habits, finance } = await classifyMessage(text, today, existingGoals);
 
     const r = upsertJournalForDay({ ...journal, transcript: text });
     const tags = journal.tags?.length ? " · 🏷️ " + journal.tags.join("، ") : "";
@@ -214,15 +223,94 @@ async function processEntry(ctx, text) {
       );
     }
 
-    await ctx.reply(`اتسجّلت ✅\n${lines.join("\n")}`);
+    // الصحة: نسجّل كل عنصر صحي يخص المستخدم ونعرضه في "الصفحة"
+    const savedHealth = [];
+    for (const h of health ?? []) {
+      addHealth(h);
+      savedHealth.push(h);
+      lines.push(`🩺 صحة (${h.category}${h.bodyRegion ? " · " + h.bodyRegion : ""}): ${h.detail}`);
+    }
+
+    // متابعة حالة صحية: نفتح متابعة لمدة (٣٠ يوم افتراضي) لو طلبها
+    let savedCondition = null;
+    if (condition) {
+      const c = addCondition({
+        title: condition.title,
+        startDate: today,
+        durationDays: condition.durationDays || 30,
+      });
+      if (c) {
+        savedCondition = c;
+        if (c.created) {
+          lines.push(`🩹 متابعة جديدة: ${c.title} — من ${c.start_date} لـ ${c.end_date}`);
+        } else {
+          lines.push(`🩹 متابعة شغّالة بالفعل: ${c.title} (لـ ${c.end_date})`);
+        }
+      }
+    }
+
+    // الأكل: بند مستقل نسجّل فيه كل أكلة
+    const savedMeals = [];
+    for (const m of meals ?? []) {
+      addMeal(m);
+      savedMeals.push(m);
+      lines.push(`🍽️ أكل (${m.entryDate}): ${m.items}`);
+    }
+
+    // العادات: نعرّف العادة أو نسجّل إنها اتعملت النهاردة
+    const savedHabits = [];
+    for (const h of habits ?? []) {
+      let habit = findHabitByTitle(h.title);
+      if (!habit && (h.action === "create" || h.action === "both")) {
+        habit = addHabit({ title: h.title, kind: h.kind, emoji: h.emoji });
+        if (habit?.created) {
+          lines.push(`${h.emoji || (h.kind === "quit" ? "🚭" : "🔁")} عادة جديدة: ${habit.title}`);
+        }
+      } else if (!habit) {
+        // قال إنه عملها من غير ما تكون معرّفة → نعرّفها ونسجّلها
+        habit = addHabit({ title: h.title, kind: h.kind, emoji: h.emoji });
+        lines.push(`${h.emoji || (h.kind === "quit" ? "🚭" : "🔁")} عادة جديدة: ${habit.title}`);
+      }
+      if (habit && (h.action === "done" || h.action === "both")) {
+        const res = logHabit(habit.id, h.date);
+        if (res.logged) lines.push(`✅ عادة اتعملت: ${habit.title} (${res.date})`);
+      }
+      savedHabits.push({ title: h.title, kind: h.kind, action: h.action, date: h.date });
+    }
+
+    // الماليات: كسب/صرف بالبند
+    const savedFinance = [];
+    for (const f of finance ?? []) {
+      addFinance(f);
+      savedFinance.push(f);
+      const sign = f.direction === "income" ? "➕ دخل" : "➖ صرف";
+      lines.push(`💰 ${sign}: ${fmtNum(f.amount)} ${f.currency}${f.note ? " · " + f.note : ""}`);
+    }
+
+    const confirm = `اتسجّلت ✅\n${lines.join("\n")}`;
+    await ctx.reply(confirm);
 
     // الرد التأمّلي الفوري (بيهنّي على الأهداف كمان)
+    let reflection = "";
     try {
       await ctx.sendChatAction("typing");
-      const reflection = await reflectOnEntry(text, memoryContext, goalUpdates);
+      reflection = await reflectOnEntry(text, memoryContext, goalUpdates);
       if (reflection) await ctx.reply(reflection);
     } catch (err) {
       console.error("reflect error:", err); // مش هنوقّف الحفظ لو التأمّل فشل
+    }
+
+    // سجل المحادثة للمراجعة والتحسين بعدين
+    try {
+      logConversation({
+        chatId,
+        kind,
+        userText: text,
+        aiReply: reflection || confirm,
+        meta: { journal, goals: goalUpdates, health: savedHealth, condition: savedCondition, meals: savedMeals, habits: savedHabits, finance: savedFinance },
+      });
+    } catch (err) {
+      console.error("log conversation error:", err);
     }
   } catch (err) {
     console.error("process error:", err);

@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>دوّنلي — مساحتك الشخصية لحياتك كلها</title>
+    <meta
+      name="description"
+      content="دوّنلي: بوت تليجرام بيحوّل كلامك العادي لتدوين منظّم — صحتك، عاداتك، أهدافك، وفلوسك. كله في مكان واحد، وتقرير جاهز لأي دكتور في ثانية."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0a0a0f;
+        --surface: #14121f;
+        --surface-2: #1a1530;
+        --text: #f5f5f7;
+        --muted: #9a96ad;
+        --violet: #8b5cf6;
+        --purple: #a855f7;
+        --grad: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+        --grad-line: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+        --border: rgba(168, 85, 247, 0.16);
+        --border-strong: rgba(168, 85, 247, 0.34);
+        --soft: rgba(139, 92, 246, 0.12);
+        --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+        --shadow-lg: 0 18px 50px rgba(88, 40, 160, 0.28);
+        --radius: 18px;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        font-family: "Cairo", system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.8;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .bg-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        pointer-events: none;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 22px;
+      }
+
+      /* ===== Nav ===== */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        backdrop-filter: blur(14px);
+        background: rgba(10, 10, 15, 0.6);
+        border-bottom: 1px solid var(--border);
+      }
+      .nav-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 22px;
+        max-width: 1080px;
+        margin: 0 auto;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+      }
+      .brand-mark {
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        font-size: 21px;
+        background: var(--grad);
+        border-radius: 13px;
+        box-shadow: 0 8px 22px rgba(139, 92, 246, 0.4);
+      }
+      .brand-name {
+        font-size: 1.3rem;
+        font-weight: 900;
+      }
+      .btn {
+        display: inline-block;
+        font-family: inherit;
+        font-weight: 700;
+        font-size: 0.98rem;
+        color: #fff;
+        background: var(--grad);
+        border: none;
+        border-radius: 12px;
+        padding: 11px 24px;
+        cursor: pointer;
+        box-shadow: 0 10px 26px rgba(139, 92, 246, 0.38);
+        transition: transform 0.12s, filter 0.15s;
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.08);
+      }
+      .btn.ghost {
+        background: transparent;
+        color: var(--text);
+        border: 1.5px solid var(--border-strong);
+        box-shadow: none;
+      }
+      .btn.ghost:hover {
+        background: var(--soft);
+        border-color: var(--violet);
+      }
+      .btn.lg {
+        font-size: 1.08rem;
+        padding: 15px 36px;
+      }
+
+      /* ===== Hero ===== */
+      .hero {
+        text-align: center;
+        padding: 86px 0 64px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.86rem;
+        font-weight: 700;
+        color: #d6bbff;
+        background: var(--soft);
+        border: 1px solid var(--border-strong);
+        padding: 7px 16px;
+        border-radius: 999px;
+        margin-bottom: 26px;
+      }
+      .hero h1 {
+        font-size: clamp(2.1rem, 6vw, 3.6rem);
+        font-weight: 900;
+        line-height: 1.25;
+        letter-spacing: -0.01em;
+        margin-bottom: 20px;
+      }
+      .hero h1 .grad {
+        background: var(--grad);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .hero p.lead {
+        font-size: clamp(1.02rem, 2.5vw, 1.25rem);
+        color: var(--muted);
+        max-width: 660px;
+        margin: 0 auto 34px;
+      }
+      .hero-cta {
+        display: flex;
+        gap: 14px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .hero-note {
+        margin-top: 18px;
+        font-size: 0.86rem;
+        color: #6f6a85;
+      }
+
+      /* ===== Section ===== */
+      section {
+        padding: 56px 0;
+      }
+      .sec-head {
+        text-align: center;
+        max-width: 640px;
+        margin: 0 auto 44px;
+      }
+      .sec-head h2 {
+        font-size: clamp(1.6rem, 4vw, 2.3rem);
+        font-weight: 900;
+        margin-bottom: 12px;
+      }
+      .sec-head p {
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+
+      /* ===== Pillars ===== */
+      .pillars {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+      .pcard {
+        background: linear-gradient(180deg, var(--surface-2), var(--surface));
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 26px 22px;
+        transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      }
+      .pcard:hover {
+        transform: translateY(-5px);
+        border-color: var(--border-strong);
+        box-shadow: var(--shadow-lg);
+      }
+      .pcard .ico {
+        width: 54px;
+        height: 54px;
+        display: grid;
+        place-items: center;
+        font-size: 26px;
+        background: var(--soft);
+        border: 1px solid var(--border);
+        border-radius: 15px;
+        margin-bottom: 16px;
+      }
+      .pcard h3 {
+        font-size: 1.2rem;
+        font-weight: 800;
+        margin-bottom: 8px;
+      }
+      .pcard p {
+        color: var(--muted);
+        font-size: 0.96rem;
+      }
+
+      /* ===== How it works ===== */
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      .step {
+        position: relative;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 30px 24px 26px;
+      }
+      .step .num {
+        position: absolute;
+        top: -18px;
+        right: 22px;
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        font-size: 1.2rem;
+        font-weight: 900;
+        color: #fff;
+        background: var(--grad);
+        border-radius: 13px;
+        box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
+      }
+      .step h3 {
+        font-size: 1.12rem;
+        font-weight: 800;
+        margin: 10px 0 8px;
+      }
+      .step p {
+        color: var(--muted);
+        font-size: 0.96rem;
+      }
+      .chat-demo {
+        margin-top: 14px;
+        display: grid;
+        gap: 8px;
+      }
+      .msg {
+        font-size: 0.9rem;
+        padding: 9px 14px;
+        border-radius: 13px;
+        max-width: 92%;
+      }
+      .msg.me {
+        align-self: flex-start;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+      }
+      .msg.bot {
+        align-self: flex-end;
+        background: var(--soft);
+        border: 1px solid var(--border-strong);
+      }
+
+      /* ===== Highlight (doctor report) ===== */
+      .highlight {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 34px;
+        align-items: center;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.14), rgba(168, 85, 247, 0.08));
+        border: 1px solid var(--border-strong);
+        border-radius: 24px;
+        box-shadow: var(--shadow-lg);
+        padding: 42px;
+        overflow: hidden;
+      }
+      .highlight h2 {
+        font-size: clamp(1.5rem, 3.5vw, 2.1rem);
+        font-weight: 900;
+        margin-bottom: 14px;
+      }
+      .highlight p {
+        color: var(--muted);
+        font-size: 1.04rem;
+        margin-bottom: 18px;
+      }
+      .check-list {
+        display: grid;
+        gap: 11px;
+      }
+      .check-list li {
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-weight: 600;
+      }
+      .check-list .ck {
+        width: 26px;
+        height: 26px;
+        display: grid;
+        place-items: center;
+        font-size: 0.85rem;
+        color: #fff;
+        background: var(--grad);
+        border-radius: 8px;
+        flex: none;
+      }
+      .report-mock {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 22px;
+      }
+      .report-mock .rm-h {
+        font-weight: 800;
+        color: var(--purple);
+        margin-bottom: 10px;
+        font-size: 0.95rem;
+      }
+      .report-mock .rm-line {
+        height: 9px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.07);
+        margin-bottom: 9px;
+      }
+      .report-mock .rm-line.s {
+        width: 62%;
+      }
+      .report-mock .rm-tl {
+        margin-top: 14px;
+        display: grid;
+        gap: 7px;
+      }
+      .report-mock .rm-row {
+        display: flex;
+        gap: 10px;
+        font-size: 0.82rem;
+        color: var(--muted);
+        padding: 7px 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 9px;
+        border-right: 2px solid var(--border-strong);
+      }
+
+      /* ===== Final CTA ===== */
+      .cta {
+        text-align: center;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(168, 85, 247, 0.1));
+        border: 1px solid var(--border-strong);
+        border-radius: 24px;
+        padding: 56px 30px;
+        box-shadow: var(--shadow-lg);
+      }
+      .cta h2 {
+        font-size: clamp(1.6rem, 4vw, 2.4rem);
+        font-weight: 900;
+        margin-bottom: 14px;
+      }
+      .cta p {
+        color: var(--muted);
+        max-width: 540px;
+        margin: 0 auto 28px;
+        font-size: 1.05rem;
+      }
+
+      footer {
+        text-align: center;
+        color: #6f6a85;
+        font-size: 0.86rem;
+        padding: 36px 22px 44px;
+        border-top: 1px solid var(--border);
+        margin-top: 30px;
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(22px);
+        transition: opacity 0.6s ease, transform 0.6s ease;
+      }
+      .reveal.in {
+        opacity: 1;
+        transform: none;
+      }
+
+      @media (max-width: 860px) {
+        .pillars {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .steps {
+          grid-template-columns: 1fr;
+        }
+        .highlight {
+          grid-template-columns: 1fr;
+          padding: 30px;
+        }
+      }
+      @media (max-width: 520px) {
+        .pillars {
+          grid-template-columns: 1fr;
+        }
+        .nav .btn {
+          padding: 9px 16px;
+          font-size: 0.9rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="bgCanvas" class="bg-canvas" aria-hidden="true"></canvas>
+
+    <!-- ===== Nav ===== -->
+    <nav class="nav">
+      <div class="nav-inner">
+        <div class="brand">
+          <span class="brand-mark">✍️</span>
+          <span class="brand-name">دوّنلي</span>
+        </div>
+        <a href="/login" class="btn">ابدأ دلوقتي</a>
+      </div>
+    </nav>
+
+    <!-- ===== Hero ===== -->
+    <header class="hero">
+      <div class="wrap">
+        <span class="pill">🤖 بوت تليجرام + داشبورد ذكية</span>
+        <h1>
+          كل حياتك متدوّنة ومنظّمة<br />
+          من غير ما تكتب <span class="grad">حرف واحد</span>
+        </h1>
+        <p class="lead">
+          كلّم دوّنلي على تليجرام بصوتك أو رسالة عادية، وهو يفهمك ويرتّبلك صحتك،
+          عاداتك، أهدافك، وفلوسك في داشبورد واحدة احترافية — ويطلّعلك تقرير جاهز لأي
+          دكتور في ثانية.
+        </p>
+        <div class="hero-cta">
+          <a href="/login" class="btn lg">ادخل على مساحتك</a>
+          <a href="#how" class="btn ghost lg">إزاي بيشتغل؟</a>
+        </div>
+        <p class="hero-note">كلامك بالعامية يكفي — مفيش فورمات ولا خانات تملاها.</p>
+      </div>
+    </header>
+
+    <!-- ===== Pillars ===== -->
+    <section id="pillars">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <h2>٤ محاور بتشتغل لوحدها</h2>
+          <p>بتتكلم عادي، ودوّنلي يعرف الكلام ده بيخص أنهي محور ويسجّله في مكانه.</p>
+        </div>
+        <div class="pillars">
+          <div class="pcard reveal">
+            <div class="ico">🩺</div>
+            <h3>الصحة والعلاج</h3>
+            <p>أي عرض أو دوا أو متابعة بيتسجّل على خريطة جسمك، ومنه تطلّع تقرير للدكتور.</p>
+          </div>
+          <div class="pcard reveal">
+            <div class="ico">🔁</div>
+            <h3>العادات</h3>
+            <p>«بلعب رياضة» أو «ببطّل سجاير» — يتعرف عليها ويعدّلك الـ streak كل يوم تعملها.</p>
+          </div>
+          <div class="pcard reveal">
+            <div class="ico">🎯</div>
+            <h3>الأهداف</h3>
+            <p>حدّد هدفك زي «أوصل ٥٠٠ ألف» ودوّنلي يتابع تقدّمك أول بأول.</p>
+          </div>
+          <div class="pcard reveal">
+            <div class="ico">💰</div>
+            <h3>الماليات</h3>
+            <p>كسبت كام وصرفت كام وفي إيه — كله متبوّب وواضح برسوم بيانية.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== How it works ===== -->
+    <section id="how">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <h2>بيشتغل في ٣ خطوات</h2>
+          <p>من غير تطبيق جديد تتعلّمه — كله من على تليجرام اللي بتستخدمه أصلاً.</p>
+        </div>
+        <div class="steps">
+          <div class="step reveal">
+            <div class="num">١</div>
+            <h3>كلّم دوّنلي</h3>
+            <p>ابعتله رسالة أو فويس بأي حاجة حصلت في يومك.</p>
+            <div class="chat-demo">
+              <div class="msg me">النهاردة لعبت رياضة وكان عندي حرقان في معدتي وصرفت ٢٠٠ جنيه أكل</div>
+            </div>
+          </div>
+          <div class="step reveal">
+            <div class="num">٢</div>
+            <h3>هو يفهم ويرتّب</h3>
+            <p>الذكاء الاصطناعي يفكّك كلامك ويوزّعه على المحاور صح.</p>
+            <div class="chat-demo">
+              <div class="msg bot">✅ عادة اتعملت: رياضة<br />🩺 اتسجّل عرض: حرقان (معدة)<br />💰 صرف: ٢٠٠ جنيه — أكل</div>
+            </div>
+          </div>
+          <div class="step reveal">
+            <div class="num">٣</div>
+            <h3>راجع داشبوردك</h3>
+            <p>افتح المساحة وشوف كل حاجة منظّمة برسوم وإحصائيات.</p>
+            <div class="chat-demo">
+              <div class="msg bot">📊 streak الرياضة: ٥ أيام · صافي الرصيد محدّث · تقرير الصحة جاهز</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Highlight: doctor report ===== -->
+    <section>
+      <div class="wrap">
+        <div class="highlight reveal">
+          <div>
+            <h2>تقرير جاهز لأي دكتور في ثانية</h2>
+            <p>
+              بدل ما تفتكر امتى بدأ العرض وكان شكله إيه، دوّنلي بيجمّع كل أعراضك في
+              فترة المتابعة ويطلّعلك تلخيص طبّي مرتّب + خط زمني — توريه لأي دكتور
+              تروحله.
+            </p>
+            <ul class="check-list">
+              <li><span class="ck">✓</span> متابعة ٣٠ يوم تتفتح أوتوماتيك</li>
+              <li><span class="ck">✓</span> تجميع كل الأعراض المرتبطة بالحالة</li>
+              <li><span class="ck">✓</span> تلخيص بالذكاء الاصطناعي + خط زمني</li>
+            </ul>
+          </div>
+          <div class="report-mock" aria-hidden="true">
+            <div class="rm-h">📋 تقرير الحالة — ارتجاع مريئي</div>
+            <div class="rm-line"></div>
+            <div class="rm-line"></div>
+            <div class="rm-line s"></div>
+            <div class="rm-tl">
+              <div class="rm-row"><span>٢ يونيو</span><span>حرقان بعد الأكل</span></div>
+              <div class="rm-row"><span>٤ يونيو</span><span>تحسّن مع الدوا</span></div>
+              <div class="rm-row"><span>٧ يونيو</span><span>رجع خفيف بالليل</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Final CTA ===== -->
+    <section>
+      <div class="wrap">
+        <div class="cta reveal">
+          <h2>ابدأ تدوّن من غير مجهود</h2>
+          <p>مساحتك الشخصية مستنياك — صحتك وعاداتك وأهدافك وفلوسك في مكان واحد.</p>
+          <a href="/login" class="btn lg">ادخل على دوّنلي</a>
+        </div>
+      </div>
+    </section>
+
+    <footer>دوّنلي · مساحتك الشخصية لحياتك كلها</footer>
+
+    <script>
+      // reveal on scroll
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              e.target.classList.add("in");
+              io.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.12 }
+      );
+      document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+
+      // ambient floating orbs
+      (function () {
+        const c = document.getElementById("bgCanvas");
+        const ctx = c.getContext("2d");
+        let w, h, dpr;
+        const orbs = [
+          { x: 0.15, y: 0.2, r: 320, col: "99,102,241", vx: 0.02, vy: 0.015 },
+          { x: 0.8, y: 0.15, r: 280, col: "168,85,247", vx: -0.018, vy: 0.02 },
+          { x: 0.5, y: 0.7, r: 360, col: "139,92,246", vx: 0.015, vy: -0.018 },
+          { x: 0.85, y: 0.8, r: 240, col: "236,72,153", vx: -0.02, vy: -0.012 },
+        ];
+        function resize() {
+          dpr = Math.min(window.devicePixelRatio || 1, 2);
+          w = c.width = innerWidth * dpr;
+          h = c.height = innerHeight * dpr;
+          c.style.width = innerWidth + "px";
+          c.style.height = innerHeight + "px";
+        }
+        resize();
+        addEventListener("resize", resize);
+        function frame() {
+          ctx.clearRect(0, 0, w, h);
+          orbs.forEach((o) => {
+            o.x += o.vx / 100;
+            o.y += o.vy / 100;
+            if (o.x < -0.1 || o.x > 1.1) o.vx *= -1;
+            if (o.y < -0.1 || o.y > 1.1) o.vy *= -1;
+            const px = o.x * w,
+              py = o.y * h,
+              pr = o.r * dpr;
+            const g = ctx.createRadialGradient(px, py, 0, px, py, pr);
+            g.addColorStop(0, "rgba(" + o.col + ",0.16)");
+            g.addColorStop(1, "rgba(" + o.col + ",0)");
+            ctx.fillStyle = g;
+            ctx.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+          });
+          requestAnimationFrame(frame);
+        }
+        frame();
+      })();
+    </script>
+  </body>
+</html>

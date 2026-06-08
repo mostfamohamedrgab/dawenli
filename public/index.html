@@ -3,91 +3,261 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>دوّنلي — يومياتي</title>
+    <title>دوّنلي — مساحتك الشخصية</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="topbar-inner">
-        <div class="brand brand-sm">
+    <canvas id="bgCanvas" class="bg-canvas" aria-hidden="true"></canvas>
+
+    <div class="app-shell">
+      <!-- ===================== Sidebar ===================== -->
+      <aside class="sidebar" id="sidebar">
+        <div class="side-brand">
           <span class="brand-mark">✍️</span>
-          <span class="brand-name">دوّنلي</span>
+          <div class="brand-text">
+            <span class="brand-name">دوّنلي</span>
+            <span class="brand-sub">مساحتك الشخصية</span>
+          </div>
         </div>
-        <button id="logoutBtn" class="ghost-btn">خروج</button>
-      </div>
-    </header>
 
-    <div class="container">
-      <section id="stats" class="stats">
-        <div class="stat-card">
-          <span class="stat-num" id="statJournal">—</span>
-          <span class="stat-label">تدوينات</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-num" id="statStreak">—</span>
-          <span class="stat-label">أيام متتالية</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-num" id="statMood">—</span>
-          <span class="stat-label">المزاج الغالب</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-num" id="statGoals">—</span>
-          <span class="stat-label">أهداف</span>
-        </div>
-      </section>
+        <nav class="side-nav" id="sideNav">
+          <button class="nav-item active" data-tab="overview"><span class="ni-ico">🏠</span><span class="ni-label">الرئيسية</span></button>
+          <button class="nav-item" data-tab="journal"><span class="ni-ico">📝</span><span class="ni-label">يوميات</span></button>
+          <div class="nav-group">المحاور</div>
+          <button class="nav-item" data-tab="health"><span class="ni-ico">🩺</span><span class="ni-label">الصحة</span></button>
+          <button class="nav-item" data-tab="habits"><span class="ni-ico">🔁</span><span class="ni-label">العادات</span></button>
+          <button class="nav-item" data-tab="goals"><span class="ni-ico">🎯</span><span class="ni-label">الأهداف</span></button>
+          <button class="nav-item" data-tab="finance"><span class="ni-ico">💰</span><span class="ni-label">الماليات</span></button>
+          <div class="nav-group">كمان</div>
+          <button class="nav-item" data-tab="meals"><span class="ni-ico">🍽️</span><span class="ni-label">الأكل</span></button>
+          <button class="nav-item" data-tab="chats"><span class="ni-ico">💬</span><span class="ni-label">المحادثات</span></button>
+          <button class="nav-item" data-tab="usage"><span class="ni-ico">🤖</span><span class="ni-label">تكلفة الـAI</span></button>
+        </nav>
 
-      <nav class="tabs" id="tabs">
-        <button class="tab active" data-tab="journal">📝 يوميات</button>
-        <button class="tab" data-tab="goals">🎯 أهداف</button>
-      </nav>
+        <div class="side-foot">
+          <a class="side-link" href="/landing" target="_blank">عن دوّنلي ↗</a>
+          <button id="logoutBtn" class="ghost-btn block">خروج</button>
+        </div>
+      </aside>
 
-      <!-- ========== يوميات ========== -->
-      <section class="tab-panel" data-panel="journal">
-        <div class="panel analyze-panel">
-          <div class="panel-head">
-            <h2>تحليل أيامك</h2>
-            <div class="analyze-controls">
-              <select id="days" class="select">
-                <option value="7">آخر ٧ أيام</option>
-                <option value="14">آخر ١٤ يوم</option>
-                <option value="30">آخر شهر</option>
-              </select>
-              <button id="analyzeBtn" class="primary-btn">حلّلي</button>
+      <!-- ===================== Main ===================== -->
+      <main class="main">
+        <header class="topbar">
+          <button id="menuBtn" class="icon-btn only-mobile" aria-label="القائمة">☰</button>
+          <div class="topbar-titles">
+            <h1 id="pageTitle" class="page-title">الرئيسية</h1>
+            <span id="pageDateLabel" class="page-date">—</span>
+          </div>
+          <button id="refreshBtn" class="ghost-btn sm">↻ تحديث</button>
+        </header>
+
+        <!-- ========== الرئيسية ========== -->
+        <section class="tab-panel" data-panel="overview">
+          <div class="hero-card">
+            <div class="hero-text">
+              <h2 id="heroGreeting">أهلاً بيك 👋</h2>
+              <p class="muted" id="heroSub">كل يومياتك ومحاورك في مكان واحد.</p>
+            </div>
+            <div class="hero-streak">
+              <div class="ring-wrap"><canvas id="streakRing" width="120" height="120"></canvas>
+                <div class="ring-center"><span id="streakNum">0</span><small>يوم متتالي</small></div>
+              </div>
             </div>
           </div>
-          <div id="analysis" class="analysis-result hidden"></div>
-        </div>
-        <h2 class="section-title">يومياتك</h2>
-        <div id="entries" class="entries">
-          <p class="muted center">بحمّل اليوميات...</p>
-        </div>
-      </section>
 
-      <!-- ========== أهداف ========== -->
-      <section class="tab-panel hidden" data-panel="goals">
-        <div class="panel">
-          <div class="panel-head"><h2>أضف هدف</h2></div>
-          <form id="goalForm" class="goal-form">
-            <input id="goalTitle" class="select gf" placeholder="اسم الهدف (مثلاً: أوصل ٥٠٠ ألف)" required />
-            <input id="goalTarget" class="select gf" type="number" placeholder="الرقم المستهدف" />
-            <input id="goalUnit" class="select gf" placeholder="الوحدة (جنيه)" />
-            <button type="submit" class="primary-btn">إضافة</button>
-          </form>
-          <p class="muted" style="margin-top: 10px">
-            أو قول للبوت بصوتك: «عايز أوصل ٥٠٠ ألف، عملت منهم ١٠ آلاف» — وكل ما تحقّق
-            تقدّم قوله «النهاردة عملت ٥ آلاف» وهيزوّدهم لوحده.
-          </p>
-        </div>
-        <div id="goals" class="goals-grid"></div>
-      </section>
+          <div class="stat-grid" id="overviewStats"></div>
+
+          <h3 class="block-title">محاورك</h3>
+          <div class="pillar-grid">
+            <div class="pillar-card" data-go="health">
+              <div class="pillar-head"><span class="pillar-ico">🩺</span><span>الصحة</span></div>
+              <canvas class="pillar-chart" id="chartHealth" width="280" height="90"></canvas>
+              <div class="pillar-meta" id="metaHealth">—</div>
+            </div>
+            <div class="pillar-card" data-go="habits">
+              <div class="pillar-head"><span class="pillar-ico">🔁</span><span>العادات</span></div>
+              <canvas class="pillar-chart" id="chartHabits" width="280" height="90"></canvas>
+              <div class="pillar-meta" id="metaHabits">—</div>
+            </div>
+            <div class="pillar-card" data-go="goals">
+              <div class="pillar-head"><span class="pillar-ico">🎯</span><span>الأهداف</span></div>
+              <canvas class="pillar-chart" id="chartGoals" width="280" height="90"></canvas>
+              <div class="pillar-meta" id="metaGoals">—</div>
+            </div>
+            <div class="pillar-card" data-go="finance">
+              <div class="pillar-head"><span class="pillar-ico">💰</span><span>الماليات</span></div>
+              <canvas class="pillar-chart" id="chartFinance" width="280" height="90"></canvas>
+              <div class="pillar-meta" id="metaFinance">—</div>
+            </div>
+          </div>
+
+          <h3 class="block-title">آخر النشاط</h3>
+          <div id="recentFeed" class="feed"></div>
+        </section>
+
+        <!-- ========== يوميات ========== -->
+        <section class="tab-panel hidden" data-panel="journal">
+          <div class="panel analyze-panel">
+            <div class="panel-head">
+              <h2>تحليل أيامك</h2>
+              <div class="analyze-controls">
+                <select id="days" class="select">
+                  <option value="7">آخر ٧ أيام</option>
+                  <option value="14">آخر ١٤ يوم</option>
+                  <option value="30">آخر شهر</option>
+                </select>
+                <button id="analyzeBtn" class="primary-btn">حلّلي</button>
+              </div>
+            </div>
+            <div id="analysis" class="analysis-result hidden"></div>
+          </div>
+          <h2 class="section-title">يومياتك</h2>
+          <div id="entries" class="entries"><p class="muted center">بحمّل اليوميات...</p></div>
+        </section>
+
+        <!-- ========== الصحة ========== -->
+        <section class="tab-panel hidden" data-panel="health">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>صحتك على الجسم</h2>
+              <div class="day-nav">
+                <button id="dayPrev" class="ghost-btn sm" title="اليوم اللي قبله">‹</button>
+                <span id="dayLabel" class="day-label">—</span>
+                <button id="dayNext" class="ghost-btn sm" title="اليوم اللي بعده">›</button>
+              </div>
+            </div>
+            <div class="bodymap">
+              <div class="body-wrap">
+                <svg id="bodySvg" viewBox="0 0 200 360" class="body-svg" aria-label="جسم الإنسان">
+                  <circle class="bodypart" data-region="راس" cx="100" cy="32" r="24" />
+                  <rect class="body-neutral" x="92" y="54" width="16" height="12" rx="4" />
+                  <rect class="bodypart" data-region="صدر" x="62" y="66" width="76" height="50" rx="14" />
+                  <rect class="bodypart" data-region="معدة" x="66" y="118" width="68" height="38" rx="10" />
+                  <rect class="bodypart" data-region="بطن" x="68" y="158" width="64" height="40" rx="10" />
+                  <rect class="bodypart" data-region="ذراعين" x="38" y="70" width="18" height="106" rx="9" />
+                  <rect class="bodypart" data-region="ذراعين" x="144" y="70" width="18" height="106" rx="9" />
+                  <rect class="bodypart" data-region="ساقين" x="72" y="202" width="24" height="146" rx="11" />
+                  <rect class="bodypart" data-region="ساقين" x="104" y="202" width="24" height="146" rx="11" />
+                  <g id="bodyBadges"></g>
+                </svg>
+              </div>
+              <div class="health-side">
+                <div id="generalChips" class="general-chips"></div>
+                <div id="healthList" class="list"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>متابعة الحالات + تقرير الطبيب</h2>
+            </div>
+            <p class="muted">قول للبوت «عندي ارتجاع مريئي وعايز أتابع حالتي» وهيفتحلك متابعة ٣٠ يوم، يجمّع الأعراض، وتطلّع تقرير جاهز للدكتور.</p>
+            <div id="conditions" class="conditions"></div>
+          </div>
+        </section>
+
+        <!-- ========== العادات ========== -->
+        <section class="tab-panel hidden" data-panel="habits">
+          <div class="panel">
+            <div class="panel-head"><h2>أضف عادة</h2></div>
+            <form id="habitForm" class="inline-form">
+              <input id="habitTitle" class="select gf" placeholder="اسم العادة (رياضة، قراءة...)" required />
+              <select id="habitKind" class="select">
+                <option value="do">عادة أعملها 🔁</option>
+                <option value="quit">عادة أبطّلها 🚭</option>
+              </select>
+              <button type="submit" class="primary-btn">إضافة</button>
+            </form>
+            <p class="muted" style="margin-top:10px">أو قول للبوت «بلعب رياضة كل يوم» وكل ما تعملها قوله «النهاردة لعبت رياضة» وهيعلّمها لوحده.</p>
+          </div>
+          <div id="habits" class="habits-grid"></div>
+        </section>
+
+        <!-- ========== الأهداف ========== -->
+        <section class="tab-panel hidden" data-panel="goals">
+          <div class="panel">
+            <div class="panel-head"><h2>أضف هدف</h2></div>
+            <form id="goalForm" class="inline-form">
+              <input id="goalTitle" class="select gf" placeholder="اسم الهدف (أوصل ٥٠٠ ألف)" required />
+              <input id="goalTarget" class="select gf" type="number" placeholder="الرقم المستهدف" />
+              <input id="goalUnit" class="select gf" placeholder="الوحدة (جنيه)" />
+              <button type="submit" class="primary-btn">إضافة</button>
+            </form>
+            <p class="muted" style="margin-top:10px">أو قول للبوت «عايز أوصل ٥٠٠ ألف، عملت منهم ١٠ آلاف» وكل ما تتقدّم قوله «النهاردة عملت ٥ آلاف».</p>
+          </div>
+          <div id="goals" class="goals-grid"></div>
+        </section>
+
+        <!-- ========== الماليات ========== -->
+        <section class="tab-panel hidden" data-panel="finance">
+          <div class="fin-summary" id="finSummary"></div>
+          <div class="panel">
+            <div class="panel-head"><h2>الدخل مقابل الصرف</h2><span class="muted" id="finRangeLabel">آخر ١٤ يوم</span></div>
+            <canvas id="finChart" class="fin-chart" width="900" height="240"></canvas>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>إضافة عملية</h2></div>
+            <form id="finForm" class="inline-form">
+              <select id="finDir" class="select">
+                <option value="expense">صرف ➖</option>
+                <option value="income">دخل ➕</option>
+              </select>
+              <input id="finAmount" class="select gf" type="number" placeholder="المبلغ" required />
+              <input id="finNote" class="select gf" placeholder="البند (أكل، مواصلات...)" />
+              <button type="submit" class="primary-btn">إضافة</button>
+            </form>
+          </div>
+          <h2 class="section-title">العمليات</h2>
+          <div id="finList" class="list"></div>
+        </section>
+
+        <!-- ========== الأكل ========== -->
+        <section class="tab-panel hidden" data-panel="meals">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>الأكل</h2>
+              <div class="day-nav">
+                <button id="mealPrev" class="ghost-btn sm" title="اليوم اللي قبله">‹</button>
+                <span id="mealDayLabel" class="day-label">—</span>
+                <button id="mealNext" class="ghost-btn sm" title="اليوم اللي بعده">›</button>
+              </div>
+            </div>
+            <p class="muted">قول للبوت «أكلت رز وفراخ» وهيتسجّل هنا باليوم.</p>
+            <div id="meals" class="list"></div>
+          </div>
+        </section>
+
+        <!-- ========== المحادثات ========== -->
+        <section class="tab-panel hidden" data-panel="chats">
+          <h2 class="section-title">سجل المحادثات</h2>
+          <p class="muted">كل رسالة بعتّها ورد دوّنلي عليها — للمراجعة وتحسين الردود بعدين.</p>
+          <div id="chats" class="chats"></div>
+        </section>
+
+        <!-- ========== تكلفة الـAI ========== -->
+        <section class="tab-panel hidden" data-panel="usage">
+          <div class="fin-summary" id="usageSummary"></div>
+          <div class="panel">
+            <div class="panel-head"><h2>التكلفة اليومية</h2><span class="muted" id="usageRangeLabel">آخر ٣٠ يوم</span></div>
+            <canvas id="usageChart" class="fin-chart" width="900" height="240"></canvas>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>التفصيل حسب العملية</h2></div>
+            <div id="usageBreakdown" class="list"></div>
+          </div>
+          <p class="muted center" id="usageNote"></p>
+        </section>
+      </main>
     </div>
+
+    <div id="sideScrim" class="side-scrim hidden"></div>
 
     <div id="confirmOverlay" class="modal-overlay hidden">
       <div class="modal" role="dialog" aria-modal="true">
