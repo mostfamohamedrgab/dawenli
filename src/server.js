@@ -98,13 +98,16 @@ export function startServer() {
     res.json({ ok: true });
   });
 
-  // أصول عامة (مفيهاش بيانات حسّاسة)
-  app.get("/style.css", (_req, res) =>
-    res.sendFile(join(publicDir, "style.css"))
-  );
-  app.get("/login.js", (_req, res) =>
-    res.sendFile(join(publicDir, "login.js"))
-  );
+  // أصول عامة (مفيهاش بيانات حسّاسة) — no-cache عشان أي تحديث يوصل فورًا للمتصفح
+  const noCache = (res) => res.set("Cache-Control", "no-cache, must-revalidate");
+  app.get("/style.css", (_req, res) => {
+    noCache(res);
+    res.sendFile(join(publicDir, "style.css"));
+  });
+  app.get("/login.js", (_req, res) => {
+    noCache(res);
+    res.sendFile(join(publicDir, "login.js"));
+  });
 
   app.get(["/login", "/login.html"], (req, res) => {
     if (authed(req)) return res.redirect("/");
@@ -117,9 +120,11 @@ export function startServer() {
   );
 
   // محمي: السكربت والصفحة والبيانات
-  app.get("/app.js", (req, res) =>
-    authed(req) ? res.sendFile(join(publicDir, "app.js")) : res.status(401).end()
-  );
+  app.get("/app.js", (req, res) => {
+    if (!authed(req)) return res.status(401).end();
+    noCache(res);
+    res.sendFile(join(publicDir, "app.js"));
+  });
 
   app.get("/", (req, res) => {
     if (!authed(req)) return res.redirect("/login");

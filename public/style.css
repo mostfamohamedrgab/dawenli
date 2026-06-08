@@ -1840,9 +1840,11 @@ canvas, img, svg { max-width: 100%; }
   width: 100%;
 }
 .tab-panel { min-width: 0; }
+/* the panels are grids; their children default to min-width:auto and refuse to
+   shrink below content → they overflowed the container. let them shrink. */
+.tab-panel > * { min-width: 0; }
 
-/* the real overflow cause: 1fr columns wouldn't shrink below their content,
-   so the grids spilled past the container. minmax(0,1fr) lets them fit. */
+/* and let the columns themselves shrink below content too */
 .stat-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .pillar-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .stat-card, .pillar-card, .fin-card, .step { min-width: 0; }
