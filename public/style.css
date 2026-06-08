@@ -1739,12 +1739,14 @@ h3 {
   -webkit-text-fill-color: transparent;
 }
 
-/* brand mark: warm sage tile instead of glossy violet */
+/* brand mark: warm sage tile holding the dawwenli logo */
 .brand-mark {
-  background: var(--soft) !important;
+  background: var(--surface) !important;
   border: 2px solid var(--border-strong);
   box-shadow: var(--shadow) !important;
+  overflow: hidden;
 }
+.brand-mark img { width: 82%; height: 82%; object-fit: contain; display: block; }
 
 /* auth card on paper */
 .auth-card { background: var(--surface); }

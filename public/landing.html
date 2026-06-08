@@ -70,6 +70,8 @@ img{max-width:100%}
   color:var(--brand-deep);background:var(--brand-wash);border-radius:var(--radius-pill);
   padding:7px 16px;margin-bottom:22px;
 }
+.brand-lock{display:inline-flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:1.5rem;color:var(--ink)}
+.brand-lock img{height:44px;width:auto}
 
 /* ---------- header ---------- */
 .header{
@@ -237,7 +239,7 @@ img{max-width:100%}
 <body>
 
 <header class="header">
-  <img src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" style="height:40px" />
+  <a href="/" class="brand-lock"><img src="/assets/logo/dawwenli-mark.svg" alt="" /><span>دوّنلي</span></a>
   <nav>
     <a href="#how">إزاي بيشتغل</a>
     <a href="#worlds">العوالم</a>
@@ -364,7 +366,7 @@ img{max-width:100%}
 
 <footer class="footer">
   <div class="wrap">
-    <img src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" style="height:30px" />
+    <a href="/" class="brand-lock" style="font-size:1.25rem"><img src="/assets/logo/dawwenli-mark.svg" alt="" style="height:34px" /><span>دوّنلي</span></a>
     <span>دوّنلي © ٢٠٢٦ — دفترك الشخصي، بيرتّب نفسه</span>
   </div>
 </footer>
