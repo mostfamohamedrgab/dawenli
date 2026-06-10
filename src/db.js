@@ -154,11 +154,14 @@ function addColumnIfMissing(table, col, def) {
 }
 
 // كل جداول البيانات بقت per-user
-for (const t of ["entries", "finance", "health", "conversations", "goals", "conditions", "meals", "habits", "ai_usage"]) {
+for (const t of ["entries", "finance", "health", "conversations", "goals", "conditions", "meals", "habits", "tasks", "ai_usage"]) {
   addColumnIfMissing(t, "user_id", "INTEGER");
 }
 addColumnIfMissing("health", "body_region", "TEXT");
 addColumnIfMissing("finance", "category", "TEXT"); // أكل، مواصلات، فواتير...
+addColumnIfMissing("tasks", "completed_at", "TEXT");
+addColumnIfMissing("tasks", "reminded_at", "TEXT");
+db.prepare(`UPDATE tasks SET status = 'pending' WHERE status = 'open'`).run();
 
 const now = () => new Date().toISOString();
 
@@ -234,7 +237,7 @@ export function listUsers() {
       owner = getUserByIdStmt.get(Number(info.lastInsertRowid));
     }
   }
-  for (const t of ["entries", "finance", "health", "conversations", "goals", "conditions", "meals", "habits", "ai_usage"]) {
+  for (const t of ["entries", "finance", "health", "conversations", "goals", "conditions", "meals", "habits", "tasks", "ai_usage"]) {
     db.prepare(`UPDATE ${t} SET user_id = ? WHERE user_id IS NULL`).run(owner.id);
   }
 })();
