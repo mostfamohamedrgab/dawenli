@@ -397,6 +397,13 @@ export function financeSince(userId, dateStr) {
   return financeSinceStmt.all(userId, dateStr);
 }
 
+const financeBetweenStmt = db.prepare(
+  `SELECT * FROM finance WHERE user_id = ? AND entry_date >= ? AND entry_date <= ? ORDER BY entry_date ASC`
+);
+export function financeBetween(userId, from, to) {
+  return financeBetweenStmt.all(userId, from, to);
+}
+
 export function deleteFinance(userId, id) {
   return db.prepare(`DELETE FROM finance WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
 }
@@ -432,6 +439,20 @@ const healthSinceStmt = db.prepare(
 );
 export function healthSince(userId, dateStr) {
   return healthSinceStmt.all(userId, dateStr);
+}
+
+const entriesBetweenStmt = db.prepare(
+  `SELECT * FROM entries WHERE user_id = ? AND entry_date >= ? AND entry_date <= ? ORDER BY entry_date ASC, id ASC`
+);
+export function entriesBetween(userId, from, to) {
+  return entriesBetweenStmt.all(userId, from, to);
+}
+
+const mealsBetweenStmt = db.prepare(
+  `SELECT * FROM meals WHERE user_id = ? AND entry_date >= ? AND entry_date <= ? ORDER BY entry_date ASC, id ASC`
+);
+export function mealsBetween(userId, from, to) {
+  return mealsBetweenStmt.all(userId, from, to);
 }
 
 const healthBetweenStmt = db.prepare(

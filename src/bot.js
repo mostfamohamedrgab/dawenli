@@ -67,8 +67,9 @@ export function startBot() {
         "اتربط حسابك ✅🎉\nمن دلوقتي ابعتلي voice أو اكتبلي عن يومك — مصاريفك وصحتك وعاداتك وأهدافك ومهامك كلها هتتسجل وتظهر في داشبوردك.\nجرّب دلوقتي: احكيلي يومك عدى إزاي؟"
       );
     }
+    const firstName = ctx.from?.first_name ? ` يا ${ctx.from.first_name}` : "";
     return ctx.reply(
-      "أهلاً بيك في دوّنلي ✍️\nابعتلي voice أو اكتبلي عن يومك — هفهم كلامك وأسجّل منه: مصاريفك 💰، صحتك ونفسيتك 🩺، عاداتك وأهدافك 🎯، ومهامك في التقويم 📅.\nولو سألتك حاجة مش واضحة، رد عليّا وهكمّل التسجيل.\n\nأوامر:\n/report — تقرير شامل عن آخر ٣٠ يوم\n/analyze — تحليل يومياتك آخر ٧ أيام\n/code — كود دخول للوحة التحكم\n/checkin — اسألني عن يومي دلوقتي"
+      `أهلاً بيك في دوّنلي${firstName} ✍️\nحسابك جاهز خلاص — ابعتلي voice أو اكتبلي عن يومك وأنا أفهم كلامك وأسجّل منه: مصاريفك 💰، صحتك ونفسيتك 🩺، عاداتك وأهدافك 🎯، ومهامك في التقويم 📅.\nوتقدر تسألني عن أي حاجة فاتت كمان (امبارح أكلت إيه؟ صرفت كام الأسبوع ده؟).\nولو سألتك حاجة مش واضحة، رد عليّا وهكمّل التسجيل.\n\nأوامر:\n/report — تقرير شامل عن آخر ٣٠ يوم\n/analyze — تحليل يومياتك آخر ٧ أيام\n/code — كود دخول للوحة التحكم\n/checkin — اسألني عن يومي دلوقتي`
     );
   });
 
@@ -229,16 +230,21 @@ function startSchedulers(bot) {
       }
     }
 
-    // الـ check-in اليومي لكل المستخدمين
+    // الـ check-in اليومي 9 مساءً — بيسأل كل مستخدم نشط عن الناقص في عوالمه الأربعة.
+    // بنبعت للنشطين بس (آخر ظهور خلال ١٤ يوم) عشان منهدرش نداءات على حسابات نايمة،
+    // وبستاجر بسيط بين الرسايل عشان منضغطش OpenAI/تيليجرام دفعة واحدة.
     if (c.hour === config.checkinHour && c.minute === 0 && lastCheckin !== c.date) {
       lastCheckin = c.date;
-      for (const user of usersWithChat()) {
+      const targets = activeUsersWithChat(14);
+      console.log(`🌙 check-in اليومي — ${targets.length} مستخدم نشط`);
+      for (const user of targets) {
         try {
           const msg = await composeCheckin(user);
           await bot.telegram.sendMessage(user.chat_id, msg);
         } catch (err) {
           console.error(`checkin send error (user ${user.id}):`, err);
         }
+        await sleep(600); // ستاجر لطيف
       }
     }
 
@@ -264,6 +270,14 @@ function startSchedulers(bot) {
 function usersWithChat() {
   return listUsers().filter((u) => u.chat_id && u.chat_id !== "owner");
 }
+
+// المستخدمين النشطين بس (آخر ظهور خلال N يوم) — للمبادرة اليومية
+function activeUsersWithChat(days = 14) {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  return usersWithChat().filter((u) => !u.last_seen || u.last_seen >= cutoff);
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function sendWeeklyReflection(bot, user) {
   const since = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);

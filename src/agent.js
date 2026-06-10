@@ -14,9 +14,13 @@ import {
   entriesSince,
   addFinance,
   financeSince,
+  financeBetween,
   FINANCE_CATEGORIES,
   addHealth,
   healthSince,
+  healthBetween,
+  entriesBetween,
+  mealsBetween,
   applyGoal,
   listGoals,
   addHabit,
@@ -237,15 +241,20 @@ const TOOLS = [
     function: {
       name: "get_data",
       description:
-        "هات بيانات المستخدم الحقيقية عشان تجاوب على أسئلته: صرف كام؟ إيه مهامه؟ وصل لفين في أهدافه؟ استخدمها قبل ما تجاوب على أي سؤال عن بياناته.",
+        "هات بيانات المستخدم الحقيقية للإجابة على أسئلته — سواء عن دلوقتي أو عن الماضي (امبارح أكلت إيه؟ الأسبوع اللي فات عملت إيه؟ صرفت كام الشهر ده؟). استخدمها قبل أي إجابة عن بياناته. للأسئلة عن يوم أو فترة معيّنة استخدم topic='day' أو حدّد from/to بالتواريخ المحسوبة من سياق الأيام.",
       parameters: {
         type: "object",
         properties: {
           topic: {
             type: "string",
-            enum: ["finance", "goals", "habits", "tasks", "health", "journal"],
+            enum: ["day", "finance", "goals", "habits", "tasks", "health", "journal", "meals"],
+            description:
+              "day = كل اللي حصل في يوم معيّن (يوميات+أكل+صحة+فلوس) — مثالي لـ«امبارح عملت إيه». غير كده اختار المحور المطلوب.",
           },
-          days: { type: "number", description: "الفترة بالأيام لورا، الافتراضي 30" },
+          date: { type: "string", description: "يوم محدد YYYY-MM-DD (لـ topic='day' أو سؤال عن يوم واحد)" },
+          from: { type: "string", description: "بداية الفترة YYYY-MM-DD" },
+          to: { type: "string", description: "نهاية الفترة YYYY-MM-DD" },
+          days: { type: "number", description: "بدل from/to: عدد الأيام لورا من النهاردة، الافتراضي 30" },
         },
         required: ["topic"],
       },
@@ -420,11 +429,36 @@ function executeTool(ctx, name, args) {
       };
     }
     case "get_data": {
+      // نحدّد نافذة التاريخ: date واحد، أو from/to، أو days لورا (افتراضي 30)
       const days = Number(args.days) > 0 ? Number(args.days) : 30;
-      const since = daysAgo(days - 1);
+      let from, to;
+      if (isDate(args.date)) {
+        from = to = args.date;
+      } else {
+        from = isDate(args.from) ? args.from : daysAgo(days - 1);
+        to = isDate(args.to) ? args.to : today;
+      }
+
       switch (args.topic) {
+        case "day": {
+          // كل اللي حصل في يوم (أو فترة) — للأسئلة زي "امبارح عملت إيه"
+          const journal = entriesBetween(userId, from, to);
+          const meals = mealsBetween(userId, from, to);
+          const health = healthBetween(userId, from, to);
+          const fin = financeBetween(userId, from, to);
+          return {
+            result: {
+              from, to,
+              journal: journal.map((e) => ({ date: e.entry_date, mood: e.mood, text: e.summary || (e.transcript || "").slice(0, 200) })),
+              meals: meals.map((m) => ({ date: m.entry_date, items: m.items, time: m.at_time, note: m.note })),
+              health: health.map((h) => ({ date: h.entry_date, category: h.category, detail: h.detail })),
+              finance: fin.map((f) => ({ date: f.entry_date, dir: f.direction, amount: f.amount, category: f.category, note: f.note })),
+              empty: !journal.length && !meals.length && !health.length && !fin.length,
+            },
+          };
+        }
         case "finance": {
-          const rows = financeSince(userId, since);
+          const rows = financeBetween(userId, from, to);
           const income = rows.filter((r) => r.direction === "income").reduce((a, r) => a + r.amount, 0);
           const expense = rows.filter((r) => r.direction === "expense").reduce((a, r) => a + r.amount, 0);
           const byCat = {};
@@ -432,15 +466,18 @@ function executeTool(ctx, name, args) {
             byCat[r.category || "أخرى"] = (byCat[r.category || "أخرى"] || 0) + r.amount;
           return {
             result: {
-              since,
-              income,
-              expense,
-              net: income - expense,
+              from, to, income, expense, net: income - expense,
               expense_by_category: byCat,
-              last_items: rows.slice(-15).map((r) => ({ date: r.entry_date, dir: r.direction, amount: r.amount, category: r.category, note: r.note })),
+              items: rows.slice(-25).map((r) => ({ date: r.entry_date, dir: r.direction, amount: r.amount, category: r.category, note: r.note })),
             },
           };
         }
+        case "meals":
+          return {
+            result: mealsBetween(userId, from, to).map((m) => ({
+              date: m.entry_date, items: m.items, time: m.at_time, note: m.note,
+            })),
+          };
         case "goals":
           return {
             result: listGoals(userId).map((g) => ({
@@ -462,13 +499,13 @@ function executeTool(ctx, name, args) {
           };
         case "health":
           return {
-            result: healthSince(userId, since).map((h) => ({
+            result: healthBetween(userId, from, to).map((h) => ({
               date: h.entry_date, category: h.category, detail: h.detail, region: h.body_region,
             })),
           };
         case "journal":
           return {
-            result: entriesSince(userId, since).map((e) => ({
+            result: entriesBetween(userId, from, to).map((e) => ({
               date: e.entry_date, mood: e.mood, summary: e.summary,
             })),
           };
@@ -506,11 +543,19 @@ function buildSnapshot(userId) {
     const d = daysAhead(i);
     week.push(`${weekdayOf(d)} = ${d}`);
   }
+  // الأيام اللي فاتت بالتواريخ — عشان "امبارح"، "أول امبارح"، "الأسبوع اللي فات" تتحسب صح
+  const past = [];
+  for (let i = 1; i <= 8; i++) {
+    const d = daysAgo(i);
+    const label = i === 1 ? "امبارح" : i === 2 ? "أول امبارح" : `من ${i} أيام`;
+    past.push(`${label} (${weekdayOf(d)}) = ${d}`);
+  }
 
   return {
     today: `${today} (${weekdayOf(today)})`,
     profile, // مين هو، بيدرس/بيشتغل إيه، أمراضه المزمنة، تفضيلاته
     next_days: week.join("، "),
+    past_days: past.join("، "),
     spent_today: spentToday,
     goals: goals.map((g) => `${g.title}: ${g.current}${g.unit ? " " + g.unit : ""}${g.target ? ` من ${g.target}` : ""}`),
     habits: habits.map((h) => `${h.title} (${h.kind === "quit" ? "بيبطّلها" : "بيعملها"})${h.doneToday ? " ✓ اتعملت النهاردة" : ""} — ستريك ${h.streak}`),
@@ -544,8 +589,11 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 - لو المستخدم بيرد على سؤال سألته قبل كده (شوف المحادثة) → كمّل التسجيل بناءً على رده.
 - ماتسألش لو الموضوع واضح أو الناقص مش مهم.
 
-# الإجابة على الأسئلة
-- لو سأل عن بياناته (صرف كام؟ باقي إيه في المهام؟ وصل لفين في هدفه؟) → استخدم get_data الأول وجاوب من الأرقام الحقيقية.
+# الإجابة على الأسئلة (دلوقتي والماضي)
+- لو سأل عن بياناته الحالية (صرف كام؟ باقي إيه في المهام؟ وصل لفين في هدفه؟) → استخدم get_data وجاوب من الأرقام الحقيقية.
+- لو سأل عن الماضي ("امبارح أكلت إيه؟"، "الأسبوع اللي فات عملت إيه؟"، "إمتى آخر مرة جريت؟"، "صرفت كام الشهر اللي فات؟") → استخدم get_data بالتواريخ المضبوطة من "past_days" في السياق: لسؤال عن يوم استخدم topic="day" مع date، ولفترة استخدم from/to أو المحور المطلوب.
+- لو السؤال عن يوم بعينه وعايز كل اللي حصل فيه → topic="day". لو محور واحد بس (أكل/فلوس/صحة) استخدم الـ topic المناسب.
+- جاوب من النتيجة بس — لو رجعت فاضية (empty) قول بصراحة إنه ماسجّلش حاجة في اليوم/الفترة دي، متخترعش.
 
 # أسلوب الرد النهائي
 - قصير ودافي بالعامي المصري (٢-٤ سطور)، كإنك صاحب بيسمعه.
