@@ -5,41 +5,72 @@ import { runAgent, composeCheckin } from "./agent.js";
 import { buildReportData } from "./report.js";
 import {
   ensureUser,
+  getUserByChatId,
+  linkTelegram,
   listUsers,
   entriesSince,
   dueTaskReminders,
   markTaskReminded,
 } from "./db.js";
-import { issueLoginCode } from "./server.js";
+import { issueLoginCode, redeemLinkToken } from "./server.js";
 
 export function startBot() {
   const bot = new Telegraf(config.telegramToken);
 
   // التسجيل والأمان:
+  // - /start بتوكن ربط (من زرار "اربط تيليجرام" في الداشبورد): مسموح دايمًا.
+  // - حساب مربوط قبل كده (إيميل + تيليجرام): مسموح دايمًا.
   // - لو OPEN_SIGNUP=true: أي حد يكلم البوت بيتعمله حساب تلقائي.
-  // - لو لأ و ALLOWED_CHAT_ID متحدد: البوت لصاحبه بس (الوضع الشخصي).
+  // - غير كده و ALLOWED_CHAT_ID متحدد: البوت لصاحبه بس (الوضع الشخصي).
   bot.use(async (ctx, next) => {
     const chatId = String(ctx.chat?.id ?? "");
     if (!chatId) return;
-    if (!config.openSignup) {
+
+    const linkMatch = (ctx.message?.text || "").match(/^\/start\s+(lk[a-f0-9]+)$/);
+    if (linkMatch) {
+      ctx.state.linkToken = linkMatch[1];
+      return next(); // الربط بيتعامل معاه في bot.start من غير إنشاء حساب جديد
+    }
+
+    const knownUser = getUserByChatId(chatId);
+    if (!config.openSignup && !knownUser) {
       if (!config.allowedChatId) {
         await ctx.reply(
           `👋 أهلاً! الـ chat_id بتاعك هو: ${chatId}\nحطّه في ALLOWED_CHAT_ID في ملف .env وأعد التشغيل — أو فعّل OPEN_SIGNUP=true لفتح التسجيل للكل.`
         );
         return;
       }
-      if (chatId !== config.allowedChatId) return; // تجاهل أي حد تاني
+      if (chatId !== config.allowedChatId) {
+        // مش معروف: اقترح عليه يعمل حساب من الموقع ويربط
+        await ctx.reply("أهلاً 👋 اعمل حساب من الموقع الأول، وبعدين دوس «اربط تيليجرام» من الداشبورد وهنبقى جاهزين.");
+        return;
+      }
     }
     const name = [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(" ") || ctx.from?.username;
     ctx.state.user = ensureUser(chatId, name);
     return next();
   });
 
-  bot.start((ctx) =>
-    ctx.reply(
+  bot.start(async (ctx) => {
+    // جاي من زرار "اربط تيليجرام" في الداشبورد
+    if (ctx.state.linkToken) {
+      const userId = redeemLinkToken(ctx.state.linkToken);
+      if (!userId) {
+        return ctx.reply("اللينك ده خلصت صلاحيته 🙈 افتح الداشبورد ودوس «اربط تيليجرام» تاني.");
+      }
+      const name = [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(" ") || ctx.from?.username;
+      const r = linkTelegram(userId, String(ctx.chat.id), name);
+      if (!r.ok) {
+        return ctx.reply("رقم التيليجرام ده مرتبط بحساب تاني — سجّل دخول بالحساب القديم أو كلمني من هناك.");
+      }
+      return ctx.reply(
+        "اتربط حسابك ✅🎉\nمن دلوقتي ابعتلي voice أو اكتبلي عن يومك — مصاريفك وصحتك وعاداتك وأهدافك ومهامك كلها هتتسجل وتظهر في داشبوردك.\nجرّب دلوقتي: احكيلي يومك عدى إزاي؟"
+      );
+    }
+    return ctx.reply(
       "أهلاً بيك في دوّنلي ✍️\nابعتلي voice أو اكتبلي عن يومك — هفهم كلامك وأسجّل منه: مصاريفك 💰، صحتك ونفسيتك 🩺، عاداتك وأهدافك 🎯، ومهامك في التقويم 📅.\nولو سألتك حاجة مش واضحة، رد عليّا وهكمّل التسجيل.\n\nأوامر:\n/report — تقرير شامل عن آخر ٣٠ يوم\n/analyze — تحليل يومياتك آخر ٧ أيام\n/code — كود دخول للوحة التحكم\n/checkin — اسألني عن يومي دلوقتي"
-    )
-  );
+    );
+  });
 
   bot.command("analyze", async (ctx) => {
     const user = ctx.state.user;

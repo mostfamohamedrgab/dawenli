@@ -11,6 +11,8 @@ function required(name) {
 
 export const config = {
   telegramToken: required("TELEGRAM_BOT_TOKEN"),
+  // اسم البوت من غير @ — لزرار "اربط تيليجرام" في الداشبورد (deep link)
+  botUsername: (process.env.TELEGRAM_BOT_USERNAME || "dawenli_bot").replace(/^@/, ""),
   openaiKey: required("OPENAI_API_KEY"),
   // لو متحدد: ده "صاحب" المنصة (الأدمن). لو OPEN_SIGNUP=true أي حد يكلم البوت بيتسجل له حساب.
   allowedChatId: process.env.ALLOWED_CHAT_ID

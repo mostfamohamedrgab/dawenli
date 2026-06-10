@@ -13,12 +13,26 @@
       <p class="auth-sub">دفترك الشخصي — سجّل دخولك تشوف حياتك مرتّبة</p>
 
       <div class="auth-tabs">
-        <button id="tabCode" class="auth-tab active" type="button">دخول بكود 🔑</button>
-        <button id="tabPassword" class="auth-tab" type="button">كلمة سر</button>
+        <button id="tabEmail" class="auth-tab active" type="button">📧 إيميل</button>
+        <button id="tabCode" class="auth-tab" type="button">🔑 كود البوت</button>
+        <button id="tabPassword" class="auth-tab" type="button">أدمن</button>
       </div>
 
       <form id="loginForm" class="auth-form" autocomplete="off">
-        <div id="codeField">
+        <div id="emailFields">
+          <div id="nameField" hidden>
+            <label for="name">اسمك</label>
+            <input type="text" id="name" class="field" placeholder="اسمك إيه؟" style="margin-bottom:14px" />
+          </div>
+          <label for="email">الإيميل</label>
+          <input type="email" id="email" class="field" placeholder="you@example.com" style="margin-bottom:14px" />
+          <label for="emailPassword">كلمة السر</label>
+          <input type="password" id="emailPassword" class="field" placeholder="••••••••" />
+          <p style="margin:12px 0 0;font-size:var(--text-sm);color:var(--ink-muted)">
+            <a href="#" id="modeToggle" style="color:var(--brand-deep);font-weight:700">مفيش حساب؟ اعمل واحد جديد</a>
+          </p>
+        </div>
+        <div id="codeField" hidden>
           <label for="code">الكود من البوت</label>
           <input
             type="text"
@@ -30,7 +44,7 @@
           />
         </div>
         <div id="passwordField" hidden>
-          <label for="password">كلمة السر</label>
+          <label for="password">كلمة سر الأدمن</label>
           <input type="password" id="password" name="password" class="field" placeholder="••••••••" />
         </div>
         <label class="remember">

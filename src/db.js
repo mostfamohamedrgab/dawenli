@@ -9,12 +9,14 @@ const db = new DatabaseSync(config.dbPath);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at  TEXT NOT NULL,
-    chat_id     TEXT UNIQUE,
-    name        TEXT,
-    is_owner    INTEGER NOT NULL DEFAULT 0,
-    last_seen   TEXT
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at    TEXT NOT NULL,
+    chat_id       TEXT UNIQUE,
+    name          TEXT,
+    is_owner      INTEGER NOT NULL DEFAULT 0,
+    last_seen     TEXT,
+    email         TEXT,
+    password_hash TEXT
   );
 
   CREATE TABLE IF NOT EXISTS entries (
@@ -159,6 +161,8 @@ for (const t of ["entries", "finance", "health", "conversations", "goals", "cond
 }
 addColumnIfMissing("health", "body_region", "TEXT");
 addColumnIfMissing("finance", "category", "TEXT"); // أكل، مواصلات، فواتير...
+addColumnIfMissing("users", "email", "TEXT");          // التسجيل بالإيميل
+addColumnIfMissing("users", "password_hash", "TEXT");
 addColumnIfMissing("tasks", "completed_at", "TEXT");
 addColumnIfMissing("tasks", "reminded_at", "TEXT");
 db.prepare(`UPDATE tasks SET status = 'pending' WHERE status = 'open'`).run();
@@ -217,6 +221,32 @@ export function ownerUser() {
 }
 export function listUsers() {
   return db.prepare(`SELECT * FROM users ORDER BY id`).all();
+}
+
+/* ---- حسابات الإيميل + ربط تيليجرام ---- */
+
+const getUserByEmailStmt = db.prepare(`SELECT * FROM users WHERE email = ?`);
+export function getUserByEmail(email) {
+  if (!email) return null;
+  return getUserByEmailStmt.get(String(email).trim().toLowerCase()) || null;
+}
+
+export function createEmailUser({ name, email, passwordHash }) {
+  const cleanEmail = String(email).trim().toLowerCase();
+  if (getUserByEmail(cleanEmail)) return null; // الإيميل مستخدم قبل كده
+  const info = db
+    .prepare(`INSERT INTO users (created_at, name, email, password_hash, last_seen) VALUES (?, ?, ?, ?, ?)`)
+    .run(now(), name || null, cleanEmail, passwordHash, now());
+  return getUserByIdStmt.get(Number(info.lastInsertRowid));
+}
+
+// بيربط شات تيليجرام بحساب ويب موجود — بيرفض لو الشات مربوط بحساب تاني
+export function linkTelegram(userId, chatId, name) {
+  const existing = getUserByChatId(chatId);
+  if (existing && existing.id !== Number(userId)) return { ok: false, reason: "taken" };
+  db.prepare(`UPDATE users SET chat_id = ?, name = COALESCE(name, ?), last_seen = ? WHERE id = ?`)
+    .run(String(chatId), name || null, now(), Number(userId));
+  return { ok: true, user: getUserByIdStmt.get(Number(userId)) };
 }
 
 // bootstrap: نضمن وجود "صاحب" المنصة ونلحق البيانات القديمة (اللي من قبل multi-user) بيه

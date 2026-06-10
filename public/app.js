@@ -192,6 +192,20 @@ $("composerText").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) composerSend();
 });
 
+/* ===================== ربط تيليجرام ===================== */
+async function linkTelegram() {
+  try {
+    const res = await api("/api/link-telegram", { method: "POST" });
+    const data = await res.json();
+    if (data.linked) { $("tgBanner").classList.add("hidden"); return; }
+    window.open(data.url, "_blank");
+    $("tgBannerText").textContent = "فتحنالك البوت — دوس Start هناك وارجع هنا ودوس تحديث ✌️";
+    $("tgRefreshBtn").classList.remove("hidden");
+  } catch {}
+}
+$("tgLinkBtn").addEventListener("click", linkTelegram);
+$("tgRefreshBtn").addEventListener("click", () => window.location.reload());
+
 /* ===================== النظرة العامة ===================== */
 function computeStreak(entries) {
   const days = new Set(entries.map((e) => e.entry_date));
@@ -1113,6 +1127,7 @@ async function loadAll(rerender = true) {
   const first = (state.me?.name || "د").trim()[0] || "د";
   $("userAvatar").textContent = first;
   $("userName").textContent = state.me?.name || "صاحب الدفتر";
+  $("tgBanner").classList.toggle("hidden", !!state.me?.hasTelegram);
   fillCategorySelect();
 
   if (!rerender) return;

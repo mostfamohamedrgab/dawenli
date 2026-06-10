@@ -6,6 +6,8 @@ import { config } from "./config.js";
 import {
   ownerUser,
   getUserById,
+  getUserByEmail,
+  createEmailUser,
   localToday,
   listEntries,
   entriesSince,
@@ -102,28 +104,92 @@ function redeemLoginCode(code) {
   return entry.userId;
 }
 
+/* ===================== كلمات السر (scrypt — من غير مكتبات) ===================== */
+
+function hashPassword(pw) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(String(pw), salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+function verifyPassword(pw, stored) {
+  try {
+    const [salt, hash] = String(stored).split(":");
+    return crypto.timingSafeEqual(
+      Buffer.from(hash, "hex"),
+      crypto.scryptSync(String(pw), salt, 64)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/* ===================== توكنات ربط تيليجرام =====================
+   المستخدم بيدوس "اربط تيليجرام" في الداشبورد → بنطلّع توكن →
+   لينك t.me/البوت?start=التوكن → البوت بيستقبل /start بالتوكن ويربط الشات. */
+
+const LINK_TTL = 15 * 60 * 1000;
+const linkTokens = new Map(); // token -> { userId, expiresAt }
+
+function issueLinkToken(userId) {
+  const token = "lk" + crypto.randomBytes(8).toString("hex");
+  linkTokens.set(token, { userId, expiresAt: Date.now() + LINK_TTL });
+  return token;
+}
+export function redeemLinkToken(token) {
+  const entry = linkTokens.get(String(token).trim());
+  if (!entry) return null;
+  linkTokens.delete(String(token).trim());
+  if (Date.now() > entry.expiresAt) return null;
+  return entry.userId;
+}
+
 /* ===================== السيرفر ===================== */
 
 export function startServer() {
   const app = express();
   app.use(express.json());
 
-  // الدخول: كلمة سر (الأدمن/الأونر) أو كود من البوت (/code) لأي مستخدم
-  app.post("/api/login", (req, res) => {
-    const { password, code, remember } = req.body || {};
-    let userId = null;
-    if (password && password === config.dashboardPassword) {
-      userId = ownerUser()?.id ?? null;
-    } else if (code) {
-      userId = redeemLoginCode(code);
-    }
-    if (!userId) return res.status(401).json({ ok: false, error: "بيانات الدخول غلط" });
+  function openSession(res, userId, remember) {
     const token = newSession(userId);
     const maxAge = remember === false ? "" : `; Max-Age=${30 * 86400}`;
     res.setHeader(
       "Set-Cookie",
       `dawenli_session=${token}; HttpOnly; SameSite=Strict; Path=/${maxAge}`
     );
+  }
+
+  // الدخول: إيميل+باسورد، أو كود من البوت (/code)، أو كلمة سر الأدمن
+  app.post("/api/login", (req, res) => {
+    const { email, password, code, remember } = req.body || {};
+    let userId = null;
+    if (email && password) {
+      const user = getUserByEmail(email);
+      if (user?.password_hash && verifyPassword(password, user.password_hash)) userId = user.id;
+    } else if (code) {
+      userId = redeemLoginCode(code);
+    } else if (password && password === config.dashboardPassword) {
+      userId = ownerUser()?.id ?? null;
+    }
+    if (!userId) return res.status(401).json({ ok: false, error: "بيانات الدخول غلط" });
+    openSession(res, userId, remember);
+    return res.json({ ok: true });
+  });
+
+  // حساب جديد بالإيميل — وبعد الدخول يقدر يربط تيليجرام بزرار
+  app.post("/api/signup", (req, res) => {
+    const { name, email, password } = req.body || {};
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail))
+      return res.status(400).json({ ok: false, error: "اكتب إيميل صحيح" });
+    if (!password || String(password).length < 6)
+      return res.status(400).json({ ok: false, error: "كلمة السر لازم ٦ حروف على الأقل" });
+    const user = createEmailUser({
+      name: String(name || "").trim() || null,
+      email: cleanEmail,
+      passwordHash: hashPassword(password),
+    });
+    if (!user) return res.status(409).json({ ok: false, error: "الإيميل ده متسجّل قبل كده — ادخل عادي" });
+    openSession(res, user.id, true);
     return res.json({ ok: true });
   });
 
@@ -170,7 +236,22 @@ export function startServer() {
   app.get("/api/me", (req, res) => {
     const user = gate(req, res);
     if (!user) return;
-    res.json({ id: user.id, name: user.name, isOwner: !!user.is_owner, today: localToday() });
+    res.json({
+      id: user.id,
+      name: user.name,
+      isOwner: !!user.is_owner,
+      hasTelegram: !!user.chat_id,
+      today: localToday(),
+    });
+  });
+
+  // زرار "اربط تيليجرام": بيرجّع لينك يفتح البوت ومعاه توكن الربط
+  app.post("/api/link-telegram", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    if (user.chat_id) return res.json({ ok: true, linked: true });
+    const token = issueLinkToken(user.id);
+    res.json({ ok: true, linked: false, url: `https://t.me/${config.botUsername}?start=${token}` });
   });
 
   /* ===== الأقسام ===== */
