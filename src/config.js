@@ -19,7 +19,9 @@ export const config = {
   openSignup: String(process.env.OPEN_SIGNUP || "").toLowerCase() === "true",
   // موديل كويس للصوت العربي + موديل قوي للـ agent (tool calling)
   transcribeModel: process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-transcribe",
-  agentModel: process.env.OPENAI_AGENT_MODEL || process.env.OPENAI_CHAT_MODEL || "gpt-4o",
+  // مهم: مفيش fallback على OPENAI_CHAT_MODEL القديم — كان بيخلي الـ agent يشتغل
+  // بـ gpt-4o-mini من ملفات .env القديمة فميستخرجش حاجة من الكلام
+  agentModel: process.env.OPENAI_AGENT_MODEL || "gpt-4o",
   analysisModel: process.env.OPENAI_ANALYSIS_MODEL || "gpt-4o",
   port: Number(process.env.PORT || 3000),
   dashboardPassword: process.env.DASHBOARD_PASSWORD || "change-me",

@@ -162,6 +162,7 @@ a { color: inherit; }
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
+  text-decoration: none;
   background: var(--brand);
   color: var(--on-accent);
   border: 2px solid var(--brand-deep);

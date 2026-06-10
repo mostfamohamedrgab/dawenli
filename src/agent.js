@@ -542,11 +542,17 @@ export async function runAgent({ user, text, kind = "text" }) {
       model: config.agentModel,
       messages,
       tools: TOOLS,
-      tool_choice: "auto",
+      // أول لفة الموديل لازم ينده أداة على الأقل (يسجّل أو يجيب بيانات) —
+      // من غيرها الموديلات الصغيرة بترد كلام وخلاص ومفيش حاجة بتتسجل
+      tool_choice: turn === 0 ? "required" : "auto",
     });
     logChatUsage("agent", config.agentModel, res, userId);
     const msg = res.choices[0].message;
     messages.push(msg);
+    console.log(
+      `🧠 agent[${config.agentModel}] لفة ${turn + 1}: ${msg.tool_calls?.length || 0} أداة` +
+        (msg.tool_calls?.length ? ` (${msg.tool_calls.map((t) => t.function.name).join("، ")})` : "")
+    );
 
     if (!msg.tool_calls?.length) {
       reply = (msg.content || "").trim();
@@ -562,7 +568,8 @@ export async function runAgent({ user, text, kind = "text" }) {
       try {
         out = executeTool({ userId, sourceText: text }, tc.function.name, args);
       } catch (err) {
-        console.error(`tool ${tc.function.name} error:`, err);
+        // اللوج ده بيطلع في pm2 logs — أهم حاجة للتشخيص على السيرفر
+        console.error(`❌ tool ${tc.function.name} failed with args ${JSON.stringify(args)}:`, err);
         out = { result: { ok: false, error: "حصل خطأ داخلي في الأداة" } };
       }
       if (out.receipt) receipts.push(out.receipt);
