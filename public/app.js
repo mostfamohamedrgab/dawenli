@@ -11,6 +11,7 @@ const state = {
   finance: [],
   tasks: [],
   usage: null,
+  profile: [],
   categories: [],
   pageDate: null,
   mealDate: null,
@@ -227,12 +228,59 @@ function greeting() {
   return `مساء الخير${name} 🌙`;
 }
 
+/* ===================== الذاكرة الدائمة (دوّنلي يعرف عنك) ===================== */
+const PROFILE_CAT = {
+  "هوية": { label: "هوية", emoji: "🪪" },
+  "دراسة_وشغل": { label: "دراسة وشغل", emoji: "🎓" },
+  "صحة": { label: "صحة", emoji: "🩺" },
+  "تفضيلات": { label: "تفضيلات", emoji: "⭐" },
+  "علاقات": { label: "علاقات", emoji: "👥" },
+  "أخرى": { label: "أخرى", emoji: "📌" },
+};
+function renderProfile() {
+  const el = $("profileFacts");
+  if (!el) return;
+  const data = state.profile || [];
+  if (!data.length) {
+    el.innerHTML = `<p class="muted" style="font-size:var(--text-sm)">لسه فاضية — كل ما تحكي للبوت حاجة ثابتة عنك (بدرس إيه، عندك مرض مزمن...) هيفتكرها هنا. أو ضيفها بنفسك بزرار «معلومة».</p>`;
+    return;
+  }
+  const byCat = {};
+  for (const f of data) (byCat[f.category] = byCat[f.category] || []).push(f);
+  el.innerHTML = Object.entries(byCat).map(([cat, facts]) => {
+    const meta = PROFILE_CAT[cat] || PROFILE_CAT["أخرى"];
+    return `<div style="margin-bottom:14px">
+      <div class="muted" style="font-size:var(--text-xs);font-weight:700;margin-bottom:6px">${meta.emoji} ${meta.label}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${facts.map((f) => `<span class="chip" style="gap:8px">
+          <b style="font-weight:700">${escapeHtml(f.fact_key)}:</b> ${escapeHtml(f.value)}
+          <button class="icon-btn" style="width:18px;height:18px;font-size:11px" onclick="del('profile', ${f.id})" title="نسّيه">✕</button>
+        </span>`).join("")}
+      </div>
+    </div>`;
+  }).join("");
+}
+$("profileAddBtn")?.addEventListener("click", () => $("profileForm").classList.toggle("hidden"));
+$("profileForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const category = $("profileCategory").value;
+  const key = $("profileKey").value.trim();
+  const value = $("profileValue").value.trim();
+  if (!key || !value) return;
+  await api("/api/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category, key, value }) });
+  e.target.reset();
+  $("profileForm").classList.add("hidden");
+  await loadAll(false);
+  renderProfile();
+});
+
 function renderOverview() {
   $("heroGreeting").textContent = greeting();
   const streak = computeStreak(state.journal);
   $("heroSub").textContent = streak > 0 ? "دي حياتك مرتّبة — لحد دلوقتي." : "ابدأ بحاجة صغيرة — احكيلي عن يومك.";
   $("todayChip").textContent = `🗓 ${fmtDate(TODAY())}`;
   $("streakChip").textContent = `🔥 ${arNum(streak)} ${streak === 1 ? "يوم" : "أيام"}`;
+  renderProfile();
 
   // كروت العوالم بأرقام حقيقية
   const week = lastNDays(7);
@@ -1104,7 +1152,7 @@ $("logoutBtn").addEventListener("click", logout);
 
 async function loadAll(rerender = true) {
   try {
-    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, usg] = await Promise.all([
+    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, usg, prof] = await Promise.all([
       api("/api/me").then((r) => r.json()),
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
@@ -1117,11 +1165,12 @@ async function loadAll(rerender = true) {
       api("/api/tasks").then((r) => r.json()),
       api("/api/finance-categories").then((r) => r.json()),
       api("/api/usage").then((r) => r.json()),
+      api("/api/profile").then((r) => r.json()),
     ]);
     state.me = me;
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
     state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin;
-    state.tasks = tasks; state.categories = cats; state.usage = usg;
+    state.tasks = tasks; state.categories = cats; state.usage = usg; state.profile = prof;
   } catch { return; }
 
   const first = (state.me?.name || "د").trim()[0] || "د";

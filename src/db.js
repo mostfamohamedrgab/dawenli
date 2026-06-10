@@ -141,6 +141,20 @@ db.exec(`
     cost_usd      REAL NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS idx_ai_usage_date ON ai_usage(usage_date);
+
+  -- ذاكرة دائمة عن الشخص: مين هو، بيدرس/بيشتغل إيه، أمراضه وأدويته المزمنة، تفضيلاته.
+  -- (حاجات ثابتة مش يوميات) — عشان الـ agent يبقى عنده تصور عن المستخدم.
+  CREATE TABLE IF NOT EXISTS profile_facts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    category    TEXT NOT NULL,   -- هوية | دراسة_وشغل | صحة | تفضيلات | علاقات | أخرى
+    fact_key    TEXT NOT NULL,   -- مفتاح قصير ثابت (مثلاً: التخصص، مرض مزمن، حساسية)
+    value       TEXT NOT NULL,   -- القيمة
+    UNIQUE(user_id, fact_key)
+  );
+  CREATE INDEX IF NOT EXISTS idx_profile_user ON profile_facts(user_id);
 `);
 
 /* ===================== Migrations ===================== */
@@ -884,6 +898,49 @@ export function aiUsageSummary(days = 30) {
     byKind: usageByKindStmt.all(),
     daily: usageDailyStmt.all(since),
   };
+}
+
+/* ===================== Profile facts (ذاكرة دائمة عن الشخص) ===================== */
+
+const PROFILE_CATEGORIES = ["هوية", "دراسة_وشغل", "صحة", "تفضيلات", "علاقات", "أخرى"];
+
+const upsertProfileFactStmt = db.prepare(`
+  INSERT INTO profile_facts (created_at, updated_at, user_id, category, fact_key, value)
+  VALUES (?, ?, ?, ?, ?, ?)
+  ON CONFLICT(user_id, fact_key) DO UPDATE SET
+    value = excluded.value,
+    category = excluded.category,
+    updated_at = excluded.updated_at
+`);
+
+// بيضيف معلومة دائمة أو بيحدّثها لو المفتاح موجود (مثلاً "الوزن" بيتحدّث مش بيتكرر)
+export function upsertProfileFact({ userId, category, key, value }) {
+  if (!key || !value) return null;
+  const cat = PROFILE_CATEGORIES.includes(category) ? category : "أخرى";
+  const k = String(key).trim();
+  const existed = db.prepare(`SELECT id FROM profile_facts WHERE user_id = ? AND fact_key = ?`).get(userId, k);
+  upsertProfileFactStmt.run(now(), now(), userId, cat, k, String(value).trim());
+  return { key: k, value: String(value).trim(), category: cat, created: !existed };
+}
+
+export function listProfileFacts(userId) {
+  return db
+    .prepare(`SELECT * FROM profile_facts WHERE user_id = ? ORDER BY category, id`)
+    .all(userId);
+}
+
+export function deleteProfileFact(userId, id) {
+  return db.prepare(`DELETE FROM profile_facts WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+}
+
+// نسخة مختصرة للـ agent: { category: ["key: value", ...] }
+export function profileForAgent(userId) {
+  const rows = listProfileFacts(userId);
+  const out = {};
+  for (const r of rows) {
+    (out[r.category] = out[r.category] || []).push(`${r.fact_key}: ${r.value}`);
+  }
+  return out;
 }
 
 /* ===================== helpers ===================== */

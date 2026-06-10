@@ -32,6 +32,8 @@ import {
   addMeal,
   logConversation,
   recentConversations,
+  upsertProfileFact,
+  profileForAgent,
 } from "./db.js";
 
 /* ===================== الأدوات ===================== */
@@ -212,6 +214,27 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "remember",
+      description:
+        "احفظ معلومة **دائمة** ومهمة عن الشخص نفسه عشان تفضل فاكرها في أي محادثة جاية: مين هو، بيدرس/بيشتغل إيه، أمراض مزمنة، أدوية بياخدها بانتظام، حساسية، تفضيلات ثابتة، أهم العلاقات (مراته/أولاده...). دي حاجات ثابتة مش أحداث يوم. لو المعلومة بتتغير (زي الوزن) استخدم نفس الـ key وهتتحدّث. ماتحفظش أحداث عابرة هنا (دي بتتسجل في اليوميات/الصحة).",
+      parameters: {
+        type: "object",
+        properties: {
+          category: {
+            type: "string",
+            enum: ["هوية", "دراسة_وشغل", "صحة", "تفضيلات", "علاقات", "أخرى"],
+            description: "هوية=اسم/سن/مكان، دراسة_وشغل=تخصص/شغل، صحة=مرض مزمن/دواء/حساسية، تفضيلات، علاقات",
+          },
+          key: { type: "string", description: "مفتاح قصير ثابت (مثلاً: التخصص، مرض مزمن، حساسية، الوزن)" },
+          value: { type: "string", description: "القيمة (مثلاً: طب بشري سنة تالتة)" },
+        },
+        required: ["category", "key", "value"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_data",
       description:
         "هات بيانات المستخدم الحقيقية عشان تجاوب على أسئلته: صرف كام؟ إيه مهامه؟ وصل لفين في أهدافه؟ استخدمها قبل ما تجاوب على أي سؤال عن بياناته.",
@@ -383,6 +406,19 @@ function executeTool(ctx, name, args) {
       });
       return { result: { ok: true }, receipt: `🍽️ أكل (${date}): ${args.items}` };
     }
+    case "remember": {
+      const f = upsertProfileFact({
+        userId,
+        category: args.category,
+        key: args.key,
+        value: args.value,
+      });
+      if (!f) return { result: { ok: false, error: "key و value مطلوبين" } };
+      return {
+        result: { ok: true, created: f.created },
+        receipt: `🧠 ${f.created ? "افتكرت عنك" : "حدّثت معلومة"}: ${f.key} — ${f.value}`,
+      };
+    }
     case "get_data": {
       const days = Number(args.days) > 0 ? Number(args.days) : 30;
       const since = daysAgo(days - 1);
@@ -462,6 +498,7 @@ function buildSnapshot(userId) {
   const tasks = pendingTasks(userId, 12).filter((t) => t.due_date <= daysAhead(7));
   const conditions = activeConditions(userId);
   const recentJournal = listEntries(userId, 3);
+  const profile = profileForAgent(userId); // الذاكرة الدائمة عن الشخص
 
   // الأسبوع الجاي بالتواريخ عشان "الخميس الجاي" تتحول صح
   const week = [];
@@ -472,6 +509,7 @@ function buildSnapshot(userId) {
 
   return {
     today: `${today} (${weekdayOf(today)})`,
+    profile, // مين هو، بيدرس/بيشتغل إيه، أمراضه المزمنة، تفضيلاته
     next_days: week.join("، "),
     spent_today: spentToday,
     goals: goals.map((g) => `${g.title}: ${g.current}${g.unit ? " " + g.unit : ""}${g.target ? ` من ${g.target}` : ""}`),
@@ -494,6 +532,12 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 - الصحة النفسية: قلق، توتر، حزن، ضغط نفسي → log_health بـ category="نفسية" و body_region="راس".
 - صحة حد تاني غير المستخدم ماتسجّلهاش خالص.
 - متسجّلش نفس الحاجة مرتين — لو واضح من المحادثة إنها اتسجلت خلاص، بلاش تكرار.
+
+# الذاكرة الدائمة عن الشخص (remember)
+- في سياقك "profile" فيه أهم المعلومات الثابتة عن الشخص — اقراها واتعامل معاه على أساسها (مثلاً لو عنده مرض مزمن، خد باله في كلامك).
+- لو ظهرت في الكلام معلومة **ثابتة ومهمة** عن الشخص نفسه (تخصصه/شغله، مرض مزمن، دواء بياخده بانتظام، حساسية، مكان سكنه، أهم علاقاته، تفضيل ثابت) ومش موجودة في الـ profile → احفظها بـ remember.
+- فرّق بين الدائم والعابر: "عندي ارتجاع مزمن" → remember (صحة). "حاسس بصداع النهاردة" → log_health مش remember. "بدرس طب" → remember. "ذاكرت النهاردة ساعتين" → يوميات.
+- ماتسألش عن معلومات للذاكرة بشكل استجوابي — احفظ بس اللي بيجي طبيعي في الكلام.
 
 # الأسئلة التوضيحية
 - لو في لبس حقيقي يمنع التسجيل الصح (قال "صرفت فلوس" من غير مبلغ، أو مهمة من غير معاد واضح، أو هدف غامض) → سجّل اللي واضح، واسأل **سؤال واحد قصير ومحدد** عن الناقص.

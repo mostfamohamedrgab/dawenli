@@ -43,6 +43,9 @@ import {
   reopenTask,
   deleteTask,
   aiUsageSummary,
+  listProfileFacts,
+  upsertProfileFact,
+  deleteProfileFact,
 } from "./db.js";
 import { analyzeEntries, doctorReport, unifiedReport } from "./openai.js";
 import { buildReportData } from "./report.js";
@@ -300,6 +303,25 @@ export function startServer() {
     if (!user) return;
     const days = Number(req.query.days) > 0 ? Number(req.query.days) : 30;
     res.json(aiUsageSummary(days));
+  });
+
+  /* ===== الذاكرة الدائمة (دوّنلي يعرف عنك) ===== */
+  app.get("/api/profile", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listProfileFacts(user.id));
+  });
+  app.post("/api/profile", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const { category, key, value } = req.body || {};
+    if (!key || !value) return res.status(400).json({ error: "المفتاح والقيمة مطلوبين" });
+    res.json({ ok: true, fact: upsertProfileFact({ userId: user.id, category, key, value }) });
+  });
+  app.delete("/api/profile/:id", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: deleteProfileFact(user.id, Number(req.params.id)) });
   });
 
   /* ===== المهام والتقويم ===== */
