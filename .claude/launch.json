@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dawenli",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "autoPort": true
+    }
+  ]
+}

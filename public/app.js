@@ -1,5 +1,6 @@
 /* ===================== State ===================== */
 const state = {
+  me: null,
   journal: [],
   goals: [],
   health: [],
@@ -10,8 +11,12 @@ const state = {
   finance: [],
   tasks: [],
   usage: null,
+  categories: [],
   pageDate: null,
   mealDate: null,
+  calY: new Date().getFullYear(),
+  calM: new Date().getMonth(),
+  selDate: null,
 };
 
 // سعر صرف تقريبي للدولار (للعرض بالجنيه فقط — عدّله وقت ما تحب)
@@ -22,29 +27,35 @@ const TODAY = () => new Date().toISOString().slice(0, 10);
 
 const PAGE_TITLES = {
   overview: "الرئيسية",
-  tasks: "المهام",
-  journal: "يوميات",
-  health: "الصحة",
-  habits: "العادات",
-  goals: "الأهداف",
+  journal: "اليوميات",
   finance: "الماليات",
-  meals: "الأكل",
+  health: "الصحة والنفسية",
+  goalshabits: "الأهداف والعادات",
+  tasks: "المهام والتقويم",
   chats: "المحادثات",
   usage: "تكلفة الـAI",
 };
 
 /* ===================== Helpers ===================== */
-const MOODS = [
-  { re: /مبسوط|سعيد|فرحان|متحمّس|متحمس|رايق|كويس/, emoji: "😄" },
-  { re: /حزين|زعلان|متضايق|مكتئب|تعبان نفسيا/, emoji: "😔" },
-  { re: /متوتر|قلقان|عصبي|مضغوط|متوتّر/, emoji: "😣" },
-  { re: /عادي|محايد/, emoji: "😐" },
+const MOOD_SCORES = [
+  { re: /مبسوط|سعيد|فرحان|متحمّس|متحمس|رايق|ممتاز/, score: 5, emoji: "😄" },
+  { re: /كويس|حلو|مرتاح|هادي|راضي/, score: 4, emoji: "🙂" },
+  { re: /عادي|محايد/, score: 3, emoji: "😐" },
+  { re: /متوتر|قلقان|عصبي|مضغوط|متوتّر|زهقان|تعبان/, score: 2, emoji: "😣" },
+  { re: /حزين|زعلان|متضايق|مكتئب/, score: 1, emoji: "😔" },
 ];
-function moodEmoji(mood = "") {
+function moodInfo(mood = "") {
   const m = String(mood).toLowerCase();
-  for (const x of MOODS) if (x.re.test(m)) return x.emoji;
-  return "🙂";
+  for (const x of MOOD_SCORES) if (x.re.test(m)) return x;
+  return { score: 3, emoji: "🙂" };
 }
+const moodEmoji = (m) => moodInfo(m).emoji;
+
+const CAT_ICONS = {
+  "أكل": "🍔", "مواصلات": "🚌", "فواتير": "🧾", "صحة": "💊", "تسوق": "🛍️",
+  "ترفيه": "🎮", "بيت": "🏠", "شغل": "💼", "تعليم": "📚", "أخرى": "📦",
+};
+
 function fmtDate(d) {
   try {
     return new Date(d).toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" });
@@ -72,6 +83,18 @@ async function api(path, opts) {
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
+// عرض تقارير الموديل: عناوين ## وبولد ** بشكل مرتب
+function renderRich(text) {
+  const esc = escapeHtml(text || "");
+  return esc
+    .split("\n")
+    .map((line) => {
+      if (line.startsWith("## ")) return `<h4 class="report-h">${line.slice(3)}</h4>`;
+      if (line.startsWith("# ")) return `<h4 class="report-h">${line.slice(2)}</h4>`;
+      return line ? `<p>${line.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^- /, "• ")}</p>` : "";
+    })
+    .join("");
+}
 
 /* ===================== Confirm Modal ===================== */
 const confirmOverlay = $("confirmOverlay");
@@ -98,28 +121,22 @@ async function del(kind, id) {
 window.del = del;
 
 /* ===================== Navigation ===================== */
-const TABS = ["overview", "tasks", "journal", "health", "habits", "goals", "finance", "meals", "chats", "usage"];
-function gotoTab(tab, opts = {}) {
-  if (!TABS.includes(tab)) tab = "overview";
+function gotoTab(tab) {
   document.querySelectorAll(".nav-item").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== tab));
   $("pageTitle").textContent = PAGE_TITLES[tab] || "";
   closeSidebar();
-  // نحفظ الصفحة في الـ hash عشان الريلود يفضل واقف في نفس المكان
-  if (location.hash.slice(1) !== tab) {
-    history.replaceState(null, "", "#" + tab);
-  }
   if (tab === "overview") renderOverview();
-  if (tab === "tasks") renderTasksView();
   if (tab === "finance") renderFinance();
+  if (tab === "tasks") renderCalendar();
   if (tab === "usage") renderUsage();
-  if (!opts.noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 $("sideNav").addEventListener("click", (e) => {
   const btn = e.target.closest(".nav-item");
   if (btn) gotoTab(btn.dataset.tab);
 });
-document.querySelectorAll(".pillar-card[data-go]").forEach((c) =>
+document.querySelectorAll("[data-go]").forEach((c) =>
   c.addEventListener("click", () => gotoTab(c.dataset.go))
 );
 
@@ -147,32 +164,28 @@ function last7() {
   for (let i = 6; i >= 0; i--) out.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
   return out;
 }
-function last30() {
-  const out = [];
-  for (let i = 29; i >= 0; i--) out.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
-  return out;
-}
 function greeting() {
+  const name = state.me?.name ? ` يا ${state.me.name.split(" ")[0]}` : "";
   const h = new Date().getHours();
-  if (h < 12) return "صباح الفل ☀️";
-  if (h < 18) return "نهارك سعيد 🌤️";
-  return "مساء الخير 🌙";
+  if (h < 12) return `صباح الفل${name} ☀️`;
+  if (h < 18) return `نهارك سعيد${name} 🌤️`;
+  return `مساء الخير${name} 🌙`;
 }
 
 function renderOverview() {
   $("heroGreeting").textContent = greeting();
   const streak = computeStreak(state.journal);
-  $("heroSub").textContent = streak > 0 ? `ماشي صح — ${streak} يوم تدوين ورا بعض 🔥` : "ابدأ يومك بتدوينة صغيرة.";
+  $("heroSub").textContent = streak > 0 ? `ماشي صح — ${streak} يوم تدوين ورا بعض 🔥` : "ابدأ يومك بتدوينة صغيرة — ابعت للبوت voice عن يومك.";
 
-  // stat cards
   const totalIncome = state.finance.filter((f) => f.direction === "income").reduce((a, f) => a + f.amount, 0);
   const totalExpense = state.finance.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
   const activeHabits = state.habits.length;
   const doneToday = state.habits.filter((h) => h.doneToday).length;
+  const todayTasks = state.tasks.filter((t) => t.due_date === TODAY());
   const stats = [
     { n: state.journal.length, l: "تدوينات", i: "📝" },
     { n: streak, l: "أيام متتالية", i: "🔥" },
-    { n: state.health.length, l: "سجلات صحية", i: "🩺" },
+    { n: `${todayTasks.filter((t) => t.status === "done").length}/${todayTasks.length}`, l: "مهام النهاردة", i: "📅" },
     { n: `${doneToday}/${activeHabits}`, l: "عادات النهاردة", i: "🔁" },
     { n: state.goals.length, l: "أهداف", i: "🎯" },
     { n: fmtNum(totalIncome - totalExpense), l: "صافي الرصيد", i: "💰" },
@@ -181,9 +194,11 @@ function renderOverview() {
     .map((s) => `<div class="stat-card"><span class="stat-ico">${s.i}</span><span class="stat-num">${s.n}</span><span class="stat-label">${s.l}</span></div>`)
     .join("");
 
-  // streak ring
   drawRing($("streakRing"), Math.min(1, streak / 30), cssVar("--violet"));
   $("streakNum").textContent = streak;
+
+  // مهام النهاردة
+  renderTaskRows($("todayTasks"), todayTasks, "مفيش مهام النهاردة — قول للبوت «فكّرني بكرة بـ...»");
 
   // pillar charts
   const days = last7();
@@ -202,16 +217,15 @@ function renderOverview() {
   drawIncomeExpense($("chartFinance"), totalIncome, totalExpense);
   $("metaFinance").textContent = `دخل ${fmtNum(totalIncome)} · صرف ${fmtNum(totalExpense)}`;
 
-  // recent feed
   renderFeed();
 }
 
 function renderFeed() {
   const items = [];
   for (const e of state.journal.slice(0, 6)) items.push({ t: e.created_at || e.entry_date, ico: "📝", txt: e.summary || "تدوينة", tag: "يوميات" });
-  for (const h of state.health.slice(0, 6)) items.push({ t: h.created_at, ico: "🩺", txt: h.detail, tag: "صحة" });
-  for (const f of state.finance.slice(0, 6)) items.push({ t: f.created_at, ico: f.direction === "income" ? "➕" : "➖", txt: `${fmtNum(f.amount)} ${f.currency}${f.note ? " · " + f.note : ""}`, tag: "ماليات" });
-  for (const m of state.meals.slice(0, 4)) items.push({ t: m.created_at, ico: "🍽️", txt: m.items, tag: "أكل" });
+  for (const h of state.health.slice(0, 6)) items.push({ t: h.created_at, ico: h.category === "نفسية" ? "🧠" : "🩺", txt: h.detail, tag: h.category === "نفسية" ? "نفسية" : "صحة" });
+  for (const f of state.finance.slice(0, 6)) items.push({ t: f.created_at, ico: f.direction === "income" ? "➕" : "➖", txt: `${fmtNum(f.amount)} ${f.currency}${f.note ? " · " + f.note : f.category ? " · " + f.category : ""}`, tag: "ماليات" });
+  for (const t of state.tasks.slice(-4)) items.push({ t: t.created_at, ico: "📅", txt: `${t.title} — ${fmtShort(t.due_date)}${t.due_time ? " " + t.due_time : ""}`, tag: "مهمة" });
   items.sort((a, b) => new Date(b.t) - new Date(a.t));
   const top = items.slice(0, 10);
   $("recentFeed").innerHTML = top.length
@@ -236,10 +250,10 @@ function drawRing(canvas, ratio, color) {
   const { ctx, w, h } = prep(canvas);
   const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 8;
   ctx.lineWidth = 9; ctx.lineCap = "round";
-  ctx.strokeStyle = "rgba(52,48,42,0.10)";
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
   const grad = ctx.createLinearGradient(0, 0, w, h);
-  grad.addColorStop(0, cssVar("--indigo")); grad.addColorStop(1, cssVar("--finances"));
+  grad.addColorStop(0, cssVar("--indigo")); grad.addColorStop(1, cssVar("--pink"));
   ctx.strokeStyle = grad;
   ctx.beginPath();
   ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.001, ratio));
@@ -248,17 +262,17 @@ function drawRing(canvas, ratio, color) {
 function drawBars(canvas, values, labels, color, fixedMax) {
   if (!canvas) return;
   const { ctx, w, h } = prep(canvas);
-  if (!values.length) { ctx.fillStyle = "rgba(52,48,42,.4)"; ctx.font = "13px Tajawal"; ctx.textAlign = "center"; ctx.fillText("مفيش بيانات", w / 2, h / 2); return; }
+  if (!values.length) { ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.font = "13px Cairo"; ctx.textAlign = "center"; ctx.fillText("مفيش بيانات", w / 2, h / 2); return; }
   const pad = 18, bw = (w - pad) / values.length;
   const max = fixedMax || Math.max(1, ...values);
   values.forEach((v, i) => {
     const bh = (v / max) * (h - 30);
     const x = i * bw + pad / 2, y = h - 16 - bh;
     const grad = ctx.createLinearGradient(0, y, 0, h);
-    grad.addColorStop(0, color); grad.addColorStop(1, "rgba(255,252,245,0.04)");
+    grad.addColorStop(0, color); grad.addColorStop(1, "rgba(139,92,246,0.15)");
     ctx.fillStyle = grad;
     roundRect(ctx, x + 3, y, bw - 8, Math.max(2, bh), 5); ctx.fill();
-    ctx.fillStyle = "rgba(52,48,42,.62)"; ctx.font = "11px Tajawal"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(245,245,247,.55)"; ctx.font = "11px Cairo"; ctx.textAlign = "center";
     ctx.fillText(String(labels[i]).slice(0, 8), x + bw / 2, h - 3);
   });
 }
@@ -273,7 +287,7 @@ function drawIncomeExpense(canvas, income, expense) {
     const x = i * bw, y = h - 16 - bh;
     ctx.fillStyle = d.c;
     roundRect(ctx, x + bw * 0.2, y, bw * 0.6, Math.max(2, bh), 6); ctx.fill();
-    ctx.fillStyle = "rgba(52,48,42,.62)"; ctx.font = "11px Tajawal"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(245,245,247,.6)"; ctx.font = "11px Cairo"; ctx.textAlign = "center";
     ctx.fillText(d.l, x + bw / 2, h - 3);
   });
 }
@@ -290,8 +304,56 @@ function drawFinChart(canvas, days) {
       const x = x0 + j * bw, y = h - 20 - bh;
       ctx.fillStyle = c; roundRect(ctx, x, y, bw - 3, Math.max(1, bh), 4); ctx.fill();
     });
-    ctx.fillStyle = "rgba(52,48,42,.6)"; ctx.font = "10px Tajawal"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(245,245,247,.5)"; ctx.font = "10px Cairo"; ctx.textAlign = "center";
     ctx.fillText(fmtShort(d.date), x0 + bw, h - 5);
+  });
+}
+// خط المزاج: نقاط من ١ لـ ٥ على آخر ١٤ يوم
+function drawMoodChart(canvas, points) {
+  if (!canvas) return;
+  const { ctx, w, h } = prep(canvas);
+  if (!points.some((p) => p.score != null)) {
+    ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.font = "13px Cairo"; ctx.textAlign = "center";
+    ctx.fillText("مفيش مزاج متسجّل لسه — احكي للبوت عن يومك", w / 2, h / 2);
+    return;
+  }
+  const padX = 16, padTop = 14, padBot = 26;
+  const slot = (w - padX * 2) / Math.max(1, points.length - 1);
+  const yFor = (s) => padTop + (1 - (s - 1) / 4) * (h - padTop - padBot);
+
+  // خطوط إرشادية خفيفة
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  for (let s = 1; s <= 5; s++) {
+    ctx.beginPath(); ctx.moveTo(padX, yFor(s)); ctx.lineTo(w - padX, yFor(s)); ctx.stroke();
+  }
+
+  // الخط نفسه (بنوصل النقاط الموجودة بس)
+  const known = points.map((p, i) => ({ ...p, i })).filter((p) => p.score != null);
+  ctx.strokeStyle = cssVar("--violet");
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  known.forEach((p, k) => {
+    const x = padX + p.i * slot, y = yFor(p.score);
+    if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // النقاط + الإيموجي
+  known.forEach((p) => {
+    const x = padX + p.i * slot, y = yFor(p.score);
+    ctx.fillStyle = cssVar("--bg");
+    ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.font = "13px Cairo"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(p.emoji, x, y);
+  });
+  ctx.textBaseline = "alphabetic";
+
+  // تواريخ تحت
+  ctx.fillStyle = "rgba(245,245,247,.5)"; ctx.font = "10px Cairo"; ctx.textAlign = "center";
+  points.forEach((p, i) => {
+    if (i % 2 === 0) ctx.fillText(fmtShort(p.date), padX + i * slot, h - 6);
   });
 }
 function roundRect(ctx, x, y, w, h, r) {
@@ -371,158 +433,6 @@ $("goalForm").addEventListener("submit", async (e) => {
   e.target.reset(); loadAll();
 });
 
-/* ===================== Tasks (المهام + الجدول) ===================== */
-function taskDayLabel(dateStr) {
-  if (!dateStr) return "من غير موعد";
-  const today = TODAY();
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  if (dateStr < today) return "فات ميعادها";
-  if (dateStr === today) return "النهاردة";
-  if (dateStr === tomorrow) return "بكره";
-  return fmtDate(dateStr);
-}
-function taskRow(t) {
-  const done = t.status === "done";
-  const time = t.due_time ? `<span class="task-time">🕐 ${t.due_time}</span>` : "";
-  return `<div class="list-row task-row ${done ? "tdone" : ""}">
-    <div class="task-left">
-      <button class="task-check ${done ? "on" : ""}" onclick="toggleTask(${t.id}, ${done})" title="${done ? "رجّعها مفتوحة" : "علّمها خلصت"}">${done ? "✓" : ""}</button>
-      <span class="task-title">${escapeHtml(t.title)}</span>
-    </div>
-    <div class="row-actions">${time}
-      <button class="del-btn" onclick="openTaskEdit(${t.id})" title="تعديل الميعاد">✏️</button>
-      <button class="del-btn" onclick="del('tasks', ${t.id})" title="حذف">🗑️</button>
-    </div>
-  </div>`;
-}
-function renderTasks() {
-  const el = $("tasks");
-  if (!el) return;
-  const data = state.tasks || [];
-  if (!data.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-emoji">🗓️</div><p class="muted">مفيش مهام لسه. ضيف واحدة فوق، أو قول للبوت "عندي تاسك أكلم العميل بكره الساعة ٥".</p></div>`;
-    return;
-  }
-  const open = data.filter((t) => t.status !== "done");
-  const done = data.filter((t) => t.status === "done");
-  const groups = {};
-  for (const t of open) { const k = t.due_date || "__none"; (groups[k] ||= []).push(t); }
-  const keys = Object.keys(groups).sort((a, b) => {
-    if (a === "__none") return 1; if (b === "__none") return -1; return a < b ? -1 : 1;
-  });
-  let html = keys.map((k) => {
-    const dateStr = k === "__none" ? null : k;
-    const overdue = dateStr && dateStr < TODAY();
-    const rows = groups[k]
-      .sort((a, b) => (a.due_time || "99:99") < (b.due_time || "99:99") ? -1 : 1)
-      .map(taskRow).join("");
-    return `<div class="sched-group ${overdue ? "overdue" : ""}">
-      <div class="sched-day">${taskDayLabel(dateStr)}${dateStr ? ` <span class="sched-date">${fmtShort(dateStr)}</span>` : ""}</div>
-      <div class="list">${rows}</div></div>`;
-  }).join("");
-  if (done.length) {
-    html += `<div class="sched-group sched-done"><div class="sched-day">خلصت ✓</div><div class="list">${done.map(taskRow).join("")}</div></div>`;
-  }
-  el.innerHTML = html;
-}
-async function toggleTask(id, done) {
-  await api(`/api/tasks/${id}/status`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: done ? "open" : "done" }) });
-  loadAll();
-}
-window.toggleTask = toggleTask;
-$("taskForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const title = $("taskTitle").value.trim();
-  if (!title) return;
-  const dueDate = $("taskDate").value || null;
-  const dueTime = $("taskTime").value || null;
-  await api("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, dueDate, dueTime }) });
-  e.target.reset(); loadAll();
-});
-
-/* ---- عرض كالندر + التبديل بين القائمة والكالندر ---- */
-const AR_MONTHS = ["يناير", "فبراير", "مارس", "إبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-function renderTasksView() {
-  if ((state.taskView || "list") === "calendar") renderCalendar();
-  else renderTasks();
-}
-function setTaskView(v) {
-  state.taskView = v;
-  $("taskViewList")?.classList.toggle("active", v === "list");
-  $("taskViewCal")?.classList.toggle("active", v === "calendar");
-  $("tasks")?.classList.toggle("hidden", v !== "list");
-  $("taskCalendar")?.classList.toggle("hidden", v !== "calendar");
-  renderTasksView();
-}
-$("taskViewList")?.addEventListener("click", () => setTaskView("list"));
-$("taskViewCal")?.addEventListener("click", () => setTaskView("calendar"));
-
-function renderCalendar() {
-  const el = $("taskCalendar");
-  if (!el) return;
-  if (!state.calRef) { const n = new Date(); state.calRef = { y: n.getFullYear(), m: n.getMonth() }; }
-  const { y, m } = state.calRef;
-  const tasks = state.tasks || [];
-  const byDate = {};
-  for (const t of tasks) if (t.due_date) (byDate[t.due_date] ||= []).push(t);
-  const startCol = (new Date(y, m, 1).getDay() + 1) % 7; // السبت = 0
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const todayISO = TODAY();
-  const dow = ["السبت", "الأحد", "الاتنين", "التلات", "الأربع", "الخميس", "الجمعة"];
-  let cells = "";
-  for (let i = 0; i < startCol; i++) cells += `<div class="cal-cell empty"></div>`;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const iso = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    const list = byDate[iso] || [];
-    const chips = list.slice(0, 3).map((t) =>
-      `<span class="cal-task ${t.status === "done" ? "done" : ""}" onclick="openTaskEdit(${t.id})" title="${escapeHtml(t.title)}">${t.due_time ? t.due_time + " " : ""}${escapeHtml(t.title)}</span>`
-    ).join("");
-    const more = list.length > 3 ? `<span class="cal-more">+${list.length - 3}</span>` : "";
-    cells += `<div class="cal-cell ${iso === todayISO ? "today" : ""}"><span class="cal-num">${d}</span>${chips}${more}</div>`;
-  }
-  const noDate = tasks.filter((t) => !t.due_date && t.status !== "done");
-  el.innerHTML = `
-    <div class="cal-head">
-      <button class="ghost-btn sm" onclick="calShift(-1)">‹ السابق</button>
-      <h3 class="cal-title">${AR_MONTHS[m]} ${y}</h3>
-      <button class="ghost-btn sm" onclick="calShift(1)">التالي ›</button>
-    </div>
-    <div class="cal-grid cal-dows">${dow.map((h) => `<div class="cal-dow">${h}</div>`).join("")}</div>
-    <div class="cal-grid cal-days">${cells}</div>
-    ${noDate.length ? `<div class="cal-nodate"><b>من غير موعد:</b> ${noDate.map((t) => `<span class="cal-task" onclick="openTaskEdit(${t.id})">${escapeHtml(t.title)}</span>`).join("")}</div>` : ""}`;
-}
-function calShift(delta) {
-  const r = state.calRef; let m = r.m + delta, yy = r.y;
-  if (m < 0) { m = 11; yy--; }
-  if (m > 11) { m = 0; yy++; }
-  state.calRef = { y: yy, m }; renderCalendar();
-}
-window.calShift = calShift;
-
-/* ---- تعديل المهمة (مودال) ---- */
-let editTaskId = null;
-function openTaskEdit(id) {
-  const t = (state.tasks || []).find((x) => x.id === id);
-  if (!t) return;
-  editTaskId = id;
-  $("teTitle").value = t.title || "";
-  $("teDate").value = t.due_date || "";
-  $("teTime").value = t.due_time || "";
-  $("taskEditOverlay").classList.remove("hidden");
-}
-window.openTaskEdit = openTaskEdit;
-function closeTaskEdit() { $("taskEditOverlay").classList.add("hidden"); editTaskId = null; }
-$("teCancel").addEventListener("click", closeTaskEdit);
-$("taskEditOverlay").addEventListener("click", (e) => { if (e.target === $("taskEditOverlay")) closeTaskEdit(); });
-$("teSave").addEventListener("click", async () => {
-  if (editTaskId == null) return;
-  const title = $("teTitle").value.trim();
-  const dueDate = $("teDate").value || null;
-  const dueTime = $("teTime").value || null;
-  await api(`/api/tasks/${editTaskId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, dueDate, dueTime }) });
-  closeTaskEdit(); loadAll();
-});
-
 /* ===================== Habits ===================== */
 function renderHabits() {
   const el = $("habits");
@@ -531,25 +441,22 @@ function renderHabits() {
     el.innerHTML = `<div class="empty"><div class="empty-emoji">🔁</div><p class="muted">ضيف عادة فوق، أو قول للبوت "بلعب رياضة كل يوم".</p></div>`;
     return;
   }
-  const days = last30(); // آخر ٣٠ يوم (تحدّي الشهر)
+  const days = last7();
   el.innerHTML = data.map((h) => {
     const logset = new Set(h.logs || []);
-    const doneInMonth = days.filter((d) => logset.has(d)).length;
-    const pct = Math.round((doneInMonth / 30) * 100);
-    const cells = days.map((d) => `<span class="hb-cell ${logset.has(d) ? "on" : ""}" title="${fmtShort(d)}"></span>`).join("");
+    const dots = days.map((d) => `<span class="hb-dot ${logset.has(d) ? "on" : ""}" title="${fmtShort(d)}"></span>`).join("");
     const isQuit = h.kind === "quit";
     return `<div class="habit-card ${h.doneToday ? "done" : ""}">
       <div class="habit-top">
         <span class="habit-emoji">${h.emoji || (isQuit ? "🚭" : "🔁")}</span>
         <div class="habit-info">
           <span class="habit-title">${escapeHtml(h.title)}</span>
-          <span class="habit-kind">${isQuit ? "ببطّلها" : "بعملها"} · تحدّي ٣٠ يوم</span>
+          <span class="habit-kind">${isQuit ? "ببطّلها" : "بعملها"}</span>
         </div>
         <button class="del-btn" onclick="del('habits', ${h.id})" title="حذف">🗑️</button>
       </div>
-      <div class="habit-streak"><span class="hs-fire">🔥</span><b>${h.streak}</b> يوم متتالي · <b>${doneInMonth}</b>/٣٠ في الشهر</div>
-      <div class="hb-progress"><span style="width:${pct}%"></span></div>
-      <div class="hb-month" title="آخر ٣٠ يوم">${cells}</div>
+      <div class="habit-streak"><span class="hs-fire">🔥</span><b>${h.streak}</b> يوم متتالي · ${h.total} إجمالي</div>
+      <div class="hb-week">${dots}</div>
       <button class="habit-check ${h.doneToday ? "checked" : ""}" onclick="toggleHabit(${h.id}, ${h.doneToday})">
         ${h.doneToday ? "✓ اتعملت النهاردة" : "علّمها للنهاردة"}
       </button>
@@ -597,49 +504,169 @@ function renderFinance() {
   }
   drawFinChart($("finChart"), days);
 
+  // صرفت في إيه؟ — تفصيل بالبنود آخر ٣٠ يوم
+  const since = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+  const byCat = {};
+  for (const f of data.filter((f) => f.direction === "expense" && f.entry_date >= since)) {
+    const c = f.category || "أخرى";
+    byCat[c] = (byCat[c] || 0) + f.amount;
+  }
+  const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const catTotal = catRows.reduce((a, [, v]) => a + v, 0);
+  $("catBreakdown").innerHTML = catRows.length
+    ? catRows.map(([c, v]) => {
+        const pct = catTotal ? Math.round((v / catTotal) * 100) : 0;
+        return `<div class="cat-row">
+          <span class="cat-ico">${CAT_ICONS[c] || "📦"}</span>
+          <div class="cat-mid">
+            <div class="cat-head"><span>${escapeHtml(c)}</span><span class="cat-amount">${fmtNum(v)} ج · ${pct}%</span></div>
+            <div class="cat-bar"><span style="width:${pct}%"></span></div>
+          </div>
+        </div>`;
+      }).join("")
+    : `<div class="empty"><div class="empty-emoji">🧾</div><p class="muted">قول للبوت "صرفت ٢٠٠ على أكل" وهيتصنّف هنا لوحده.</p></div>`;
+
   // list
   const el = $("finList");
   if (!data.length) {
     el.innerHTML = `<div class="empty"><div class="empty-emoji">💰</div><p class="muted">قول للبوت "صرفت ٢٠٠ على أكل" أو ضيف عملية فوق.</p></div>`;
     return;
   }
-  // عبّي قايمة البنود الموجودة للـ datalist (للإضافة اليدوية)
-  const cats = [...new Set(data.filter((f) => f.category).map((f) => f.category))];
-  const dl = $("finCatList");
-  if (dl) dl.innerHTML = cats.map((c) => `<option value="${escapeHtml(c)}"></option>`).join("");
-
-  el.innerHTML = data.map((f) => {
-    const catChip = f.category ? `<span class="fin-cat">🏷️ ${escapeHtml(f.category)}</span>` : "";
-    const note = f.note ? ` · ${escapeHtml(f.note)}` : "";
-    return `<div class="list-row ${f.direction === "income" ? "pos" : "neg"}">
+  el.innerHTML = data.map((f) => `
+    <div class="list-row ${f.direction === "income" ? "pos" : "neg"}">
       <div class="lr-main">
-        <span class="hcat">${f.direction === "income" ? "➕ دخل" : "➖ صرف"} · ${fmtShort(f.entry_date)}</span>
-        <span class="lr-note">${catChip}${escapeHtml(f.category ? "" : (f.note ? "" : "—"))}${note}</span>
+        <span class="hcat">${f.direction === "income" ? "➕ دخل" : "➖ صرف"} · ${fmtShort(f.entry_date)}${f.category ? ` · ${CAT_ICONS[f.category] || ""} ${escapeHtml(f.category)}` : ""}</span>
+        <span class="lr-note">${escapeHtml(f.note || "—")}</span>
       </div>
       <div class="row-actions">
         <span class="lr-amount">${fmtNum(f.amount)} ${escapeHtml(f.currency || "جنيه")}</span>
         <button class="del-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
       </div>
-    </div>`;
-  }).join("");
+    </div>`).join("");
 }
 $("finForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const direction = $("finDir").value;
   const amount = $("finAmount").value;
-  const category = $("finCategory").value.trim();
+  const category = $("finCategory").value;
   const note = $("finNote").value.trim();
   if (amount === "") return;
   await api("/api/finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ direction, amount, category, note }) });
-  e.target.reset(); loadAll();
+  e.target.reset(); fillCategorySelect(); loadAll();
+});
+function fillCategorySelect() {
+  const sel = $("finCategory");
+  if (!sel || !state.categories.length) return;
+  sel.innerHTML = state.categories.map((c) => `<option value="${c}">${CAT_ICONS[c] || ""} ${c}</option>`).join("");
+}
+
+/* ===================== المهام والتقويم ===================== */
+const AR_WD = ["سبت", "حد", "اتنين", "تلات", "أربع", "خميس", "جمعة"];
+const wdIndex = (jsDay) => (jsDay + 1) % 7; // السبت أول الأسبوع
+
+function isoOf(y, m, d) {
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+function renderCalendar() {
+  if (!state.selDate) state.selDate = TODAY();
+  $("calWeekdays").innerHTML = AR_WD.map((w) => `<span>${w}</span>`).join("");
+  const { calY: y, calM: m } = state;
+  $("calTitle").textContent = new Date(y, m, 1).toLocaleDateString("ar-EG", { month: "long", year: "numeric" });
+
+  const first = new Date(y, m, 1);
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const lead = wdIndex(first.getDay());
+  const byDate = {};
+  for (const t of state.tasks) (byDate[t.due_date] = byDate[t.due_date] || []).push(t);
+
+  let cells = "";
+  for (let i = 0; i < lead; i++) cells += `<span class="cal-cell blank"></span>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = isoOf(y, m, d);
+    const dayTasks = byDate[iso] || [];
+    const pending = dayTasks.filter((t) => t.status === "pending").length;
+    const done = dayTasks.filter((t) => t.status === "done").length;
+    const cls = ["cal-cell", iso === TODAY() ? "today" : "", iso === state.selDate ? "sel" : ""].filter(Boolean).join(" ");
+    const dots =
+      (pending ? `<i class="cd p"></i>` : "") + (done ? `<i class="cd d"></i>` : "");
+    cells += `<button class="${cls}" data-date="${iso}"><span class="cal-num">${d}</span><span class="cal-dots">${dots}</span></button>`;
+  }
+  $("calGrid").innerHTML = cells;
+  $("calGrid").querySelectorAll(".cal-cell[data-date]").forEach((c) =>
+    c.addEventListener("click", () => { state.selDate = c.dataset.date; renderCalendar(); })
+  );
+
+  // مهام اليوم المختار
+  const isToday = state.selDate === TODAY();
+  $("dayTasksTitle").textContent = isToday ? "مهام النهاردة" : `مهام ${fmtDate(state.selDate)}`;
+  const sel = (byDate[state.selDate] || []).slice().sort((a, b) => (a.due_time || "99") < (b.due_time || "99") ? -1 : 1);
+  renderTaskRows($("dayTasks"), sel, "مفيش مهام في اليوم ده — ضيف واحدة فوق ✍️");
+}
+
+function renderTaskRows(el, tasks, emptyMsg) {
+  if (!el) return;
+  if (!tasks.length) {
+    el.innerHTML = `<div class="empty sm"><div class="empty-emoji">📅</div><p class="muted">${emptyMsg}</p></div>`;
+    return;
+  }
+  el.innerHTML = tasks.map((t) => `
+    <div class="task-row ${t.status === "done" ? "done" : ""}">
+      <button class="task-check" onclick="toggleTask(${t.id}, '${t.status}')" title="${t.status === "done" ? "رجّعها" : "خلصت"}">${t.status === "done" ? "✓" : ""}</button>
+      <div class="lr-main">
+        <span class="task-title">${escapeHtml(t.title)}</span>
+        ${t.note ? `<span class="lr-note">${escapeHtml(t.note)}</span>` : ""}
+      </div>
+      <div class="row-actions">
+        ${t.due_time ? `<span class="time-chip">⏰ ${t.due_time}</span>` : ""}
+        <button class="del-btn" onclick="delTask(${t.id})" title="حذف">🗑️</button>
+      </div>
+    </div>`).join("");
+}
+async function toggleTask(id, status) {
+  await api(`/api/tasks/${id}/${status === "done" ? "reopen" : "done"}`, { method: "PUT" });
+  await loadAll();
+  renderCalendar();
+  renderOverview();
+}
+window.toggleTask = toggleTask;
+async function delTask(id) {
+  if (!(await askConfirm())) return;
+  await api(`/api/tasks/${id}`, { method: "DELETE" });
+  await loadAll();
+  renderCalendar();
+}
+window.delTask = delTask;
+$("taskForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("taskTitle").value.trim();
+  const dueTime = $("taskTime").value || null;
+  if (!title) return;
+  await api("/api/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, dueDate: state.selDate || TODAY(), dueTime }),
+  });
+  e.target.reset();
+  await loadAll();
+  renderCalendar();
+});
+$("calPrev").addEventListener("click", () => { state.calM--; if (state.calM < 0) { state.calM = 11; state.calY--; } renderCalendar(); });
+$("calNext").addEventListener("click", () => { state.calM++; if (state.calM > 11) { state.calM = 0; state.calY++; } renderCalendar(); });
+$("calToday").addEventListener("click", () => {
+  const n = new Date();
+  state.calY = n.getFullYear(); state.calM = n.getMonth(); state.selDate = TODAY();
+  renderCalendar();
 });
 
 /* ===================== تكلفة الـAI ===================== */
 const USAGE_KINDS = {
   transcribe: { label: "تفريغ الصوت", emoji: "🎙️" },
-  classify: { label: "تصنيف الكلام", emoji: "🧠" },
-  reflect: { label: "رد البوت", emoji: "💬" },
+  agent: { label: "الـ Agent (فهم وتسجيل ورد)", emoji: "🧠" },
+  classify: { label: "تصنيف الكلام (قديم)", emoji: "🗂️" },
+  reflect: { label: "رد البوت (قديم)", emoji: "💬" },
   analyze: { label: "تحليل اليوميات", emoji: "📈" },
+  report: { label: "التقرير الشامل", emoji: "📋" },
   doctor: { label: "تقرير الدكتور", emoji: "🩺" },
   other: { label: "غير ذلك", emoji: "⚙️" },
 };
@@ -664,10 +691,8 @@ function renderUsage() {
     <div class="fin-card"><span class="fc-label">الشهر ده</span><span class="fc-num">${usd(monthCost)}</span><span class="fc-cur">≈ ${egp(monthCost)}</span></div>
     <div class="fin-card pos"><span class="fc-label">عدد النداءات</span><span class="fc-num">${fmtNum(t.calls || 0)}</span><span class="fc-cur">${fmtNum(tokens)} توكن · ${minutes.toFixed(1)} دقيقة صوت</span></div>`;
 
-  // daily cost chart
   drawCostChart($("usageChart"), u.daily || []);
 
-  // breakdown by operation
   const byKind = {};
   (u.byKind || []).forEach((r) => {
     const k = USAGE_KINDS[r.kind] ? r.kind : "other";
@@ -677,7 +702,7 @@ function renderUsage() {
   const rows = Object.entries(byKind).sort((a, b) => b[1].cost - a[1].cost);
   const el = $("usageBreakdown");
   if (!rows.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-emoji">🧮</div><p class="muted">لسه مفيش استهلاك متسجّل. التتبّع بيشتغل من أول ما اتفعّل.</p></div>`;
+    el.innerHTML = `<div class="empty"><div class="empty-emoji">🧮</div><p class="muted">لسه مفيش استهلاك متسجّل.</p></div>`;
   } else {
     el.innerHTML = rows.map(([k, v]) => {
       const meta = USAGE_KINDS[k];
@@ -699,7 +724,6 @@ function renderUsage() {
 function drawCostChart(canvas, daily) {
   if (!canvas) return;
   const { ctx, w, h } = prep(canvas);
-  // املا الأيام الناقصة بصفر لآخر ٣٠ يوم
   const map = {}; daily.forEach((d) => (map[d.usage_date] = d.cost_usd));
   const days = [];
   for (let i = 29; i >= 0; i--) {
@@ -708,7 +732,7 @@ function drawCostChart(canvas, daily) {
   }
   const max = Math.max(0.0001, ...days.map((d) => d.cost));
   if (max <= 0.0001 && !daily.length) {
-    ctx.fillStyle = "rgba(52,48,42,.4)"; ctx.font = "13px Tajawal"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.font = "13px Cairo"; ctx.textAlign = "center";
     ctx.fillText("مفيش استهلاك لسه", w / 2, h / 2); return;
   }
   const slot = w / days.length;
@@ -716,11 +740,11 @@ function drawCostChart(canvas, daily) {
     const bh = (d.cost / max) * (h - 32);
     const x = i * slot, y = h - 20 - bh;
     const grad = ctx.createLinearGradient(0, y, 0, h);
-    grad.addColorStop(0, cssVar("--violet")); grad.addColorStop(1, "rgba(255,252,245,0.04)");
+    grad.addColorStop(0, cssVar("--violet")); grad.addColorStop(1, "rgba(139,92,246,0.12)");
     ctx.fillStyle = grad;
     roundRect(ctx, x + slot * 0.18, y, slot * 0.64, Math.max(1, bh), 4); ctx.fill();
     if (i % 5 === 0) {
-      ctx.fillStyle = "rgba(52,48,42,.6)"; ctx.font = "10px Tajawal"; ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(245,245,247,.5)"; ctx.font = "10px Cairo"; ctx.textAlign = "center";
       ctx.fillText(fmtShort(d.date), x + slot / 2, h - 5);
     }
   });
@@ -728,7 +752,7 @@ function drawCostChart(canvas, daily) {
 
 /* ===================== الصحة — body map ===================== */
 const REGION_CENTERS = { "راس": [100, 32], "صدر": [100, 90], "معدة": [100, 137], "بطن": [100, 178], "ذراعين": [153, 120], "ساقين": [116, 270] };
-const REGION_ICON = { "تمرين": "🏃", "دواء": "💊", "أكل": "🍽️", "عرض": "🤒", "نوم": "😴", "ملاحظة": "📝" };
+const REGION_ICON = { "تمرين": "🏃", "دواء": "💊", "أكل": "🍽️", "عرض": "🤒", "نوم": "😴", "نفسية": "🧠", "ملاحظة": "📝" };
 const SVGNS = "http://www.w3.org/2000/svg";
 let pageFilter = null;
 function healthDates() { return [...new Set(state.health.map((h) => h.entry_date))].sort(); }
@@ -794,6 +818,31 @@ $("bodySvg")?.addEventListener("click", (e) => {
 $("dayPrev")?.addEventListener("click", () => shiftPageDate(-1));
 $("dayNext")?.addEventListener("click", () => shiftPageDate(1));
 
+/* ===================== الصحة — المزاج والنفسية ===================== */
+function renderMood() {
+  const moodByDate = {};
+  for (const e of state.journal) if (e.mood) moodByDate[e.entry_date] = e.mood;
+  const points = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const mood = moodByDate[d];
+    points.push(mood ? { date: d, ...moodInfo(mood) } : { date: d, score: null, emoji: "" });
+  }
+  drawMoodChart($("moodChart"), points);
+
+  const mental = state.health.filter((h) => h.category === "نفسية").slice(0, 10);
+  $("mentalList").innerHTML = mental.length
+    ? mental.map((h) => `
+      <div class="list-row">
+        <div class="lr-main">
+          <span class="hcat">🧠 نفسية · ${fmtShort(h.entry_date)}</span>
+          <span class="lr-note">${escapeHtml(h.detail)}</span>
+        </div>
+        <div class="row-actions"><button class="del-btn" onclick="del('health', ${h.id})" title="حذف">🗑️</button></div>
+      </div>`).join("")
+    : "";
+}
+
 /* ===================== الصحة — conditions ===================== */
 function daysLeft(endDate) {
   const end = new Date(endDate + "T00:00:00");
@@ -836,7 +885,7 @@ async function doctorReport(id) {
     if (data.error) { box.innerHTML = `<p class="muted">${escapeHtml(data.error)}</p>`; return; }
     const timeline = (data.timeline || []).map((h) =>
       `<div class="tl-row"><span class="tl-date">${fmtDate(h.entry_date)}</span><span class="tl-text">${REGION_ICON[h.category] || "🩺"} ${escapeHtml(h.detail)}</span></div>`).join("");
-    box.innerHTML = `<div class="report-summary">${escapeHtml(data.summary || "").replace(/\n/g, "<br>")}</div>
+    box.innerHTML = `<div class="report-summary">${renderRich(data.summary)}</div>
       <h4 class="report-h">الخط الزمني للأعراض</h4>
       <div class="timeline">${timeline || `<p class="muted">مفيش أعراض في الفترة.</p>`}</div>`;
   } catch { box.innerHTML = `<p class="muted">حصل خطأ في توليد التقرير.</p>`; }
@@ -845,7 +894,7 @@ window.doctorReport = doctorReport;
 async function closeCondition(id) { await api(`/api/conditions/${id}/close`, { method: "PUT" }); loadAll(); }
 window.closeCondition = closeCondition;
 
-/* ===================== الأكل ===================== */
+/* ===================== الصحة — الأكل ===================== */
 function mealDates() { return [...new Set(state.meals.map((m) => m.entry_date))].sort(); }
 function shiftMealDate(delta) {
   if (!state.mealDate) return;
@@ -861,7 +910,7 @@ function renderMeals() {
   dayLabel.textContent = fmtDate(state.mealDate);
   const items = state.meals.filter((m) => m.entry_date === state.mealDate);
   const el = $("meals");
-  if (!items.length) { el.innerHTML = `<div class="empty"><div class="empty-emoji">🍽️</div><p class="muted">مفيش أكل مسجّل في اليوم ده.</p></div>`; return; }
+  if (!items.length) { el.innerHTML = `<div class="empty sm"><div class="empty-emoji">🍽️</div><p class="muted">مفيش أكل مسجّل في اليوم ده.</p></div>`; return; }
   el.innerHTML = items.map((m) => `
     <div class="list-row">
       <div class="lr-main"><span class="hcat">🍽️ ${m.at_time ? escapeHtml(m.at_time) : "أكل"}</span>
@@ -872,8 +921,26 @@ function renderMeals() {
 $("mealPrev")?.addEventListener("click", () => shiftMealDate(-1));
 $("mealNext")?.addEventListener("click", () => shiftMealDate(1));
 
+/* ===================== التقرير الشامل ===================== */
+async function makeReport() {
+  const days = $("reportDays").value;
+  const box = $("reportResult");
+  box.classList.remove("hidden");
+  box.innerHTML = `<div class="loading"><span class="spinner"></span> بجمّع كل كلامك وبجهّز التقرير... ممكن ياخد شوية</div>`;
+  $("reportBtn").disabled = true;
+  try {
+    const res = await api(`/api/report?days=${days}`);
+    const data = await res.json();
+    box.innerHTML = data.report
+      ? `<div class="analysis-text">${renderRich(data.report)}</div>`
+      : `<p class="muted">${escapeHtml(data.error || "حصل خطأ")}</p>`;
+  } catch { box.innerHTML = `<p class="muted">حصل خطأ في توليد التقرير.</p>`; }
+  finally { $("reportBtn").disabled = false; }
+}
+$("reportBtn").addEventListener("click", makeReport);
+
 /* ===================== المحادثات ===================== */
-const KIND_ICON = { voice: "🎙️", text: "⌨️", command: "⚙️" };
+const KIND_ICON = { voice: "🎙️", text: "⌨️", command: "⚙️", checkin: "⏰" };
 function renderChats() {
   const el = $("chats");
   const data = state.conversations;
@@ -881,12 +948,12 @@ function renderChats() {
   el.innerHTML = data.map((c) => `
     <div class="chat-card">
       <div class="chat-head">
-        <span class="kind-chip">${KIND_ICON[c.kind] || "💬"} ${escapeHtml(c.kind || "")}</span>
+        <span class="kind-chip">${KIND_ICON[c.kind] || "💬"} ${escapeHtml(c.kind === "checkin" ? "سؤال اليوم" : c.kind || "")}</span>
         <div class="row-actions"><span class="lr-date">${fmtDateTime(c.created_at)}</span>
           <button class="del-btn" onclick="del('conversations', ${c.id})" title="حذف">🗑️</button></div>
       </div>
-      <div class="bubble user"><span class="who">أنت</span>${escapeHtml(c.user_text || "")}</div>
-      <div class="bubble ai"><span class="who">دوّنلي</span>${escapeHtml(c.ai_reply || "")}</div>
+      ${c.user_text ? `<div class="bubble user"><span class="who">أنت</span>${escapeHtml(c.user_text)}</div>` : ""}
+      ${c.ai_reply ? `<div class="bubble ai"><span class="who">دوّنلي</span>${escapeHtml(c.ai_reply)}</div>` : ""}
     </div>`).join("");
 }
 
@@ -900,7 +967,7 @@ async function analyze() {
   try {
     const res = await api(`/api/analyze?days=${days}`);
     const data = await res.json();
-    analysisEl.innerHTML = `<div class="analysis-text">${escapeHtml(data.analysis || data.error || "").replace(/\n/g, "<br>")}</div>`;
+    analysisEl.innerHTML = `<div class="analysis-text">${renderRich(data.analysis || data.error || "")}</div>`;
   } catch { analysisEl.innerHTML = `<p class="muted">حصل خطأ في التحليل.</p>`; }
   finally { $("analyzeBtn").disabled = false; }
 }
@@ -911,12 +978,13 @@ async function logout() {
   window.location.href = "/login";
 }
 $("logoutBtn").addEventListener("click", logout);
-$("refreshBtn").addEventListener("click", loadAll);
+$("refreshBtn").addEventListener("click", () => loadAll());
 
 /* ===================== Load ===================== */
 async function loadAll() {
   try {
-    const [j, g, h, c, cond, m, hab, fin, usg, tsk] = await Promise.all([
+    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, usg] = await Promise.all([
+      api("/api/me").then((r) => r.json()),
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
       api("/api/health").then((r) => r.json()),
@@ -925,24 +993,28 @@ async function loadAll() {
       api("/api/meals").then((r) => r.json()),
       api("/api/habits").then((r) => r.json()),
       api("/api/finance").then((r) => r.json()),
-      api("/api/usage").then((r) => r.json()),
       api("/api/tasks").then((r) => r.json()),
+      api("/api/finance-categories").then((r) => r.json()),
+      api("/api/usage").then((r) => r.json()),
     ]);
+    state.me = me;
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
     state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin;
-    state.usage = usg; state.tasks = tsk;
+    state.tasks = tasks; state.categories = cats; state.usage = usg;
   } catch { return; }
   $("pageDateLabel").textContent = fmtDate(TODAY());
+  fillCategorySelect();
   renderJournal();
-  renderTasksView();
   renderGoals();
   renderHabits();
   renderPage();
+  renderMood();
   renderConditions();
   renderMeals();
   renderChats();
   const active = document.querySelector(".nav-item.active")?.dataset.tab;
   if (active === "finance") renderFinance();
+  if (active === "tasks") renderCalendar();
   if (active === "usage") renderUsage();
   renderOverview();
 }
@@ -981,16 +1053,5 @@ async function loadAll() {
   resize(); init(); tick();
   window.addEventListener("resize", () => { resize(); init(); });
 })();
-
-// نفتح على الصفحة اللي كان واقف فيها (من الـ hash) عشان الريلود يفضل مكانه
-(function restoreTab() {
-  const tab = location.hash.slice(1);
-  if (tab && TABS.includes(tab) && tab !== "overview") gotoTab(tab, { noScroll: true });
-})();
-window.addEventListener("hashchange", () => {
-  const tab = location.hash.slice(1) || "overview";
-  const active = document.querySelector(".nav-item.active")?.dataset.tab;
-  if (tab !== active) gotoTab(tab, { noScroll: true });
-});
 
 loadAll();

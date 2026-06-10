@@ -4,12 +4,18 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { config } from "./config.js";
 import {
+  ownerUser,
+  getUserById,
+  localToday,
   listEntries,
   entriesSince,
   deleteEntry,
   listFinance,
+  addFinance,
   deleteFinance,
+  FINANCE_CATEGORIES,
   listHealth,
+  addHealth,
   deleteHealth,
   listGoals,
   applyGoal,
@@ -24,42 +30,45 @@ import {
   healthBetween,
   listMeals,
   deleteMeal,
-  addFinance,
   listHabits,
   addHabit,
   logHabit,
   unlogHabit,
   deleteHabit,
-  aiUsageSummary,
-  listTasks,
   addTask,
-  setTaskStatus,
-  updateTask,
+  listTasks,
+  completeTask,
+  reopenTask,
   deleteTask,
+  aiUsageSummary,
 } from "./db.js";
-import { analyzeEntries, doctorReport } from "./openai.js";
+import { analyzeEntries, doctorReport, unifiedReport } from "./openai.js";
+import { buildReportData } from "./report.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
 
-const SESSION_TTL = 30 * 86400 * 1000;
-const sessions = new Map(); // token -> expiresAt
+/* ===================== الجلسات ===================== */
 
-function newSession() {
+const SESSION_TTL = 30 * 86400 * 1000;
+const sessions = new Map(); // token -> { userId, expiresAt }
+
+function newSession(userId) {
   const token = crypto.randomBytes(24).toString("hex");
-  sessions.set(token, Date.now() + SESSION_TTL);
+  sessions.set(token, { userId, expiresAt: Date.now() + SESSION_TTL });
   return token;
 }
 
-function validSession(token) {
-  if (!token) return false;
-  const exp = sessions.get(token);
-  if (!exp) return false;
-  if (Date.now() > exp) {
+function sessionUser(req) {
+  const token = parseCookies(req).dawenli_session;
+  if (!token) return null;
+  const s = sessions.get(token);
+  if (!s) return null;
+  if (Date.now() > s.expiresAt) {
     sessions.delete(token);
-    return false;
+    return null;
   }
-  return true;
+  return getUserById(s.userId);
 }
 
 function parseCookies(req) {
@@ -73,28 +82,48 @@ function parseCookies(req) {
   );
 }
 
-const authed = (req) => validSession(parseCookies(req).dawenli_session);
+/* ===================== أكواد الدخول من البوت ===================== */
+
+const CODE_TTL = 10 * 60 * 1000;
+const loginCodes = new Map(); // code -> { userId, expiresAt }
+
+export function issueLoginCode(userId) {
+  const code = String(crypto.randomInt(100000, 999999));
+  loginCodes.set(code, { userId, expiresAt: Date.now() + CODE_TTL });
+  return code;
+}
+
+function redeemLoginCode(code) {
+  const entry = loginCodes.get(String(code).trim());
+  if (!entry) return null;
+  loginCodes.delete(String(code).trim());
+  if (Date.now() > entry.expiresAt) return null;
+  return entry.userId;
+}
+
+/* ===================== السيرفر ===================== */
 
 export function startServer() {
   const app = express();
   app.use(express.json());
 
-  // أصول ثابتة عامة (شعارات ورسومات SVG للصفحة الترويجية والداشبورد) — مفيهاش بيانات
-  app.use("/assets", express.static(join(publicDir, "assets")));
-
+  // الدخول: كلمة سر (الأدمن/الأونر) أو كود من البوت (/code) لأي مستخدم
   app.post("/api/login", (req, res) => {
-    const { password, remember } = req.body || {};
+    const { password, code, remember } = req.body || {};
+    let userId = null;
     if (password && password === config.dashboardPassword) {
-      const token = newSession();
-      // remember me: كوكي دائم 30 يوم، غير كده كوكي جلسة بيخلص بقفل المتصفح
-      const maxAge = remember === false ? "" : `; Max-Age=${30 * 86400}`;
-      res.setHeader(
-        "Set-Cookie",
-        `dawenli_session=${token}; HttpOnly; SameSite=Strict; Path=/${maxAge}`
-      );
-      return res.json({ ok: true });
+      userId = ownerUser()?.id ?? null;
+    } else if (code) {
+      userId = redeemLoginCode(code);
     }
-    return res.status(401).json({ ok: false, error: "كلمة السر غلط" });
+    if (!userId) return res.status(401).json({ ok: false, error: "بيانات الدخول غلط" });
+    const token = newSession(userId);
+    const maxAge = remember === false ? "" : `; Max-Age=${30 * 86400}`;
+    res.setHeader(
+      "Set-Cookie",
+      `dawenli_session=${token}; HttpOnly; SameSite=Strict; Path=/${maxAge}`
+    );
+    return res.json({ ok: true });
   });
 
   app.post("/api/logout", (req, res) => {
@@ -103,55 +132,134 @@ export function startServer() {
     res.json({ ok: true });
   });
 
-  // أصول عامة (مفيهاش بيانات حسّاسة) — no-cache عشان أي تحديث يوصل فورًا للمتصفح
-  const noCache = (res) => res.set("Cache-Control", "no-cache, must-revalidate");
-  app.get("/style.css", (_req, res) => {
-    noCache(res);
-    res.sendFile(join(publicDir, "style.css"));
-  });
-  app.get("/login.js", (_req, res) => {
-    noCache(res);
-    res.sendFile(join(publicDir, "login.js"));
-  });
+  // أصول عامة (مفيهاش بيانات حسّاسة)
+  app.get("/style.css", (_req, res) => res.sendFile(join(publicDir, "style.css")));
+  app.get("/login.js", (_req, res) => res.sendFile(join(publicDir, "login.js")));
 
   app.get(["/login", "/login.html"], (req, res) => {
-    if (authed(req)) return res.redirect("/");
+    if (sessionUser(req)) return res.redirect("/");
     res.sendFile(join(publicDir, "login.html"));
   });
 
-  // صفحة هبوط ترويجية عامة (مفيهاش بيانات)
   app.get(["/landing", "/landing.html", "/welcome"], (_req, res) =>
     res.sendFile(join(publicDir, "landing.html"))
   );
 
   // محمي: السكربت والصفحة والبيانات
-  app.get("/app.js", (req, res) => {
-    if (!authed(req)) return res.status(401).end();
-    noCache(res);
-    res.sendFile(join(publicDir, "app.js"));
-  });
+  app.get("/app.js", (req, res) =>
+    sessionUser(req) ? res.sendFile(join(publicDir, "app.js")) : res.status(401).end()
+  );
 
   app.get("/", (req, res) => {
-    if (!authed(req)) return res.redirect("/login");
+    if (!sessionUser(req)) return res.redirect("/login");
     res.sendFile(join(publicDir, "index.html"));
   });
 
-  app.get("/api/entries", (req, res) => {
-    if (!authed(req)) return res.status(401).json({ error: "غير مصرّح" });
-    res.json(listEntries(500));
+  // gate: بيرجّع المستخدم بتاع الجلسة أو بيقفل الطلب
+  const gate = (req, res) => {
+    const user = sessionUser(req);
+    if (!user) {
+      res.status(401).json({ error: "غير مصرّح" });
+      return null;
+    }
+    return user;
+  };
+
+  app.get("/api/me", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ id: user.id, name: user.name, isOwner: !!user.is_owner, today: localToday() });
   });
 
+  /* ===== الأقسام ===== */
+  app.get("/api/entries", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listEntries(user.id, 500));
+  });
+  app.get("/api/finance", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listFinance(user.id, 500));
+  });
+  app.get("/api/health", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listHealth(user.id, 500));
+  });
+  app.get("/api/goals", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listGoals(user.id));
+  });
+  app.get("/api/conversations", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listConversations(user.id, 500));
+  });
+  app.get("/api/conditions", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listConditions(user.id));
+  });
+  app.get("/api/meals", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listMeals(user.id, 500));
+  });
+  app.get("/api/habits", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listHabits(user.id));
+  });
+  app.get("/api/usage", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const days = Number(req.query.days) > 0 ? Number(req.query.days) : 30;
+    res.json(aiUsageSummary(days));
+  });
+
+  /* ===== المهام والتقويم ===== */
+  app.get("/api/tasks", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const from = String(req.query.from || "0000-01-01");
+    const to = String(req.query.to || "9999-12-31");
+    res.json(listTasks(user.id, from, to));
+  });
+  app.post("/api/tasks", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const { title, dueDate, dueTime, note } = req.body || {};
+    if (!title || !dueDate) return res.status(400).json({ error: "العنوان والتاريخ مطلوبين" });
+    res.json({ ok: true, task: addTask({ userId: user.id, title, dueDate, dueTime, note }) });
+  });
+  app.put("/api/tasks/:id/done", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: !!completeTask(user.id, { id: Number(req.params.id) }) });
+  });
+  app.put("/api/tasks/:id/reopen", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: reopenTask(user.id, Number(req.params.id)) });
+  });
+  app.delete("/api/tasks/:id", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: deleteTask(user.id, Number(req.params.id)) });
+  });
+
+  /* ===== التحليل والتقارير ===== */
   app.get("/api/analyze", async (req, res) => {
-    if (!authed(req)) return res.status(401).json({ error: "غير مصرّح" });
+    const user = gate(req, res);
+    if (!user) return;
     const days = Number(req.query.days) > 0 ? Number(req.query.days) : 7;
-    const since = new Date(Date.now() - days * 86400000)
-      .toISOString()
-      .slice(0, 10);
-    const entries = entriesSince(since);
-    if (!entries.length)
-      return res.json({ analysis: "مفيش تدوينات في الفترة دي." });
+    const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+    const entries = entriesSince(user.id, since);
+    if (!entries.length) return res.json({ analysis: "مفيش تدوينات في الفترة دي." });
     try {
-      const analysis = await analyzeEntries(entries);
+      const analysis = await analyzeEntries(entries, user.id);
       res.json({ analysis });
     } catch (err) {
       console.error("analyze error:", err);
@@ -159,61 +267,30 @@ export function startServer() {
     }
   });
 
-  const gate = (req, res) => {
-    if (!authed(req)) {
-      res.status(401).json({ error: "غير مصرّح" });
-      return false;
-    }
-    return true;
-  };
-
-  // ===== الأقسام =====
-  app.get("/api/finance", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json(listFinance(500));
-  });
-  app.get("/api/health", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json(listHealth(500));
-  });
-  app.get("/api/goals", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json(listGoals());
-  });
-  app.get("/api/conversations", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json(listConversations(500));
-  });
-  app.get("/api/conditions", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json(listConditions());
-  });
-  app.get("/api/meals", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json(listMeals(500));
-  });
-  app.get("/api/habits", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json(listHabits());
-  });
-  app.get("/api/tasks", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json(listTasks());
-  });
-  app.get("/api/usage", (req, res) => {
-    if (!gate(req, res)) return;
+  // التقرير الشامل الواحد — من كل كلام المستخدم في الفترة
+  app.get("/api/report", async (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
     const days = Number(req.query.days) > 0 ? Number(req.query.days) : 30;
-    res.json(aiUsageSummary(days));
+    try {
+      const data = buildReportData(user.id, days);
+      const report = await unifiedReport(data, user.id);
+      res.json({ report, data });
+    } catch (err) {
+      console.error("report error:", err);
+      res.status(500).json({ error: "فشل توليد التقرير" });
+    }
   });
 
   // تقرير للدكتور: تلخيص AI + خط زمني للأعراض في فترة المتابعة
   app.get("/api/conditions/:id/report", async (req, res) => {
-    if (!gate(req, res)) return;
-    const condition = getCondition(Number(req.params.id));
+    const user = gate(req, res);
+    if (!user) return;
+    const condition = getCondition(user.id, Number(req.params.id));
     if (!condition) return res.status(404).json({ error: "المتابعة مش موجودة" });
-    const items = healthBetween(condition.start_date, condition.end_date);
+    const items = healthBetween(user.id, condition.start_date, condition.end_date);
     try {
-      const summary = await doctorReport(condition, items);
+      const summary = await doctorReport(condition, items, user.id);
       res.json({ condition, summary, timeline: items });
     } catch (err) {
       console.error("doctor report error:", err);
@@ -221,58 +298,46 @@ export function startServer() {
     }
   });
 
-  // ===== الحذف =====
-  app.delete("/api/entries/:id", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json({ ok: deleteEntry(Number(req.params.id)) });
-  });
-  app.delete("/api/finance/:id", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json({ ok: deleteFinance(Number(req.params.id)) });
-  });
-  app.delete("/api/health/:id", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json({ ok: deleteHealth(Number(req.params.id)) });
-  });
-  app.delete("/api/goals/:id", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json({ ok: deleteGoal(Number(req.params.id)) });
-  });
-  app.delete("/api/conversations/:id", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json({ ok: deleteConversation(Number(req.params.id)) });
-  });
-  app.delete("/api/conditions/:id", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json({ ok: deleteCondition(Number(req.params.id)) });
-  });
-  app.delete("/api/meals/:id", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json({ ok: deleteMeal(Number(req.params.id)) });
-  });
-  app.delete("/api/habits/:id", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json({ ok: deleteHabit(Number(req.params.id)) });
-  });
-  app.delete("/api/tasks/:id", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json({ ok: deleteTask(Number(req.params.id)) });
-  });
+  /* ===== الحذف ===== */
+  const deleters = {
+    entries: deleteEntry,
+    finance: deleteFinance,
+    health: deleteHealth,
+    goals: deleteGoal,
+    conversations: deleteConversation,
+    conditions: deleteCondition,
+    meals: deleteMeal,
+    habits: deleteHabit,
+  };
+  for (const [kind, fn] of Object.entries(deleters)) {
+    app.delete(`/api/${kind}/:id`, (req, res) => {
+      const user = gate(req, res);
+      if (!user) return;
+      res.json({ ok: fn(user.id, Number(req.params.id)) });
+    });
+  }
 
   // إقفال متابعة (خلصت/مش محتاجها)
   app.put("/api/conditions/:id/close", (req, res) => {
-    if (!gate(req, res)) return;
-    res.json({ ok: closeCondition(Number(req.params.id)) });
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: closeCondition(user.id, Number(req.params.id)) });
   });
 
-  // ===== ماليات: إضافة يدوية من الداشبورد =====
-  app.post("/api/finance", (req, res) => {
+  /* ===== ماليات: إضافة يدوية من الداشبورد ===== */
+  app.get("/api/finance-categories", (req, res) => {
     if (!gate(req, res)) return;
+    res.json(FINANCE_CATEGORIES);
+  });
+  app.post("/api/finance", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
     const { entryDate, direction, amount, currency, category, note } = req.body || {};
     if (amount == null || amount === "" || isNaN(Number(amount)))
       return res.status(400).json({ error: "المبلغ مطلوب" });
     const id = addFinance({
-      entryDate: entryDate || new Date().toISOString().slice(0, 10),
+      userId: user.id,
+      entryDate: entryDate || localToday(),
       direction,
       amount,
       currency,
@@ -282,50 +347,46 @@ export function startServer() {
     res.json({ ok: true, id });
   });
 
-  // ===== مهام: إضافة/إكمال/حذف من الداشبورد =====
-  app.post("/api/tasks", (req, res) => {
-    if (!gate(req, res)) return;
-    const { title, dueDate, dueTime, note } = req.body || {};
-    if (!title) return res.status(400).json({ error: "عنوان المهمة مطلوب" });
-    const task = addTask({ title, dueDate: dueDate || null, dueTime: dueTime || null, note });
-    res.json({ ok: true, task });
-  });
-  app.put("/api/tasks/:id/status", (req, res) => {
-    if (!gate(req, res)) return;
-    const { status } = req.body || {};
-    res.json({ ok: setTaskStatus(Number(req.params.id), status) });
-  });
-  app.put("/api/tasks/:id", (req, res) => {
-    if (!gate(req, res)) return;
-    const { title, dueDate, dueTime, note } = req.body || {};
-    res.json({ ok: updateTask(Number(req.params.id), { title, dueDate, dueTime, note }) });
+  /* ===== صحة: إضافة يدوية ===== */
+  app.post("/api/health", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const { entryDate, category, detail, bodyRegion } = req.body || {};
+    if (!detail) return res.status(400).json({ error: "الوصف مطلوب" });
+    const id = addHealth({ userId: user.id, entryDate, category, detail, bodyRegion });
+    res.json({ ok: true, id });
   });
 
-  // ===== عادات: إنشاء/تسجيل/إلغاء تسجيل من الداشبورد =====
+  /* ===== عادات: إنشاء/تسجيل/إلغاء تسجيل من الداشبورد ===== */
   app.post("/api/habits", (req, res) => {
-    if (!gate(req, res)) return;
+    const user = gate(req, res);
+    if (!user) return;
     const { title, kind, emoji, note } = req.body || {};
     if (!title) return res.status(400).json({ error: "اسم العادة مطلوب" });
-    const habit = addHabit({ title, kind, emoji, note });
+    const habit = addHabit({ userId: user.id, title, kind, emoji, note });
     res.json({ ok: true, habit });
   });
   app.post("/api/habits/:id/log", (req, res) => {
-    if (!gate(req, res)) return;
+    const user = gate(req, res);
+    if (!user) return;
     const { date } = req.body || {};
     res.json({ ok: true, ...logHabit(Number(req.params.id), date) });
   });
   app.delete("/api/habits/:id/log", (req, res) => {
-    if (!gate(req, res)) return;
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const user = gate(req, res);
+    if (!user) return;
+    const date = req.query.date || localToday();
     res.json({ ok: unlogHabit(Number(req.params.id), date) });
   });
 
-  // ===== أهداف: إنشاء/تعديل يدوي من الداشبورد =====
+  /* ===== أهداف: إنشاء/تعديل يدوي من الداشبورد ===== */
   app.post("/api/goals", (req, res) => {
-    if (!gate(req, res)) return;
+    const user = gate(req, res);
+    if (!user) return;
     const { title, target, unit, note } = req.body || {};
     if (!title) return res.status(400).json({ error: "العنوان مطلوب" });
     const g = applyGoal({
+      userId: user.id,
       title,
       target: target != null && target !== "" ? Number(target) : null,
       unit: unit || null,
@@ -334,9 +395,10 @@ export function startServer() {
     res.json({ ok: true, goal: g });
   });
   app.put("/api/goals/:id/current", (req, res) => {
-    if (!gate(req, res)) return;
+    const user = gate(req, res);
+    if (!user) return;
     const { current } = req.body || {};
-    res.json({ ok: setGoalCurrent(Number(req.params.id), Number(current) || 0) });
+    res.json({ ok: setGoalCurrent(user.id, Number(req.params.id), Number(current) || 0) });
   });
 
   app.listen(config.port, () =>

@@ -1,40 +1,23 @@
-/* ===========================================================================
-   Daftar design system — warm paper aesthetic (light mode).
-   The existing dashboard is fully token-driven, so remapping these variable
-   names re-themes the whole app at once. Four "world" accents added below.
-   =========================================================================== */
 :root {
-  /* paper & surfaces */
-  --bg: #f6f1e4;          /* warm cream — app background */
-  --surface: #fffcf5;     /* card / sheet surface */
-  --surface-2: #ffffff;   /* raised */
-  /* ink */
-  --text: #34302a;
-  --muted: #6e665a;
-  /* brand = calm sage green (maps the old indigo/violet/purple roles) */
-  --indigo: #5c8a6b;
-  --violet: #5c8a6b;
-  --purple: #426b52;      /* brand-deep — used for accent text */
-  --pink: #e0705c;        /* coral — used by the body-map "picked" */
-  --grad: linear-gradient(135deg, #5c8a6b 0%, #6fa84a 100%);
-  --grad-line: linear-gradient(90deg, #e0705c, #e3a24a, #5285a6, #6fa84a);
-  --border: #dfd7c4;          /* hairline */
-  --border-strong: #c9bfa8;   /* heavier sketch stroke */
-  --soft: #e4eee6;            /* sage wash */
-  --shadow: 0 2px 8px rgba(52, 48, 42, 0.06);
-  --shadow-lg: 0 10px 30px rgba(52, 48, 42, 0.12);
-  --radius: 20px;
-  --pos: #6fa84a;        /* leaf green */
-  --neg: #e0705c;        /* coral */
-
-  /* the four worlds */
-  --health: #e0705c;   --health-deep: #c4543f;   --health-wash: #fbeae5;
-  --habits: #e3a24a;   --habits-deep: #c07f25;   --habits-wash: #fbf0d9;
-  --goals:  #5285a6;   --goals-deep:  #3a647f;   --goals-wash:  #e3eef4;
-  --finances: #6fa84a; --finances-deep: #527f35; --finances-wash: #eaf2e1;
-  --on-accent: #fffcf5;
-  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
-  --radius-sketch: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  --bg: #0a0a0f;
+  --surface: #14121f;
+  --surface-2: #1a1530;
+  --text: #f5f5f7;
+  --muted: #9a96ad;
+  --indigo: #6366f1;
+  --violet: #8b5cf6;
+  --purple: #a855f7;
+  --pink: #ec4899;
+  --grad: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  --grad-line: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  --border: rgba(168, 85, 247, 0.16);
+  --border-strong: rgba(168, 85, 247, 0.34);
+  --soft: rgba(139, 92, 246, 0.12);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 18px 50px rgba(88, 40, 160, 0.28);
+  --radius: 16px;
+  --pos: #34d399;
+  --neg: #fb7185;
 }
 
 * {
@@ -44,21 +27,24 @@
 }
 
 body {
-  font-family: "Tajawal", "Cairo", system-ui, -apple-system, sans-serif;
+  font-family: "Cairo", system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
-  background-image: var(--paper-grain);
+  background-image: radial-gradient(
+      900px 500px at 85% -8%,
+      rgba(124, 92, 246, 0.16),
+      transparent 60%
+    ),
+    radial-gradient(800px 500px at -5% 105%, rgba(99, 102, 241, 0.12), transparent 55%);
   background-attachment: fixed;
 }
 
 h1,
-h2,
-h3 {
-  font-family: "Cairo", "Tajawal", system-ui, sans-serif;
+h2 {
   font-weight: 800;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
 }
 
 /* ===================== Auth ===================== */
@@ -1716,242 +1702,284 @@ h3 {
   filter: brightness(1.07);
 }
 
-/* ===========================================================================
-   DAFTAR RETHEME — light-mode overrides
-   These fix the handful of rules that hard-coded dark/white colors (so they
-   couldn't follow the token swap), plus add the warm "sketch" finishing touches
-   and the four world accents. Loaded last so they win by source order.
-   =========================================================================== */
-
-/* the ambient dark particle canvas doesn't suit warm paper — hide it */
-.bg-canvas { display: none !important; }
-
-/* strong display face on the brand + numbers */
-.brand-name, .page-title, .ring-center span, .stat-num, .fc-num,
-.fin-num, .goal-title, .habit-title, .cond-title, .entry-date, .hero-text h2 {
-  font-family: "Cairo", "Tajawal", sans-serif;
-  font-weight: 800;
+/* ===================== v2: تابات الدخول ===================== */
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 5px;
 }
 
-/* gradient/coloured text needs darker stops on light paper */
-.stat-num, .ring-center span, .fin-card.net .fin-num {
-  background: linear-gradient(135deg, var(--purple), var(--finances-deep));
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
+.auth-tab {
+  flex: 1;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-/* brand mark: warm sage tile holding the dawwenli logo */
-.brand-mark {
-  background: var(--surface) !important;
-  border: 2px solid var(--border-strong);
-  box-shadow: var(--shadow) !important;
+.auth-tab.active {
+  background: var(--grad);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.35);
+}
+
+/* ===================== v2: شبكة عمودين ===================== */
+.duo-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .duo-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===================== v2: صرفت في إيه؟ ===================== */
+.cat-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.cat-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cat-ico {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.cat-mid {
+  flex: 1;
+  min-width: 0;
+}
+
+.cat-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13.5px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.cat-amount {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.cat-bar {
+  height: 7px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
-.brand-mark img { width: 82%; height: 82%; object-fit: contain; display: block; }
 
-/* auth card on paper */
-.auth-card { background: var(--surface); }
-.auth-card h1 { font-family: "Cairo", "Tajawal", sans-serif; font-weight: 800; }
-.field input, .select { background: #fff; }
-.field input::placeholder, .select::placeholder { color: var(--muted); opacity: .7; }
-
-/* sidebar: cream panel with a hairline, not a translucent dark glass */
-.sidebar {
-  background: linear-gradient(180deg, var(--surface), var(--bg));
-  border-left: 1px solid var(--border);
-  backdrop-filter: none;
+.cat-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--grad-line);
+  transition: width 0.4s ease;
 }
-.nav-group { color: var(--muted); }
 
-/* active nav item → soft sage wash + ink-green text + inset bar (per design) */
-.nav-item.active {
-  color: var(--purple);
+/* ===================== v2: التقويم ===================== */
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.cal-cell {
+  position: relative;
+  aspect-ratio: 1 / 0.92;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.cal-cell:hover {
   background: var(--soft);
   border-color: var(--border);
-  box-shadow: inset 3px 0 0 var(--indigo);
-}
-.nav-item:hover { background: var(--bg); }
-
-/* topbar fade matches paper */
-.topbar { background: linear-gradient(180deg, var(--bg) 60%, transparent); }
-
-/* hero card → warm sage wash with a four-world top rule */
-.hero-card {
-  background: linear-gradient(135deg, var(--soft), var(--surface));
-  border: 1px solid var(--border-strong);
 }
 
-/* cards get the soft warm shadow + slightly hand-drawn radius on key surfaces */
-.panel, .hero-card { border-radius: var(--radius); }
+.cal-cell:active {
+  transform: scale(0.95);
+}
 
-/* chips / tags / pills: tint by accent, readable ink-green text */
-.feed-tag, .mood-chip, .hcat, .gen-chip, .kind-chip, .cond-status.active {
-  color: var(--purple);
+.cal-cell.blank {
+  background: transparent;
+  cursor: default;
+  pointer-events: none;
+}
+
+.cal-cell.today .cal-num {
+  background: var(--grad);
+  color: #fff;
+  border-radius: 9px;
+  padding: 1px 8px;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.cal-cell.sel {
+  border-color: var(--border-strong);
   background: var(--soft);
-  border: 1px solid var(--border-strong);
+  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.18);
 }
-.tag, .bubble.user { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
-.hb-dot { background: var(--bg); }
-.goal-bar { background: var(--bg); border: 1px solid var(--border); }
-.entry-summary { color: var(--text); }
-.lr-note { color: var(--muted); }
-.tl-row { background: var(--bg); }
 
-/* four-world accents on the overview pillar cards */
-.pillar-card { border-top: 3px solid var(--border-strong); }
-.pillar-card[data-go="health"]  { border-top-color: var(--health); }
-.pillar-card[data-go="habits"]  { border-top-color: var(--habits); }
-.pillar-card[data-go="goals"]   { border-top-color: var(--goals); }
-.pillar-card[data-go="finance"] { border-top-color: var(--finances); }
-.pillar-card[data-go="health"]  .pillar-head { color: var(--health-deep); }
-.pillar-card[data-go="habits"]  .pillar-head { color: var(--habits-deep); }
-.pillar-card[data-go="goals"]   .pillar-head { color: var(--goals-deep); }
-.pillar-card[data-go="finance"] .pillar-head { color: var(--finances-deep); }
-
-/* body-map: coral "hot"/"picked" instead of violet/pink on dark */
-.body-svg .body-neutral { fill: var(--bg); }
-.body-svg .bodypart { fill: var(--surface); stroke: var(--border-strong); }
-.body-svg .bodypart.hot {
-  fill: var(--health-wash); stroke: var(--health);
-  filter: drop-shadow(0 0 5px rgba(224, 112, 92, 0.4));
+.cal-dots {
+  display: flex;
+  gap: 3px;
+  min-height: 6px;
 }
-.body-svg .bodypart.picked { fill: var(--health-tint, #f6d5cd); stroke: var(--health-deep); }
-.body-svg .badge circle { fill: var(--health); stroke: #fff; }
-.body-wrap { background: radial-gradient(circle at 50% 30%, var(--health-wash), transparent 70%); }
 
-/* danger button → warm coral, not neon rose */
-.danger-btn {
-  background: linear-gradient(135deg, var(--health), var(--health-deep));
-  box-shadow: 0 6px 18px rgba(196, 84, 63, 0.28);
+.cd {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
 }
-.modal-overlay { background: rgba(52, 48, 42, 0.5); }
-.modal-icon { background: var(--health-wash); border-color: var(--health-tint, #f6d5cd); }
 
-/* ---- layout fixes: contain the content + kill the overflow/clip ---- */
-html, body { overflow-x: hidden; max-width: 100%; }
-canvas, img, svg { max-width: 100%; }
-
-/* keep the dashboard content inside a centered container (was bleeding off
-   the left edge and getting clipped on wide screens) */
-.main {
-  max-width: 1280px;
-  margin-inline: auto;
-  padding: 0 clamp(20px, 3vw, 40px) 70px;
-  width: 100%;
+.cd.p {
+  background: var(--violet);
 }
-.tab-panel { min-width: 0; }
-/* the panels are grids; their children default to min-width:auto and refuse to
-   shrink below content → they overflowed the container. let them shrink. */
-.tab-panel > * { min-width: 0; }
 
-/* and let the columns themselves shrink below content too */
-.stat-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.pillar-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.stat-card, .pillar-card, .fin-card, .step { min-width: 0; }
-.topbar { max-width: 1280px; margin-inline: auto; width: 100%; }
-
-/* the sidebar's own scrollbar (right edge) was the ugly "side scroll" —
-   hide it; the nav fits, and it still scrolls if a short viewport needs it */
-.sidebar { scrollbar-width: none; -ms-overflow-style: none; }
-.sidebar::-webkit-scrollbar { width: 0; height: 0; display: none; }
-/* tighten the sidebar so it comfortably fits one screen */
-.sidebar { gap: 4px; padding: 20px 14px 14px; }
-.nav-item { padding: 9px 13px; font-size: .92rem; }
-.nav-group { padding: 10px 12px 3px; }
-
-/* hero greeting: compact, balanced, gentle hand-drawn corner (not the extreme 255px) */
-.hero-card {
-  border-radius: 26px 22px 26px 22px;
-  padding: 22px 28px;
-  background: linear-gradient(120deg, var(--brand-wash) 0%, var(--surface) 70%);
-  border: 1.5px solid var(--brand-tint);
+.cd.d {
+  background: var(--pos);
 }
-.hero-text h2 { font-size: 1.5rem; }
-.hero-card::before { background: var(--brand); height: 4px; opacity: .9; }
 
-/* stat cards: a touch more presence, accent number, comfortable height */
-.stat-grid { gap: 14px; }
-.stat-card { padding: 20px 12px; border-radius: 18px; }
-.stat-num { font-size: 1.7rem; }
-.stat-card:hover { box-shadow: var(--shadow-md); }
-
-/* pillar (world) cards: clearer accent header + roomier chart */
-.pillar-card { border-radius: 18px; }
-.pillar-chart { height: 96px; }
-
-/* feed rows / panels: a little warmer separation */
-.block-title, .section-title { color: var(--ink); }
-
-/* goal progress bar back to brand→leaf (was an off-palette gradient) */
-.goal-bar span { background: linear-gradient(90deg, var(--goals), var(--goals-deep)); }
-
-/* ===================== المهام (Tasks + schedule) ===================== */
-.schedule { display: flex; flex-direction: column; gap: 18px; }
-.sched-group {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px;
+/* ===================== v2: المهام ===================== */
+.task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
 }
-.sched-group.overdue { border-color: var(--health); background: var(--health-wash); }
-.sched-group.sched-done { opacity: .72; }
-.sched-day {
-  font-family: "Cairo", sans-serif; font-weight: 800; font-size: 1.02rem;
-  margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+
+.task-form-row {
+  display: flex;
+  gap: 10px;
 }
-.sched-group.overdue .sched-day { color: var(--health-deep); }
-.sched-date { font-size: .8rem; font-weight: 600; color: var(--muted); }
-.task-row { padding: 12px 14px; }
-.task-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+.task-form-row .select {
+  flex: 1;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 10px;
+}
+
 .task-check {
-  width: 26px; height: 26px; flex: none; border-radius: 50%;
-  border: 2px solid var(--brand); background: transparent; color: var(--on-accent);
-  cursor: pointer; font-size: 14px; font-weight: 800; display: grid; place-items: center;
-  transition: background .15s, transform .1s;
-}
-.task-check:hover { background: var(--brand-wash); }
-.task-check.on { background: var(--brand); }
-.task-title { font-weight: 600; }
-.task-row.tdone .task-title { text-decoration: line-through; color: var(--muted); }
-.task-time { font-size: .82rem; color: var(--muted); white-space: nowrap; }
-
-/* قائمة / كالندر toggle */
-.seg-toggle { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
-.seg-btn { border: none; background: transparent; cursor: pointer; font-family: inherit; font-weight: 700; font-size: .85rem; color: var(--muted); padding: 7px 14px; border-radius: 999px; transition: all .15s; }
-.seg-btn.active { background: var(--surface); color: var(--purple); box-shadow: var(--shadow-sm); }
-
-/* الكالندر */
-.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.cal-title { font-family: "Cairo", sans-serif; font-weight: 800; font-size: 1.15rem; margin: 0; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
-.cal-dows { margin-bottom: 8px; }
-.cal-dow { text-align: center; font-size: .78rem; font-weight: 700; color: var(--muted); }
-.cal-cell { min-height: 98px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 6px; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
-.cal-cell.empty { background: transparent; border: none; }
-.cal-cell.today { border-color: var(--brand); box-shadow: inset 0 0 0 1.5px var(--brand); }
-.cal-num { font-size: .8rem; font-weight: 700; color: var(--muted); }
-.cal-cell.today .cal-num { color: var(--brand-deep); }
-.cal-task { display: block; font-size: .72rem; font-weight: 600; color: var(--goals-deep); background: var(--goals-wash); border: 1px solid var(--goals-tint); border-radius: 6px; padding: 2px 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: filter .15s; }
-.cal-task:hover { filter: brightness(.95); }
-.cal-task.done { opacity: .55; text-decoration: line-through; }
-.cal-more { font-size: .7rem; color: var(--ink-faint); }
-.cal-nodate { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); font-size: .85rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.cal-nodate b { color: var(--ink); }
-.te-label { display: block; font-size: .82rem; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
-@media (max-width: 640px) {
-  .cal-grid { gap: 4px; }
-  .cal-cell { min-height: 64px; padding: 4px; }
-  .cal-task { font-size: .6rem; padding: 1px 3px; }
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  border: 2px solid var(--border-strong);
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
 }
 
-/* finance category chip */
-.fin-cat {
-  display: inline-block; font-size: .78rem; font-weight: 700; color: var(--finances-deep);
-  background: var(--finances-wash); border: 1px solid var(--finances-tint);
-  padding: 1px 9px; border-radius: 999px; margin-inline-end: 6px;
+.task-check:hover {
+  border-color: var(--violet);
 }
 
-/* ===================== العادات — تحدّي ٣٠ يوم ===================== */
-.hb-progress { height: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
-.hb-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--habits), var(--habits-deep)); border-radius: 999px; transition: width .5s ease; }
-.hb-month { display: grid; grid-template-columns: repeat(15, 1fr); gap: 4px; }
-.hb-cell { aspect-ratio: 1; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); }
-.hb-cell.on { background: var(--habits); border-color: var(--habits); }
+.task-check:active {
+  transform: scale(0.9);
+}
+
+.task-row.done .task-check {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  border-color: transparent;
+}
+
+.task-title {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.task-row.done .task-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.time-chip {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--violet);
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* ===================== v2: التقرير الشامل ===================== */
+.report-panel {
+  border-color: var(--border-strong);
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.08), var(--surface));
+}
+
+.empty.sm {
+  padding: 22px 14px;
+}
+
+.empty.sm .empty-emoji {
+  font-size: 26px;
+}

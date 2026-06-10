@@ -20,16 +20,29 @@
       </div>
       <p class="auth-sub">يومياتك في مكان واحد — سجّل دخولك للوحة التحكم</p>
 
+      <div class="auth-tabs">
+        <button id="tabCode" class="auth-tab active" type="button">دخول بكود 🔑</button>
+        <button id="tabPassword" class="auth-tab" type="button">كلمة سر</button>
+      </div>
+
       <form id="loginForm" class="auth-form" autocomplete="off">
-        <label for="password">كلمة السر</label>
-        <div class="field">
-          <input
-            type="password"
-            id="password"
-            name="password"
-            placeholder="••••••••"
-            required
-          />
+        <div id="codeField">
+          <label for="code">الكود من البوت</label>
+          <div class="field">
+            <input
+              type="text"
+              id="code"
+              name="code"
+              inputmode="numeric"
+              placeholder="ابعت ‎/code للبوت على تليجرام"
+            />
+          </div>
+        </div>
+        <div id="passwordField" hidden>
+          <label for="password">كلمة السر</label>
+          <div class="field">
+            <input type="password" id="password" name="password" placeholder="••••••••" />
+          </div>
         </div>
         <label class="remember">
           <input type="checkbox" id="remember" checked />
@@ -39,7 +52,7 @@
         <p id="error" class="auth-error" hidden></p>
       </form>
 
-      <footer class="auth-foot">دوّنلي — مساعد اليوميات الشخصي</footer>
+      <footer class="auth-foot">دوّنلي — رفيق التدوين الذكي</footer>
     </main>
     <script src="/login.js"></script>
   </body>
