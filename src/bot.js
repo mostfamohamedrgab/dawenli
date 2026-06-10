@@ -123,8 +123,19 @@ export function startBot() {
     }
   });
 
-  bot.on("voice", (ctx) => handleVoice(ctx, ctx.message.voice.file_id));
-  bot.on("audio", (ctx) => handleVoice(ctx, ctx.message.audio.file_id));
+  // الصوت بكل أشكاله — مباشر أو forward من أي شات:
+  // voice عادي، ملف صوتي، دايرة فيديو، أو صوت متبعت كـ"ملف" (زي فويسات واتساب المتشيّرة)
+  bot.on("voice", (ctx) => handleVoice(ctx, ctx.message.voice, "voice.ogg"));
+  bot.on("audio", (ctx) => handleVoice(ctx, ctx.message.audio, audioFilename(ctx.message.audio.file_name, "audio.mp3")));
+  bot.on("video_note", (ctx) => handleVoice(ctx, ctx.message.video_note, "note.mp4"));
+  bot.on("document", (ctx) => {
+    const doc = ctx.message.document || {};
+    const mime = doc.mime_type || "";
+    if (mime.startsWith("audio/") || mime.startsWith("video/")) {
+      return handleVoice(ctx, doc, audioFilename(doc.file_name, mime.startsWith("audio/") ? "audio.ogg" : "video.mp4"));
+    }
+    return ctx.reply("ابعتلي صوت أو نص عن يومك — الملفات التانية لسه مش بفهمها 🙏");
+  });
 
   bot.on("text", (ctx) => {
     const text = ctx.message.text.trim();
@@ -145,14 +156,25 @@ export function startBot() {
 
 /* ===================== المعالجة بالـ agent ===================== */
 
-async function handleVoice(ctx, fileId) {
+// الامتدادات اللي whisper بيقبلها — أي حاجة تانية بنرجع للاسم الافتراضي
+const AUDIO_EXTS = ["mp3", "mp4", "mpeg", "mpga", "m4a", "ogg", "oga", "wav", "webm", "flac"];
+function audioFilename(name, fallback) {
+  const ext = String(name || "").split(".").pop()?.toLowerCase();
+  return AUDIO_EXTS.includes(ext) ? `audio.${ext}` : fallback;
+}
+
+async function handleVoice(ctx, media, filename = "voice.ogg") {
   try {
+    // بوتات تيليجرام مبتعرفش تنزّل ملفات أكبر من ~20MB
+    if (media.file_size && media.file_size > 19 * 1024 * 1024) {
+      return ctx.reply("الملف ده كبير أوي عليّا (أكتر من ٢٠ ميجا) 🙈 ابعت مقطع أقصر.");
+    }
     await ctx.sendChatAction("typing");
-    const link = await ctx.telegram.getFileLink(fileId);
+    const link = await ctx.telegram.getFileLink(media.file_id);
     const res = await fetch(link.href);
     const buffer = Buffer.from(await res.arrayBuffer());
 
-    const transcript = await transcribe(buffer, "voice.ogg", ctx.state.user.id);
+    const transcript = await transcribe(buffer, filename, ctx.state.user.id);
     if (!transcript) return ctx.reply("مقدرتش أفهم الصوت، جرّب تاني.");
 
     await processMessage(ctx, transcript, "voice");
