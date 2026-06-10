@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { config } from "./config.js";
 import {
-  ownerUser,
   getUserById,
   getUserByEmail,
   createEmailUser,
@@ -46,6 +45,13 @@ import {
   listProfileFacts,
   upsertProfileFact,
   deleteProfileFact,
+  getAdminByUsername,
+  getAdminById,
+  countAdmins,
+  createAdmin,
+  touchAdminLogin,
+  listUsersWithStats,
+  platformStats,
 } from "./db.js";
 import { analyzeEntries, doctorReport, unifiedReport } from "./openai.js";
 import { buildReportData } from "./report.js";
@@ -86,6 +92,27 @@ function parseCookies(req) {
       .filter((p) => p[0])
       .map(([k, ...v]) => [k, decodeURIComponent(v.join("="))])
   );
+}
+
+/* ===================== جلسات الأدمن (منفصلة تمامًا عن المستخدمين) ===================== */
+
+const adminSessions = new Map(); // token -> { adminId, expiresAt }
+
+function newAdminSession(adminId) {
+  const token = crypto.randomBytes(24).toString("hex");
+  adminSessions.set(token, { adminId, expiresAt: Date.now() + SESSION_TTL });
+  return token;
+}
+function sessionAdmin(req) {
+  const token = parseCookies(req).dawenli_admin;
+  if (!token) return null;
+  const s = adminSessions.get(token);
+  if (!s) return null;
+  if (Date.now() > s.expiresAt) {
+    adminSessions.delete(token);
+    return null;
+  }
+  return getAdminById(s.adminId);
 }
 
 /* ===================== أكواد الدخول من البوت ===================== */
@@ -161,7 +188,19 @@ export function startServer() {
     );
   }
 
-  // الدخول: إيميل+باسورد، أو كود من البوت (/code)، أو كلمة سر الأدمن
+  // bootstrap: أول أدمن من DASHBOARD_PASSWORD (يوزر: admin) لو مفيش أدمنز
+  if (countAdmins() === 0 && config.dashboardPassword) {
+    createAdmin({ username: "admin", passwordHash: hashPassword(config.dashboardPassword) });
+    console.log("👤 اتعمل أدمن افتراضي: admin (الباسورد = DASHBOARD_PASSWORD) — غيّره بعد أول دخول");
+  }
+
+  function openAdminSession(res, adminId, remember) {
+    const token = newAdminSession(adminId);
+    const maxAge = remember === false ? "" : `; Max-Age=${30 * 86400}`;
+    res.setHeader("Set-Cookie", `dawenli_admin=${token}; HttpOnly; SameSite=Strict; Path=/${maxAge}`);
+  }
+
+  // دخول المستخدمين الموحّد: إيميل+باسورد أو كود من البوت (مفيش أدمن هنا)
   app.post("/api/login", (req, res) => {
     const { email, password, code, remember } = req.body || {};
     let userId = null;
@@ -170,12 +209,27 @@ export function startServer() {
       if (user?.password_hash && verifyPassword(password, user.password_hash)) userId = user.id;
     } else if (code) {
       userId = redeemLoginCode(code);
-    } else if (password && password === config.dashboardPassword) {
-      userId = ownerUser()?.id ?? null;
     }
     if (!userId) return res.status(401).json({ ok: false, error: "بيانات الدخول غلط" });
     openSession(res, userId, remember);
     return res.json({ ok: true });
+  });
+
+  /* ===== دخول الأدمن (منفصل) ===== */
+  app.post("/api/admin/login", (req, res) => {
+    const { username, password, remember } = req.body || {};
+    const admin = getAdminByUsername(username);
+    if (!admin || !verifyPassword(password || "", admin.password_hash)) {
+      return res.status(401).json({ ok: false, error: "اسم المستخدم أو كلمة السر غلط" });
+    }
+    touchAdminLogin(admin.id);
+    openAdminSession(res, admin.id, remember);
+    return res.json({ ok: true });
+  });
+  app.post("/api/admin/logout", (req, res) => {
+    adminSessions.delete(parseCookies(req).dawenli_admin);
+    res.setHeader("Set-Cookie", "dawenli_admin=; HttpOnly; Path=/; Max-Age=0");
+    res.json({ ok: true });
   });
 
   // حساب جديد بالإيميل — وبعد الدخول يقدر يربط تيليجرام بزرار
@@ -226,6 +280,19 @@ export function startServer() {
     res.sendFile(join(publicDir, "index.html"));
   });
 
+  /* ===== صفحات الأدمن ===== */
+  app.get(["/admin/login", "/admin-login.html"], (req, res) => {
+    if (sessionAdmin(req)) return res.redirect("/admin");
+    res.sendFile(join(publicDir, "admin-login.html"));
+  });
+  app.get("/admin.js", (req, res) =>
+    sessionAdmin(req) ? res.sendFile(join(publicDir, "admin.js")) : res.status(401).end()
+  );
+  app.get(["/admin", "/admin.html"], (req, res) => {
+    if (!sessionAdmin(req)) return res.redirect("/admin/login");
+    res.sendFile(join(publicDir, "admin.html"));
+  });
+
   // gate: بيرجّع المستخدم بتاع الجلسة أو بيقفل الطلب
   const gate = (req, res) => {
     const user = sessionUser(req);
@@ -235,6 +302,50 @@ export function startServer() {
     }
     return user;
   };
+
+  // adminGate: للـ endpoints الخاصة بلوحة الأدمن
+  const adminGate = (req, res) => {
+    const admin = sessionAdmin(req);
+    if (!admin) {
+      res.status(401).json({ error: "غير مصرّح" });
+      return null;
+    }
+    return admin;
+  };
+
+  /* ===== API الأدمن ===== */
+  app.get("/api/admin/me", (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    res.json({ username: admin.username, lastLogin: admin.last_login });
+  });
+  app.get("/api/admin/overview", (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    res.json({
+      stats: platformStats(),
+      users: listUsersWithStats(),
+      usage: aiUsageSummary(30),
+    });
+  });
+  // تفاصيل مستخدم واحد (قراءة فقط للمراقبة)
+  app.get("/api/admin/users/:id", (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    const uid = Number(req.params.id);
+    const u = getUserById(uid);
+    if (!u) return res.status(404).json({ error: "المستخدم مش موجود" });
+    res.json({
+      user: { id: u.id, name: u.name, email: u.email, chat_id: u.chat_id, last_seen: u.last_seen, created_at: u.created_at, is_owner: !!u.is_owner },
+      entries: listEntries(uid, 30),
+      finance: listFinance(uid, 50),
+      health: listHealth(uid, 50),
+      goals: listGoals(uid),
+      habits: listHabits(uid),
+      tasks: listTasks(uid, "0000-01-01", "9999-12-31"),
+      profile: listProfileFacts(uid),
+    });
+  });
 
   app.get("/api/me", (req, res) => {
     const user = gate(req, res);

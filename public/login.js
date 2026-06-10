@@ -4,12 +4,10 @@ const submitBtn = document.getElementById("submitBtn");
 const tabs = {
   email: document.getElementById("tabEmail"),
   code: document.getElementById("tabCode"),
-  password: document.getElementById("tabPassword"),
 };
 const fields = {
   email: document.getElementById("emailFields"),
   code: document.getElementById("codeField"),
-  password: document.getElementById("passwordField"),
 };
 const nameField = document.getElementById("nameField");
 const modeToggle = document.getElementById("modeToggle");
@@ -48,10 +46,8 @@ form.addEventListener("submit", async (e) => {
         url = "/api/signup";
         body.name = document.getElementById("name").value.trim();
       }
-    } else if (mode === "code") {
-      body.code = document.getElementById("code").value.trim();
     } else {
-      body.password = document.getElementById("password").value;
+      body.code = document.getElementById("code").value.trim();
     }
     const res = await fetch(url, {
       method: "POST",

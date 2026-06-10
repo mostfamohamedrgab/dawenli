@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>دوّنلي — دخول الأدمن</title>
+    <link rel="icon" href="/assets/logo/dawwenli-mark.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="auth-body">
+    <main class="auth-card">
+      <img class="auth-logo" src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" />
+      <p class="auth-sub">🛡️ لوحة تحكم الأدمن — دخول مخصّص لإدارة المنصة</p>
+
+      <form id="adminForm" class="auth-form" autocomplete="off">
+        <label for="username">اسم المستخدم</label>
+        <input type="text" id="username" class="field" placeholder="admin" style="margin-bottom:14px" required />
+        <label for="password">كلمة السر</label>
+        <input type="password" id="password" class="field" placeholder="••••••••" required />
+        <label class="remember">
+          <input type="checkbox" id="remember" checked />
+          <span>فكّرني (سيبني داخل ٣٠ يوم)</span>
+        </label>
+        <button type="submit" id="submitBtn" class="btn">دخول الأدمن</button>
+        <p id="error" class="auth-error" hidden></p>
+      </form>
+
+      <footer class="auth-foot">
+        <a href="/login" style="color:var(--ink-faint);font-size:var(--text-xs)">← دخول المستخدمين العاديين</a>
+      </footer>
+    </main>
+    <script>
+      const form = document.getElementById("adminForm");
+      const errorEl = document.getElementById("error");
+      const submitBtn = document.getElementById("submitBtn");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errorEl.hidden = true;
+        submitBtn.disabled = true;
+        submitBtn.textContent = "ثواني…";
+        try {
+          const res = await fetch("/api/admin/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: document.getElementById("username").value.trim(),
+              password: document.getElementById("password").value,
+              remember: document.getElementById("remember").checked,
+            }),
+          });
+          if (res.ok) { window.location.href = "/admin"; return; }
+          const data = await res.json().catch(() => ({}));
+          errorEl.textContent = data.error || "بيانات الدخول غلط";
+          errorEl.hidden = false;
+        } catch {
+          errorEl.textContent = "حصل خطأ، جرّب تاني";
+          errorEl.hidden = false;
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "دخول الأدمن";
+        }
+      });
+    </script>
+  </body>
+</html>

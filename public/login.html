@@ -15,7 +15,6 @@
       <div class="auth-tabs">
         <button id="tabEmail" class="auth-tab active" type="button">📧 إيميل</button>
         <button id="tabCode" class="auth-tab" type="button">🔑 كود البوت</button>
-        <button id="tabPassword" class="auth-tab" type="button">أدمن</button>
       </div>
 
       <form id="loginForm" class="auth-form" autocomplete="off">
@@ -43,10 +42,6 @@
             placeholder="ابعت ‎/code للبوت على تيليجرام"
           />
         </div>
-        <div id="passwordField" hidden>
-          <label for="password">كلمة سر الأدمن</label>
-          <input type="password" id="password" name="password" class="field" placeholder="••••••••" />
-        </div>
         <label class="remember">
           <input type="checkbox" id="remember" checked />
           <span>فكّرني (سيبني داخل ٣٠ يوم)</span>
@@ -55,7 +50,11 @@
         <p id="error" class="auth-error" hidden></p>
       </form>
 
-      <footer class="auth-foot">دوّنلي — احكيلي يومك وأنا أرتّبه ✎</footer>
+      <footer class="auth-foot">
+        دوّنلي — احكيلي يومك وأنا أرتّبه ✎
+        <br />
+        <a href="/admin/login" style="color:var(--ink-faint);font-size:var(--text-xs)">دخول الأدمن ↗</a>
+      </footer>
     </main>
     <script src="/login.js"></script>
   </body>

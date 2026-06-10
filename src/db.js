@@ -142,6 +142,15 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_ai_usage_date ON ai_usage(usage_date);
 
+  -- الأدمنز: حساب منفصل تمامًا عن المستخدمين العاديين (لوحة مراقبة المنصة)
+  CREATE TABLE IF NOT EXISTS admins (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at    TEXT NOT NULL,
+    username      TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    last_login    TEXT
+  );
+
   -- ذاكرة دائمة عن الشخص: مين هو، بيدرس/بيشتغل إيه، أمراضه وأدويته المزمنة، تفضيلاته.
   -- (حاجات ثابتة مش يوميات) — عشان الـ agent يبقى عنده تصور عن المستخدم.
   CREATE TABLE IF NOT EXISTS profile_facts (
@@ -285,6 +294,68 @@ export function linkTelegram(userId, chatId, name) {
     db.prepare(`UPDATE ${t} SET user_id = ? WHERE user_id IS NULL`).run(owner.id);
   }
 })();
+
+/* ===================== Admins (حساب منفصل للوحة المنصة) ===================== */
+
+export function getAdminByUsername(username) {
+  if (!username) return null;
+  return db.prepare(`SELECT * FROM admins WHERE username = ?`).get(String(username).trim().toLowerCase()) || null;
+}
+export function countAdmins() {
+  return db.prepare(`SELECT COUNT(*) AS n FROM admins`).get().n;
+}
+export function createAdmin({ username, passwordHash }) {
+  const u = String(username).trim().toLowerCase();
+  if (!u || !passwordHash) return null;
+  if (getAdminByUsername(u)) return null;
+  const info = db.prepare(`INSERT INTO admins (created_at, username, password_hash) VALUES (?, ?, ?)`).run(now(), u, passwordHash);
+  return db.prepare(`SELECT * FROM admins WHERE id = ?`).get(Number(info.lastInsertRowid));
+}
+export function touchAdminLogin(id) {
+  db.prepare(`UPDATE admins SET last_login = ? WHERE id = ?`).run(now(), id);
+}
+export function getAdminById(id) {
+  return db.prepare(`SELECT * FROM admins WHERE id = ?`).get(Number(id)) || null;
+}
+
+/* ===================== إحصائيات المنصة (للأدمن) ===================== */
+
+// كل المستخدمين مع عدد بياناتهم في كل محور — لجدول لوحة الأدمن
+export function listUsersWithStats() {
+  return db
+    .prepare(
+      `SELECT u.id, u.name, u.email, u.chat_id, u.last_seen, u.created_at, u.is_owner,
+         (SELECT COUNT(*) FROM entries e       WHERE e.user_id  = u.id) AS entries,
+         (SELECT COUNT(*) FROM finance f       WHERE f.user_id  = u.id) AS finance,
+         (SELECT COUNT(*) FROM health h        WHERE h.user_id  = u.id) AS health,
+         (SELECT COUNT(*) FROM tasks t         WHERE t.user_id  = u.id) AS tasks,
+         (SELECT COUNT(*) FROM goals g         WHERE g.user_id  = u.id) AS goals,
+         (SELECT COUNT(*) FROM habits hb       WHERE hb.user_id = u.id) AS habits,
+         (SELECT COUNT(*) FROM conversations c WHERE c.user_id  = u.id) AS conversations,
+         (SELECT COALESCE(SUM(cost_usd),0) FROM ai_usage a WHERE a.user_id = u.id) AS ai_cost
+       FROM users u
+       ORDER BY u.last_seen IS NULL, u.last_seen DESC`
+    )
+    .all();
+}
+
+export function platformStats() {
+  const cutoff = new Date(Date.now() - 14 * 86400000).toISOString();
+  const one = (sql, ...p) => db.prepare(sql).get(...p);
+  return {
+    users: one(`SELECT COUNT(*) AS n FROM users`).n,
+    with_telegram: one(`SELECT COUNT(*) AS n FROM users WHERE chat_id IS NOT NULL`).n,
+    with_email: one(`SELECT COUNT(*) AS n FROM users WHERE email IS NOT NULL`).n,
+    active_14d: one(`SELECT COUNT(*) AS n FROM users WHERE last_seen >= ?`, cutoff).n,
+    entries: one(`SELECT COUNT(*) AS n FROM entries`).n,
+    finance: one(`SELECT COUNT(*) AS n FROM finance`).n,
+    health: one(`SELECT COUNT(*) AS n FROM health`).n,
+    tasks: one(`SELECT COUNT(*) AS n FROM tasks`).n,
+    conversations: one(`SELECT COUNT(*) AS n FROM conversations`).n,
+    ai_cost_total: one(`SELECT COALESCE(SUM(cost_usd),0) AS c FROM ai_usage`).c,
+    ai_cost_month: one(`SELECT COALESCE(SUM(cost_usd),0) AS c FROM ai_usage WHERE usage_date >= ?`, today().slice(0, 8) + "01").c,
+  };
+}
 
 /* ===================== Journal (يوميات) ===================== */
 
