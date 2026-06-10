@@ -111,8 +111,19 @@
                 <div style="flex:1;min-width:0">
                   <textarea id="composerText" rows="2" placeholder="احكيلي عملت إيه النهاردة…"></textarea>
                   <div class="comp-foot">
-                    <span class="comp-hint">أو ابعتلي رسالة صوتية على تيليجرام ✈</span>
-                    <button class="btn" id="composerBtn">✎ رتّبهالي</button>
+                    <span class="comp-hint">اكتب، أو سجّل صوتك من هنا 🎙️ أو ابعتلي على تيليجرام ✈</span>
+                    <div style="display:flex;gap:8px;align-items:center">
+                      <button class="btn secondary" id="micBtn" title="سجّل صوتك">🎙️ سجّل</button>
+                      <button class="btn" id="composerBtn">✎ رتّبهالي</button>
+                    </div>
+                  </div>
+                  <!-- شريط التسجيل -->
+                  <div id="recBar" class="rec-bar hidden">
+                    <span class="rec-dot"></span>
+                    <span class="rec-time" id="recTime">0:00</span>
+                    <span class="rec-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+                    <button class="btn ghost sm" id="recCancel">إلغاء</button>
+                    <button class="btn finances sm" id="recStop">✓ خلّص وابعت</button>
                   </div>
                   <div id="composerResult"></div>
                 </div>

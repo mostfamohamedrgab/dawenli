@@ -159,6 +159,17 @@ function receiptWorld(line) {
   if (line.startsWith("✅") || line.startsWith("🔁") || line.startsWith("🚭") || /عادة/.test(line)) return "habits";
   return "";
 }
+// عرض رد الـ agent + الإيصالات (مشترك بين النص والصوت)
+function renderComposerResult(data, transcript) {
+  const out = $("composerResult");
+  if (data.error) { out.innerHTML = `<div class="comp-reply">${escapeHtml(data.error)}</div>`; return; }
+  const chips = (data.receipts || [])
+    .flatMap((r) => r.split("\n"))
+    .map((r) => `<span class="chip ${receiptWorld(r)}">${escapeHtml(r)}</span>`)
+    .join("");
+  const heard = transcript ? `<div class="comp-hint" style="margin-bottom:6px">🎙️ سمعتك بتقول: «${escapeHtml(transcript)}»</div>` : "";
+  out.innerHTML = `${heard}<div class="comp-reply">${escapeHtml(data.reply || "اتسجّلت ✅")}</div>${chips ? `<div class="comp-chips">${chips}</div>` : ""}`;
+}
 async function composerSend() {
   const ta = $("composerText");
   const text = ta.value.trim();
@@ -174,14 +185,8 @@ async function composerSend() {
       body: JSON.stringify({ text }),
     });
     const data = await res.json();
-    if (data.error) { out.innerHTML = `<div class="comp-reply">${escapeHtml(data.error)}</div>`; return; }
-    const chips = (data.receipts || [])
-      .flatMap((r) => r.split("\n"))
-      .map((r) => `<span class="chip ${receiptWorld(r)}">${escapeHtml(r)}</span>`)
-      .join("");
-    out.innerHTML = `<div class="comp-reply">${escapeHtml(data.reply || "اتسجّلت ✅")}</div>${chips ? `<div class="comp-chips">${chips}</div>` : ""}`;
-    ta.value = "";
-    await loadAll(false);
+    renderComposerResult(data);
+    if (!data.error) { ta.value = ""; await loadAll(false); }
   } catch {
     out.innerHTML = `<div class="comp-reply">حصل خطأ، جرّب تاني.</div>`;
   } finally {
@@ -192,6 +197,89 @@ $("composerBtn").addEventListener("click", composerSend);
 $("composerText").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) composerSend();
 });
+
+/* ===================== تسجيل الصوت من الكومبوزر ===================== */
+let mediaRecorder = null;
+let recChunks = [];
+let recTimer = null;
+let recStartedAt = 0;
+let recCancelled = false;
+
+function recElems() {
+  return { bar: $("recBar"), time: $("recTime"), mic: $("micBtn"), comp: $("composerBtn") };
+}
+function fmtRecTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+async function startRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    $("composerResult").innerHTML = `<div class="comp-reply">متصفحك مش بيدعم التسجيل — اكتب أو ابعت صوت على تيليجرام 🙏</div>`;
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    $("composerResult").innerHTML = `<div class="comp-reply">لازم تسمح للمايك عشان أسجّل صوتك 🎙️</div>`;
+    return;
+  }
+  // اختار صيغة يدعمها المتصفح
+  const mime = ["audio/webm", "audio/ogg", "audio/mp4"].find((m) => MediaRecorder.isTypeSupported?.(m)) || "";
+  mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  recChunks = [];
+  recCancelled = false;
+  mediaRecorder.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    stream.getTracks().forEach((t) => t.stop());
+    clearInterval(recTimer);
+    const { bar, mic } = recElems();
+    bar.classList.add("hidden");
+    mic.classList.remove("hidden");
+    if (recCancelled || !recChunks.length) return;
+    await sendVoice(new Blob(recChunks, { type: mediaRecorder.mimeType || "audio/webm" }));
+  };
+  mediaRecorder.start();
+  recStartedAt = Date.now();
+  const { bar, time, mic } = recElems();
+  mic.classList.add("hidden");
+  bar.classList.remove("hidden");
+  time.textContent = "0:00";
+  recTimer = setInterval(() => {
+    time.textContent = fmtRecTime(Date.now() - recStartedAt);
+    if (Date.now() - recStartedAt > 120000) stopRecording(); // سقف دقيقتين
+  }, 250);
+}
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+}
+function cancelRecording() {
+  recCancelled = true;
+  stopRecording();
+}
+async function sendVoice(blob) {
+  const out = $("composerResult");
+  const { comp, mic } = recElems();
+  comp.disabled = true; mic.disabled = true;
+  out.innerHTML = `<div class="comp-reply"><span class="loading"><span class="spinner"></span> بفرّغ صوتك وبرتّبه…</span></div>`;
+  try {
+    const res = await api("/api/voice", {
+      method: "POST",
+      headers: { "Content-Type": blob.type || "audio/webm" },
+      body: blob,
+    });
+    const data = await res.json();
+    renderComposerResult(data, data.transcript);
+    if (!data.error) await loadAll(false);
+  } catch {
+    out.innerHTML = `<div class="comp-reply">حصل خطأ في معالجة الصوت، جرّب تاني.</div>`;
+  } finally {
+    comp.disabled = false; mic.disabled = false;
+  }
+}
+$("micBtn").addEventListener("click", startRecording);
+$("recStop").addEventListener("click", stopRecording);
+$("recCancel").addEventListener("click", cancelRecording);
 
 /* ===================== ربط تيليجرام ===================== */
 async function linkTelegram() {

@@ -53,7 +53,7 @@ import {
   listUsersWithStats,
   platformStats,
 } from "./db.js";
-import { analyzeEntries, doctorReport, unifiedReport } from "./openai.js";
+import { analyzeEntries, doctorReport, unifiedReport, transcribe } from "./openai.js";
 import { buildReportData } from "./report.js";
 import { runAgent } from "./agent.js";
 
@@ -175,9 +175,52 @@ export function redeemLinkToken(token) {
 
 /* ===================== السيرفر ===================== */
 
+/* ===================== Rate limiting (in-memory, per-IP) ===================== */
+// نافذة ثابتة بسيطة — تكفي لمنع تخمين كلمات السر من غير مكتبات.
+const rlBuckets = new Map(); // key -> { count, resetAt }
+function rateLimit({ bucket, max, windowMs }) {
+  return (req, res, next) => {
+    const ip = (req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress || "?").trim();
+    const key = `${bucket}:${ip}`;
+    const nowMs = Date.now();
+    let entry = rlBuckets.get(key);
+    if (!entry || nowMs > entry.resetAt) {
+      entry = { count: 0, resetAt: nowMs + windowMs };
+      rlBuckets.set(key, entry);
+    }
+    entry.count++;
+    if (entry.count > max) {
+      const sec = Math.ceil((entry.resetAt - nowMs) / 1000);
+      res.setHeader("Retry-After", String(sec));
+      return res.status(429).json({ error: `محاولات كتير — استنى ${sec} ثانية وجرّب تاني` });
+    }
+    next();
+  };
+}
+// تنظيف دوري للذاكرة
+setInterval(() => {
+  const t = Date.now();
+  for (const [k, v] of rlBuckets) if (t > v.resetAt) rlBuckets.delete(k);
+}, 10 * 60 * 1000).unref?.();
+
+const loginLimiter = rateLimit({ bucket: "login", max: 8, windowMs: 10 * 60 * 1000 }); // 8 / 10د
+const voiceLimiter = rateLimit({ bucket: "voice", max: 40, windowMs: 10 * 60 * 1000 });
+
 export function startServer() {
   const app = express();
-  app.use(express.json());
+  app.disable("x-powered-by");
+
+  // هيدرات أمان أساسية على كل الردود
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Referrer-Policy", "same-origin");
+    res.setHeader("Permissions-Policy", "microphone=(self), camera=()");
+    next();
+  });
+
+  // JSON صغيرة للـ API العادي؛ الصوت ليه parser منفصل (raw) في endpoint بتاعه
+  app.use(express.json({ limit: "64kb" }));
 
   function openSession(res, userId, remember) {
     const token = newSession(userId);
@@ -201,7 +244,7 @@ export function startServer() {
   }
 
   // دخول المستخدمين الموحّد: إيميل+باسورد أو كود من البوت (مفيش أدمن هنا)
-  app.post("/api/login", (req, res) => {
+  app.post("/api/login", loginLimiter, (req, res) => {
     const { email, password, code, remember } = req.body || {};
     let userId = null;
     if (email && password) {
@@ -216,7 +259,7 @@ export function startServer() {
   });
 
   /* ===== دخول الأدمن (منفصل) ===== */
-  app.post("/api/admin/login", (req, res) => {
+  app.post("/api/admin/login", loginLimiter, (req, res) => {
     const { username, password, remember } = req.body || {};
     const admin = getAdminByUsername(username);
     if (!admin || !verifyPassword(password || "", admin.password_hash)) {
@@ -233,7 +276,7 @@ export function startServer() {
   });
 
   // حساب جديد بالإيميل — وبعد الدخول يقدر يربط تيليجرام بزرار
-  app.post("/api/signup", (req, res) => {
+  app.post("/api/signup", loginLimiter, (req, res) => {
     const { name, email, password } = req.body || {};
     const cleanEmail = String(email || "").trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(cleanEmail))
@@ -480,6 +523,30 @@ export function startServer() {
       res.status(500).json({ error: "حصل خطأ أثناء المعالجة، جرّب تاني" });
     }
   });
+
+  // تسجيل صوت من الداشبورد: المتصفح بيبعت الصوت (webm/ogg) كـ raw body،
+  // بنفرّغه بـ whisper وبنمرره لنفس الـ agent ونرجّع التفريغ + الرد + الإيصالات.
+  app.post(
+    "/api/voice",
+    voiceLimiter,
+    express.raw({ type: ["audio/*", "application/octet-stream"], limit: "25mb" }),
+    async (req, res) => {
+      const user = gate(req, res);
+      if (!user) return;
+      const buf = req.body;
+      if (!buf || !buf.length) return res.status(400).json({ error: "مفيش صوت" });
+      const ext = (req.headers["content-type"] || "").includes("ogg") ? "ogg" : "webm";
+      try {
+        const transcript = await transcribe(buf, `voice.${ext}`, user.id);
+        if (!transcript) return res.status(422).json({ error: "مقدرتش أفهم الصوت، جرّب تاني" });
+        const { reply, receipts } = await runAgent({ user, text: transcript, kind: "voice" });
+        res.json({ transcript, reply, receipts });
+      } catch (err) {
+        console.error("dashboard voice error:", err);
+        res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني" });
+      }
+    }
+  );
 
   /* ===== التحليل والتقارير ===== */
   app.get("/api/analyze", async (req, res) => {
