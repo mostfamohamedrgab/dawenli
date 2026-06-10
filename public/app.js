@@ -19,24 +19,15 @@ const state = {
   selDate: null,
 };
 
-// سعر صرف تقريبي للدولار (للعرض بالجنيه فقط — عدّله وقت ما تحب)
 const USD_TO_EGP = 50;
 
 const $ = (id) => document.getElementById(id);
 const TODAY = () => new Date().toISOString().slice(0, 10);
 
-const PAGE_TITLES = {
-  overview: "الرئيسية",
-  journal: "اليوميات",
-  finance: "الماليات",
-  health: "الصحة والنفسية",
-  goalshabits: "الأهداف والعادات",
-  tasks: "المهام والتقويم",
-  chats: "المحادثات",
-  usage: "تكلفة الـAI",
-};
-
 /* ===================== Helpers ===================== */
+// أرقام هندية زي التصميم: ٧.٢ ، ١٬٨٠٠
+const arNum = (n) => Number(n || 0).toLocaleString("ar-EG");
+
 const MOOD_SCORES = [
   { re: /مبسوط|سعيد|فرحان|متحمّس|متحمس|رايق|ممتاز/, score: 5, emoji: "😄" },
   { re: /كويس|حلو|مرتاح|هادي|راضي/, score: 4, emoji: "🙂" },
@@ -49,29 +40,28 @@ function moodInfo(mood = "") {
   for (const x of MOOD_SCORES) if (x.re.test(m)) return x;
   return { score: 3, emoji: "🙂" };
 }
-const moodEmoji = (m) => moodInfo(m).emoji;
 
 const CAT_ICONS = {
   "أكل": "🍔", "مواصلات": "🚌", "فواتير": "🧾", "صحة": "💊", "تسوق": "🛍️",
   "ترفيه": "🎮", "بيت": "🏠", "شغل": "💼", "تعليم": "📚", "أخرى": "📦",
 };
+const HEALTH_ICON = { "تمرين": "🏃", "دواء": "💊", "أكل": "🍽️", "عرض": "🤒", "نوم": "😴", "نفسية": "🧠", "ملاحظة": "📝" };
+
+// حرف اليوم زي التصميم: س ح ن ث ر خ ج
+const DAY_LETTER = ["ح", "ن", "ث", "ر", "خ", "ج", "س"]; // jsDay 0=الأحد
 
 function fmtDate(d) {
-  try {
-    return new Date(d).toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" });
-  } catch { return d; }
+  try { return new Date(d).toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" }); }
+  catch { return d; }
 }
 function fmtShort(d) {
-  try {
-    return new Date(d).toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
-  } catch { return d; }
+  try { return new Date(d).toLocaleDateString("ar-EG", { day: "numeric", month: "short" }); }
+  catch { return d; }
 }
 function fmtDateTime(d) {
-  try {
-    return new Date(d).toLocaleString("ar-EG", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
-  } catch { return d; }
+  try { return new Date(d).toLocaleString("ar-EG", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }); }
+  catch { return d; }
 }
-const fmtNum = (n) => Number(n || 0).toLocaleString("en-US");
 function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -83,17 +73,28 @@ async function api(path, opts) {
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
-// عرض تقارير الموديل: عناوين ## وبولد ** بشكل مرتب
+function lastNDays(n) {
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) out.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
+  return out;
+}
+// عرض تقارير الموديل: عناوين ## وبولد **
 function renderRich(text) {
   const esc = escapeHtml(text || "");
-  return esc
-    .split("\n")
-    .map((line) => {
-      if (line.startsWith("## ")) return `<h4 class="report-h">${line.slice(3)}</h4>`;
-      if (line.startsWith("# ")) return `<h4 class="report-h">${line.slice(2)}</h4>`;
-      return line ? `<p>${line.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^- /, "• ")}</p>` : "";
-    })
-    .join("");
+  return esc.split("\n").map((line) => {
+    if (line.startsWith("## ")) return `<h4 class="report-h">${line.slice(3)}</h4>`;
+    if (line.startsWith("# ")) return `<h4 class="report-h">${line.slice(2)}</h4>`;
+    return line ? `<p>${line.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^- /, "• ")}</p>` : "";
+  }).join("");
+}
+// دودل الدفتر للحالات الفاضية (من الـ design system)
+const DOODLE = `<svg class="empty-doodle" viewBox="0 0 96 96" fill="none" stroke="var(--hairline-strong)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M22 24c18-4 34-4 52 0 1 16 1 36 0 52-18 4-34 4-52 0-1-16-1-36 0-52Z" fill="var(--surface-card)"/>
+  <path d="M48 22c1 18 1 38 0 56"/><path d="M30 22v8M38 22v8M22 40h8M22 54h8"/>
+  <path d="M56 42c5-3 10 4 16 0" stroke="var(--brand)"/><path d="M56 54c6-2 11 3 16-1" stroke="var(--brand)"/>
+</svg>`;
+function emptyState(title, message) {
+  return `<div class="empty">${DOODLE}<h3>${title}</h3><p>${message}</p></div>`;
 }
 
 /* ===================== Confirm Modal ===================== */
@@ -122,31 +123,76 @@ window.del = del;
 
 /* ===================== Navigation ===================== */
 function gotoTab(tab) {
-  document.querySelectorAll(".nav-item").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
+  document.querySelectorAll(".nav-btn[data-tab]").forEach((b) => b.dataset.active = String(b.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== tab));
-  $("pageTitle").textContent = PAGE_TITLES[tab] || "";
+  const panel = document.querySelector(`.tab-panel[data-panel="${tab}"]`);
+  if (panel) { panel.classList.remove("view-fade"); void panel.offsetWidth; panel.classList.add("view-fade"); }
   closeSidebar();
   if (tab === "overview") renderOverview();
-  if (tab === "finance") renderFinance();
+  if (tab === "health") { renderHealthPage(); }
+  if (tab === "habits") renderHabitsPage();
+  if (tab === "goals") renderGoalsPage();
+  if (tab === "finances") renderFinancesPage();
   if (tab === "tasks") renderCalendar();
   if (tab === "usage") renderUsage();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 $("sideNav").addEventListener("click", (e) => {
-  const btn = e.target.closest(".nav-item");
+  const btn = e.target.closest(".nav-btn");
   if (btn) gotoTab(btn.dataset.tab);
 });
-document.querySelectorAll("[data-go]").forEach((c) =>
-  c.addEventListener("click", () => gotoTab(c.dataset.go))
-);
+document.querySelectorAll("[data-go]").forEach((c) => c.addEventListener("click", () => gotoTab(c.dataset.go)));
 
-/* mobile sidebar */
-function openSidebar() { $("sidebar").classList.add("open"); $("sideScrim").classList.remove("hidden"); }
-function closeSidebar() { $("sidebar").classList.remove("open"); $("sideScrim").classList.add("hidden"); }
+function openSidebar() { $("sidebar").classList.add("open"); $("sideScrim").classList.add("show"); }
+function closeSidebar() { $("sidebar").classList.remove("open"); $("sideScrim").classList.remove("show"); }
 $("menuBtn")?.addEventListener("click", openSidebar);
 $("sideScrim")?.addEventListener("click", closeSidebar);
 
-/* ===================== Overview ===================== */
+/* ===================== الكومبوزر: رتّبهالي ===================== */
+// سطر الإيصال من الـ agent → عالمه (للون الـ chip)
+function receiptWorld(line) {
+  if (line.startsWith("💰")) return "finances";
+  if (line.startsWith("🩺") || line.startsWith("🧠") || line.startsWith("🍽️") || line.startsWith("🩹")) return "health";
+  if (line.startsWith("🎯")) return "goals";
+  if (line.startsWith("📅") || line.startsWith("☑️")) return "goals";
+  if (line.startsWith("✅") || line.startsWith("🔁") || line.startsWith("🚭") || /عادة/.test(line)) return "habits";
+  return "";
+}
+async function composerSend() {
+  const ta = $("composerText");
+  const text = ta.value.trim();
+  if (!text) return;
+  const btn = $("composerBtn");
+  const out = $("composerResult");
+  btn.disabled = true;
+  out.innerHTML = `<div class="comp-reply"><span class="loading"><span class="spinner"></span> بقرا كلامك وبرتّبه…</span></div>`;
+  try {
+    const res = await api("/api/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (data.error) { out.innerHTML = `<div class="comp-reply">${escapeHtml(data.error)}</div>`; return; }
+    const chips = (data.receipts || [])
+      .flatMap((r) => r.split("\n"))
+      .map((r) => `<span class="chip ${receiptWorld(r)}">${escapeHtml(r)}</span>`)
+      .join("");
+    out.innerHTML = `<div class="comp-reply">${escapeHtml(data.reply || "اتسجّلت ✅")}</div>${chips ? `<div class="comp-chips">${chips}</div>` : ""}`;
+    ta.value = "";
+    await loadAll(false);
+  } catch {
+    out.innerHTML = `<div class="comp-reply">حصل خطأ، جرّب تاني.</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+$("composerBtn").addEventListener("click", composerSend);
+$("composerText").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) composerSend();
+});
+
+/* ===================== النظرة العامة ===================== */
 function computeStreak(entries) {
   const days = new Set(entries.map((e) => e.entry_date));
   let streak = 0;
@@ -159,609 +205,184 @@ function computeStreak(entries) {
   }
   return streak;
 }
-function last7() {
-  const out = [];
-  for (let i = 6; i >= 0; i--) out.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
-  return out;
-}
 function greeting() {
   const name = state.me?.name ? ` يا ${state.me.name.split(" ")[0]}` : "";
   const h = new Date().getHours();
-  if (h < 12) return `صباح الفل${name} ☀️`;
-  if (h < 18) return `نهارك سعيد${name} 🌤️`;
+  if (h < 12) return `صباح الخير${name} 👋`;
+  if (h < 18) return `يومك سعيد${name} 👋`;
   return `مساء الخير${name} 🌙`;
 }
 
 function renderOverview() {
   $("heroGreeting").textContent = greeting();
   const streak = computeStreak(state.journal);
-  $("heroSub").textContent = streak > 0 ? `ماشي صح — ${streak} يوم تدوين ورا بعض 🔥` : "ابدأ يومك بتدوينة صغيرة — ابعت للبوت voice عن يومك.";
+  $("heroSub").textContent = streak > 0 ? "دي حياتك مرتّبة — لحد دلوقتي." : "ابدأ بحاجة صغيرة — احكيلي عن يومك.";
+  $("todayChip").textContent = `🗓 ${fmtDate(TODAY())}`;
+  $("streakChip").textContent = `🔥 ${arNum(streak)} ${streak === 1 ? "يوم" : "أيام"}`;
 
-  const totalIncome = state.finance.filter((f) => f.direction === "income").reduce((a, f) => a + f.amount, 0);
-  const totalExpense = state.finance.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
-  const activeHabits = state.habits.length;
-  const doneToday = state.habits.filter((h) => h.doneToday).length;
-  const todayTasks = state.tasks.filter((t) => t.due_date === TODAY());
-  const stats = [
-    { n: state.journal.length, l: "تدوينات", i: "📝" },
-    { n: streak, l: "أيام متتالية", i: "🔥" },
-    { n: `${todayTasks.filter((t) => t.status === "done").length}/${todayTasks.length}`, l: "مهام النهاردة", i: "📅" },
-    { n: `${doneToday}/${activeHabits}`, l: "عادات النهاردة", i: "🔁" },
-    { n: state.goals.length, l: "أهداف", i: "🎯" },
-    { n: fmtNum(totalIncome - totalExpense), l: "صافي الرصيد", i: "💰" },
+  // كروت العوالم بأرقام حقيقية
+  const week = lastNDays(7);
+  const healthWeek = state.health.filter((h) => week.includes(h.entry_date));
+  const lastHealth = state.health[0];
+  const bestHabit = [...state.habits].sort((a, b) => b.streak - a.streak)[0];
+  const habitsDone = state.habits.filter((h) => h.doneToday).length;
+  const topGoal = [...state.goals].filter((g) => g.target).sort((a, b) => (b.current / b.target) - (a.current / a.target))[0] || state.goals[0];
+  const monthStart = TODAY().slice(0, 8) + "01";
+  const monthFin = state.finance.filter((f) => f.entry_date >= monthStart);
+  const mIncome = monthFin.filter((f) => f.direction === "income").reduce((a, f) => a + f.amount, 0);
+  const mExpense = monthFin.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
+
+  const worlds = [
+    {
+      w: "health", title: "الصحة",
+      metric: healthWeek.length ? `${arNum(healthWeek.length)} تدوينة الأسبوع ده` : "لسه هادية",
+      caption: lastHealth ? lastHealth.detail : "احكيلي عن نومك وجسمك",
+    },
+    {
+      w: "habits", title: "العادات",
+      metric: bestHabit ? `ستريك ${arNum(bestHabit.streak)} ${bestHabit.streak === 1 ? "يوم" : "أيام"} 🔥` : "ابدأ عادة",
+      caption: bestHabit ? `${bestHabit.title} · ${arNum(habitsDone)}/${arNum(state.habits.length)} النهاردة` : "قول للبوت «بلعب رياضة كل يوم»",
+    },
+    {
+      w: "goals", title: "الأهداف",
+      metric: topGoal && topGoal.target ? `${arNum(Math.min(100, Math.round((topGoal.current / topGoal.target) * 100)))}٪ من هدفك` : (topGoal ? topGoal.title : "حدّد هدف"),
+      caption: topGoal ? topGoal.title : "قول للبوت «عايز أوصل…»",
+    },
+    {
+      w: "finances", title: "الفلوس",
+      metric: monthFin.length ? `${mIncome - mExpense >= 0 ? "صافي +" : "صافي -"}${arNum(Math.abs(mIncome - mExpense))}` : "سجّل أول عملية",
+      caption: monthFin.length ? `دخل ${arNum(mIncome)} · صرف ${arNum(mExpense)} الشهر ده` : "قول للبوت «صرفت ٢٠٠ على أكل»",
+    },
   ];
-  $("overviewStats").innerHTML = stats
-    .map((s) => `<div class="stat-card"><span class="stat-ico">${s.i}</span><span class="stat-num">${s.n}</span><span class="stat-label">${s.l}</span></div>`)
-    .join("");
-
-  drawRing($("streakRing"), Math.min(1, streak / 30), cssVar("--violet"));
-  $("streakNum").textContent = streak;
-
-  // مهام النهاردة
-  renderTaskRows($("todayTasks"), todayTasks, "مفيش مهام النهاردة — قول للبوت «فكّرني بكرة بـ...»");
-
-  // pillar charts
-  const days = last7();
-  const healthCounts = days.map((d) => state.health.filter((h) => h.entry_date === d).length);
-  drawBars($("chartHealth"), healthCounts, days.map(fmtShort), cssVar("--pink"));
-  $("metaHealth").textContent = `${state.health.length} سجل · ${state.conditions.filter((c) => c.status === "active").length} متابعة شغّالة`;
-
-  const habitRatio = activeHabits ? doneToday / activeHabits : 0;
-  drawBars($("chartHabits"), state.habits.slice(0, 7).map((h) => h.streak), state.habits.slice(0, 7).map((h) => h.emoji || "🔁"), cssVar("--violet"));
-  $("metaHabits").textContent = activeHabits ? `${doneToday} من ${activeHabits} اتعملوا النهاردة (${Math.round(habitRatio * 100)}%)` : "مفيش عادات لسه";
-
-  const topGoals = state.goals.filter((g) => g.target).slice(0, 5);
-  drawBars($("chartGoals"), topGoals.map((g) => Math.min(100, Math.round((g.current / g.target) * 100))), topGoals.map((g) => g.title.slice(0, 6)), cssVar("--indigo"), 100);
-  $("metaGoals").textContent = state.goals.length ? `${state.goals.length} هدف نشط` : "مفيش أهداف لسه";
-
-  drawIncomeExpense($("chartFinance"), totalIncome, totalExpense);
-  $("metaFinance").textContent = `دخل ${fmtNum(totalIncome)} · صرف ${fmtNum(totalExpense)}`;
+  $("worldGrid").innerHTML = worlds.map((x) => `
+    <div class="world-card ${x.w}" data-nav="${x.w}">
+      <div class="wc-art"><img src="/assets/illustrations/world-${x.w}.svg" alt="${x.title}" /></div>
+      <div class="wc-body">
+        <span class="wc-tag">${x.title}</span>
+        <div class="wc-metric">${escapeHtml(x.metric)}</div>
+        <div class="wc-caption">${escapeHtml(x.caption)}</div>
+      </div>
+    </div>`).join("");
+  $("worldGrid").querySelectorAll(".world-card").forEach((c) =>
+    c.addEventListener("click", () => gotoTab(c.dataset.nav)));
 
   renderFeed();
 }
 
 function renderFeed() {
   const items = [];
-  for (const e of state.journal.slice(0, 6)) items.push({ t: e.created_at || e.entry_date, ico: "📝", txt: e.summary || "تدوينة", tag: "يوميات" });
-  for (const h of state.health.slice(0, 6)) items.push({ t: h.created_at, ico: h.category === "نفسية" ? "🧠" : "🩺", txt: h.detail, tag: h.category === "نفسية" ? "نفسية" : "صحة" });
-  for (const f of state.finance.slice(0, 6)) items.push({ t: f.created_at, ico: f.direction === "income" ? "➕" : "➖", txt: `${fmtNum(f.amount)} ${f.currency}${f.note ? " · " + f.note : f.category ? " · " + f.category : ""}`, tag: "ماليات" });
-  for (const t of state.tasks.slice(-4)) items.push({ t: t.created_at, ico: "📅", txt: `${t.title} — ${fmtShort(t.due_date)}${t.due_time ? " " + t.due_time : ""}`, tag: "مهمة" });
+  for (const e of state.journal.slice(0, 5)) items.push({ t: e.created_at || e.entry_date, txt: e.summary || "تدوينة", chips: [{ c: "", t: `📝 يوميات${e.mood ? " · " + e.mood : ""}` }] });
+  for (const h of state.health.slice(0, 5)) items.push({ t: h.created_at, txt: h.detail, chips: [{ c: "health", t: `${HEALTH_ICON[h.category] || "🩺"} ${h.category}` }] });
+  for (const f of state.finance.slice(0, 5)) items.push({ t: f.created_at, txt: f.note || f.category || "عملية", chips: [{ c: "finances", t: `${f.direction === "income" ? "➕" : "➖"} ${arNum(f.amount)} ${f.currency || "جنيه"}` }] });
+  for (const t of state.tasks.slice(-4)) items.push({ t: t.created_at, txt: t.title, chips: [{ c: "goals", t: `📅 ${fmtShort(t.due_date)}${t.due_time ? " · " + t.due_time : ""}` }] });
   items.sort((a, b) => new Date(b.t) - new Date(a.t));
-  const top = items.slice(0, 10);
+  const top = items.slice(0, 8);
   $("recentFeed").innerHTML = top.length
-    ? top.map((x) => `<div class="feed-row"><span class="feed-ico">${x.ico}</span><span class="feed-txt">${escapeHtml(x.txt)}</span><span class="feed-tag">${x.tag}</span></div>`).join("")
-    : `<div class="empty"><div class="empty-emoji">✨</div><p class="muted">ابدأ تكلّم البوت وهيظهر نشاطك هنا.</p></div>`;
-}
-
-/* ===================== Canvas charts ===================== */
-function prep(canvas) {
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth || canvas.width;
-  const h = canvas.clientHeight || canvas.height;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  const ctx = canvas.getContext("2d");
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  return { ctx, w, h };
-}
-function drawRing(canvas, ratio, color) {
-  if (!canvas) return;
-  const { ctx, w, h } = prep(canvas);
-  const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 8;
-  ctx.lineWidth = 9; ctx.lineCap = "round";
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-  const grad = ctx.createLinearGradient(0, 0, w, h);
-  grad.addColorStop(0, cssVar("--indigo")); grad.addColorStop(1, cssVar("--pink"));
-  ctx.strokeStyle = grad;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.001, ratio));
-  ctx.stroke();
-}
-function drawBars(canvas, values, labels, color, fixedMax) {
-  if (!canvas) return;
-  const { ctx, w, h } = prep(canvas);
-  if (!values.length) { ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.font = "13px Cairo"; ctx.textAlign = "center"; ctx.fillText("مفيش بيانات", w / 2, h / 2); return; }
-  const pad = 18, bw = (w - pad) / values.length;
-  const max = fixedMax || Math.max(1, ...values);
-  values.forEach((v, i) => {
-    const bh = (v / max) * (h - 30);
-    const x = i * bw + pad / 2, y = h - 16 - bh;
-    const grad = ctx.createLinearGradient(0, y, 0, h);
-    grad.addColorStop(0, color); grad.addColorStop(1, "rgba(139,92,246,0.15)");
-    ctx.fillStyle = grad;
-    roundRect(ctx, x + 3, y, bw - 8, Math.max(2, bh), 5); ctx.fill();
-    ctx.fillStyle = "rgba(245,245,247,.55)"; ctx.font = "11px Cairo"; ctx.textAlign = "center";
-    ctx.fillText(String(labels[i]).slice(0, 8), x + bw / 2, h - 3);
-  });
-}
-function drawIncomeExpense(canvas, income, expense) {
-  if (!canvas) return;
-  const { ctx, w, h } = prep(canvas);
-  const max = Math.max(1, income, expense);
-  const data = [{ v: income, c: cssVar("--pos"), l: "دخل" }, { v: expense, c: cssVar("--neg"), l: "صرف" }];
-  const bw = w / 2;
-  data.forEach((d, i) => {
-    const bh = (d.v / max) * (h - 28);
-    const x = i * bw, y = h - 16 - bh;
-    ctx.fillStyle = d.c;
-    roundRect(ctx, x + bw * 0.2, y, bw * 0.6, Math.max(2, bh), 6); ctx.fill();
-    ctx.fillStyle = "rgba(245,245,247,.6)"; ctx.font = "11px Cairo"; ctx.textAlign = "center";
-    ctx.fillText(d.l, x + bw / 2, h - 3);
-  });
-}
-function drawFinChart(canvas, days) {
-  if (!canvas) return;
-  const { ctx, w, h } = prep(canvas);
-  const max = Math.max(1, ...days.map((d) => Math.max(d.income, d.expense)));
-  const slot = w / days.length, pad = 14;
-  days.forEach((d, i) => {
-    const x0 = i * slot + pad;
-    const bw = (slot - pad * 1.5) / 2;
-    [["income", d.income, cssVar("--pos")], ["expense", d.expense, cssVar("--neg")]].forEach(([k, v, c], j) => {
-      const bh = (v / max) * (h - 34);
-      const x = x0 + j * bw, y = h - 20 - bh;
-      ctx.fillStyle = c; roundRect(ctx, x, y, bw - 3, Math.max(1, bh), 4); ctx.fill();
-    });
-    ctx.fillStyle = "rgba(245,245,247,.5)"; ctx.font = "10px Cairo"; ctx.textAlign = "center";
-    ctx.fillText(fmtShort(d.date), x0 + bw, h - 5);
-  });
-}
-// خط المزاج: نقاط من ١ لـ ٥ على آخر ١٤ يوم
-function drawMoodChart(canvas, points) {
-  if (!canvas) return;
-  const { ctx, w, h } = prep(canvas);
-  if (!points.some((p) => p.score != null)) {
-    ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.font = "13px Cairo"; ctx.textAlign = "center";
-    ctx.fillText("مفيش مزاج متسجّل لسه — احكي للبوت عن يومك", w / 2, h / 2);
-    return;
-  }
-  const padX = 16, padTop = 14, padBot = 26;
-  const slot = (w - padX * 2) / Math.max(1, points.length - 1);
-  const yFor = (s) => padTop + (1 - (s - 1) / 4) * (h - padTop - padBot);
-
-  // خطوط إرشادية خفيفة
-  ctx.strokeStyle = "rgba(255,255,255,0.05)";
-  ctx.lineWidth = 1;
-  for (let s = 1; s <= 5; s++) {
-    ctx.beginPath(); ctx.moveTo(padX, yFor(s)); ctx.lineTo(w - padX, yFor(s)); ctx.stroke();
-  }
-
-  // الخط نفسه (بنوصل النقاط الموجودة بس)
-  const known = points.map((p, i) => ({ ...p, i })).filter((p) => p.score != null);
-  ctx.strokeStyle = cssVar("--violet");
-  ctx.lineWidth = 2.5;
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  known.forEach((p, k) => {
-    const x = padX + p.i * slot, y = yFor(p.score);
-    if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-
-  // النقاط + الإيموجي
-  known.forEach((p) => {
-    const x = padX + p.i * slot, y = yFor(p.score);
-    ctx.fillStyle = cssVar("--bg");
-    ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
-    ctx.font = "13px Cairo"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(p.emoji, x, y);
-  });
-  ctx.textBaseline = "alphabetic";
-
-  // تواريخ تحت
-  ctx.fillStyle = "rgba(245,245,247,.5)"; ctx.font = "10px Cairo"; ctx.textAlign = "center";
-  points.forEach((p, i) => {
-    if (i % 2 === 0) ctx.fillText(fmtShort(p.date), padX + i * slot, h - 6);
-  });
-}
-function roundRect(ctx, x, y, w, h, r) {
-  r = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-
-/* ===================== Journal ===================== */
-function renderJournal() {
-  const el = $("entries");
-  const data = state.journal;
-  if (!data.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-emoji">🎙️</div><p>لسه مفيش يوميات.</p><p class="muted">ابعت voice أو اكتب نص للبوت على تليجرام.</p></div>`;
-    return;
-  }
-  el.innerHTML = data.map((e) => {
-    const tags = (e.tags || []).map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join("");
-    return `<article class="entry-card">
-      <div class="entry-head">
-        <div class="entry-date">${fmtDate(e.entry_date)}</div>
-        <div class="row-actions">
-          <span class="mood-chip">${moodEmoji(e.mood)} ${escapeHtml(e.mood || "")}</span>
-          <button class="del-btn" onclick="del('entries', ${e.id})" title="حذف">🗑️</button>
+    ? top.map((x) => `
+      <div class="log-row">
+        <div class="lr-top">
+          <span class="lr-text">${escapeHtml(x.txt)}</span>
+          <span class="lr-time">${fmtDateTime(x.t)}</span>
         </div>
-      </div>
-      <p class="entry-summary">${escapeHtml(e.summary || "")}</p>
-      ${tags ? `<div class="tags">${tags}</div>` : ""}
-      <details class="entry-full"><summary>النص الكامل</summary><p>${escapeHtml(e.transcript || "")}</p></details>
-    </article>`;
-  }).join("");
+        <div class="lr-chips">${x.chips.map((c) => `<span class="chip ${c.c}">${escapeHtml(c.t)}</span>`).join("")}</div>
+      </div>`).join("")
+    : emptyState("لسه ما دوّنتش حاجة هنا", "ابعتلي رسالة على تيليجرام أو اكتب فوق وأنا هبدأ أرتّبلك.");
 }
 
-/* ===================== Goals ===================== */
-function renderGoals() {
-  const el = $("goals");
-  const data = state.goals;
-  if (!data.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-emoji">🎯</div><p class="muted">ضيف هدف فوق، أو قول للبوت "هدفي أوصل ٥٠٠ ألف".</p></div>`;
-    return;
-  }
-  el.innerHTML = data.map((g) => {
-    const pct = g.target ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
-    const unit = g.unit ? " " + escapeHtml(g.unit) : "";
-    return `<div class="goal-card">
-      <div class="goal-top"><span class="goal-title">${escapeHtml(g.title)}</span>
-        <button class="del-btn" onclick="del('goals', ${g.id})" title="حذف">🗑️</button></div>
-      ${g.target
-        ? `<div class="goal-bar"><span style="width:${pct}%"></span></div>
-           <div class="goal-meta"><span>${fmtNum(g.current)} / ${fmtNum(g.target)}${unit}</span><span class="goal-pct">${pct}%</span></div>
-           <div class="goal-meta muted">باقي ${fmtNum(Math.max(0, g.target - g.current))}${unit}</div>`
-        : `<div class="goal-meta"><span>الحالي: ${fmtNum(g.current)}${unit}</span></div>`}
-      <div class="goal-update"><input type="number" placeholder="حدّث الحالي" id="gc-${g.id}" class="select gf-sm" />
-        <button class="ghost-btn sm" onclick="updateGoal(${g.id})">تحديث</button></div>
-    </div>`;
-  }).join("");
-}
-async function updateGoal(id) {
-  const v = $(`gc-${id}`).value;
-  if (v === "") return;
-  await api(`/api/goals/${id}/current`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ current: Number(v) }) });
-  loadAll();
-}
-window.updateGoal = updateGoal;
-$("goalForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const title = $("goalTitle").value.trim();
-  const target = $("goalTarget").value;
-  const unit = $("goalUnit").value.trim();
-  if (!title) return;
-  await api("/api/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, target, unit }) });
-  e.target.reset(); loadAll();
-});
+/* ===================== الصحة ===================== */
+function renderHealthPage() {
+  const week = lastNDays(7);
+  const month = lastNDays(30);
+  const healthWeek = state.health.filter((h) => week.includes(h.entry_date));
+  const symptomsWeek = healthWeek.filter((h) => h.category === "عرض");
+  const mentalWeek = healthWeek.filter((h) => h.category === "نفسية");
+  const activeConds = state.conditions.filter((c) => c.status === "active");
 
-/* ===================== Habits ===================== */
-function renderHabits() {
-  const el = $("habits");
-  const data = state.habits;
-  if (!data.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-emoji">🔁</div><p class="muted">ضيف عادة فوق، أو قول للبوت "بلعب رياضة كل يوم".</p></div>`;
-    return;
-  }
-  const days = last7();
-  el.innerHTML = data.map((h) => {
-    const logset = new Set(h.logs || []);
-    const dots = days.map((d) => `<span class="hb-dot ${logset.has(d) ? "on" : ""}" title="${fmtShort(d)}"></span>`).join("");
-    const isQuit = h.kind === "quit";
-    return `<div class="habit-card ${h.doneToday ? "done" : ""}">
-      <div class="habit-top">
-        <span class="habit-emoji">${h.emoji || (isQuit ? "🚭" : "🔁")}</span>
-        <div class="habit-info">
-          <span class="habit-title">${escapeHtml(h.title)}</span>
-          <span class="habit-kind">${isQuit ? "ببطّلها" : "بعملها"}</span>
-        </div>
-        <button class="del-btn" onclick="del('habits', ${h.id})" title="حذف">🗑️</button>
-      </div>
-      <div class="habit-streak"><span class="hs-fire">🔥</span><b>${h.streak}</b> يوم متتالي · ${h.total} إجمالي</div>
-      <div class="hb-week">${dots}</div>
-      <button class="habit-check ${h.doneToday ? "checked" : ""}" onclick="toggleHabit(${h.id}, ${h.doneToday})">
-        ${h.doneToday ? "✓ اتعملت النهاردة" : "علّمها للنهاردة"}
-      </button>
-    </div>`;
-  }).join("");
-}
-async function toggleHabit(id, doneToday) {
-  if (doneToday) {
-    await api(`/api/habits/${id}/log?date=${TODAY()}`, { method: "DELETE" });
-  } else {
-    await api(`/api/habits/${id}/log`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: TODAY() }) });
-  }
-  loadAll();
-}
-window.toggleHabit = toggleHabit;
-$("habitForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const title = $("habitTitle").value.trim();
-  const kind = $("habitKind").value;
-  if (!title) return;
-  await api("/api/habits", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, kind }) });
-  e.target.reset(); loadAll();
-});
-
-/* ===================== Finance ===================== */
-function renderFinance() {
-  const data = state.finance;
-  const income = data.filter((f) => f.direction === "income").reduce((a, f) => a + f.amount, 0);
-  const expense = data.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
-  const balance = income - expense;
-  $("finSummary").innerHTML = `
-    <div class="fin-card pos"><span class="fc-label">الدخل</span><span class="fc-num">${fmtNum(income)}</span><span class="fc-cur">جنيه</span></div>
-    <div class="fin-card neg"><span class="fc-label">الصرف</span><span class="fc-num">${fmtNum(expense)}</span><span class="fc-cur">جنيه</span></div>
-    <div class="fin-card ${balance >= 0 ? "pos" : "neg"}"><span class="fc-label">الصافي</span><span class="fc-num">${fmtNum(balance)}</span><span class="fc-cur">جنيه</span></div>`;
-
-  // chart last 14 days
-  const days = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
-    days.push({
-      date: d,
-      income: data.filter((f) => f.entry_date === d && f.direction === "income").reduce((a, f) => a + f.amount, 0),
-      expense: data.filter((f) => f.entry_date === d && f.direction === "expense").reduce((a, f) => a + f.amount, 0),
-    });
-  }
-  drawFinChart($("finChart"), days);
-
-  // صرفت في إيه؟ — تفصيل بالبنود آخر ٣٠ يوم
-  const since = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
-  const byCat = {};
-  for (const f of data.filter((f) => f.direction === "expense" && f.entry_date >= since)) {
-    const c = f.category || "أخرى";
-    byCat[c] = (byCat[c] || 0) + f.amount;
-  }
-  const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
-  const catTotal = catRows.reduce((a, [, v]) => a + v, 0);
-  $("catBreakdown").innerHTML = catRows.length
-    ? catRows.map(([c, v]) => {
-        const pct = catTotal ? Math.round((v / catTotal) * 100) : 0;
-        return `<div class="cat-row">
-          <span class="cat-ico">${CAT_ICONS[c] || "📦"}</span>
-          <div class="cat-mid">
-            <div class="cat-head"><span>${escapeHtml(c)}</span><span class="cat-amount">${fmtNum(v)} ج · ${pct}%</span></div>
-            <div class="cat-bar"><span style="width:${pct}%"></span></div>
-          </div>
-        </div>`;
-      }).join("")
-    : `<div class="empty"><div class="empty-emoji">🧾</div><p class="muted">قول للبوت "صرفت ٢٠٠ على أكل" وهيتصنّف هنا لوحده.</p></div>`;
-
-  // list
-  const el = $("finList");
-  if (!data.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-emoji">💰</div><p class="muted">قول للبوت "صرفت ٢٠٠ على أكل" أو ضيف عملية فوق.</p></div>`;
-    return;
-  }
-  el.innerHTML = data.map((f) => `
-    <div class="list-row ${f.direction === "income" ? "pos" : "neg"}">
-      <div class="lr-main">
-        <span class="hcat">${f.direction === "income" ? "➕ دخل" : "➖ صرف"} · ${fmtShort(f.entry_date)}${f.category ? ` · ${CAT_ICONS[f.category] || ""} ${escapeHtml(f.category)}` : ""}</span>
-        <span class="lr-note">${escapeHtml(f.note || "—")}</span>
-      </div>
-      <div class="row-actions">
-        <span class="lr-amount">${fmtNum(f.amount)} ${escapeHtml(f.currency || "جنيه")}</span>
-        <button class="del-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
-      </div>
+  $("healthStats").innerHTML = [
+    { label: "تدوينات الأسبوع", value: arNum(healthWeek.length), unit: "", ico: "🩺", delta: "صحة وجسم", trend: "" },
+    { label: "أعراض الأسبوع", value: arNum(symptomsWeek.length), unit: "", ico: "🤒", delta: symptomsWeek.length ? "خد بالك من نفسك" : "ولا عرض 👌", trend: symptomsWeek.length ? "down" : "up" },
+    { label: "نفسيتك", value: arNum(mentalWeek.length), unit: "تدوينة", ico: "🧠", delta: "آخر أسبوع", trend: "" },
+    { label: "متابعات نشطة", value: arNum(activeConds.length), unit: "", ico: "🩹", delta: activeConds[0] ? activeConds[0].title : "—", trend: "" },
+  ].map((s) => `
+    <div class="stat-card health">
+      <div class="sc-top"><span class="sc-ico">${s.ico}</span><span class="sc-label">${s.label}</span></div>
+      <div class="sc-value"><b>${s.value}</b>${s.unit ? `<span class="sc-unit">${s.unit}</span>` : ""}</div>
+      <div class="sc-delta ${s.trend}">${escapeHtml(s.delta)}</div>
     </div>`).join("");
-}
-$("finForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const direction = $("finDir").value;
-  const amount = $("finAmount").value;
-  const category = $("finCategory").value;
-  const note = $("finNote").value.trim();
-  if (amount === "") return;
-  await api("/api/finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ direction, amount, category, note }) });
-  e.target.reset(); fillCategorySelect(); loadAll();
-});
-function fillCategorySelect() {
-  const sel = $("finCategory");
-  if (!sel || !state.categories.length) return;
-  sel.innerHTML = state.categories.map((c) => `<option value="${c}">${CAT_ICONS[c] || ""} ${c}</option>`).join("");
-}
 
-/* ===================== المهام والتقويم ===================== */
-const AR_WD = ["سبت", "حد", "اتنين", "تلات", "أربع", "خميس", "جمعة"];
-const wdIndex = (jsDay) => (jsDay + 1) % 7; // السبت أول الأسبوع
+  renderMoodChart();
 
-function isoOf(y, m, d) {
-  return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-}
-
-function renderCalendar() {
-  if (!state.selDate) state.selDate = TODAY();
-  $("calWeekdays").innerHTML = AR_WD.map((w) => `<span>${w}</span>`).join("");
-  const { calY: y, calM: m } = state;
-  $("calTitle").textContent = new Date(y, m, 1).toLocaleDateString("ar-EG", { month: "long", year: "numeric" });
-
-  const first = new Date(y, m, 1);
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const lead = wdIndex(first.getDay());
-  const byDate = {};
-  for (const t of state.tasks) (byDate[t.due_date] = byDate[t.due_date] || []).push(t);
-
-  let cells = "";
-  for (let i = 0; i < lead; i++) cells += `<span class="cal-cell blank"></span>`;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const iso = isoOf(y, m, d);
-    const dayTasks = byDate[iso] || [];
-    const pending = dayTasks.filter((t) => t.status === "pending").length;
-    const done = dayTasks.filter((t) => t.status === "done").length;
-    const cls = ["cal-cell", iso === TODAY() ? "today" : "", iso === state.selDate ? "sel" : ""].filter(Boolean).join(" ");
-    const dots =
-      (pending ? `<i class="cd p"></i>` : "") + (done ? `<i class="cd d"></i>` : "");
-    cells += `<button class="${cls}" data-date="${iso}"><span class="cal-num">${d}</span><span class="cal-dots">${dots}</span></button>`;
+  // أعراض آخر ٣٠ يوم كـ chips بعدد التكرار
+  const counts = {};
+  for (const h of state.health.filter((h) => h.category === "عرض" && month.includes(h.entry_date))) {
+    const key = h.detail.length > 26 ? h.detail.slice(0, 26) + "…" : h.detail;
+    counts[key] = (counts[key] || 0) + 1;
   }
-  $("calGrid").innerHTML = cells;
-  $("calGrid").querySelectorAll(".cal-cell[data-date]").forEach((c) =>
-    c.addEventListener("click", () => { state.selDate = c.dataset.date; renderCalendar(); })
-  );
+  const symRows = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  $("symptomChips").innerHTML = symRows.length
+    ? symRows.map(([t, n]) => `<span class="chip health">${escapeHtml(t)}${n > 1 ? ` ×${arNum(n)}` : ""}</span>`).join("")
+    : `<span class="muted" style="font-size:var(--text-sm)">مفيش أعراض متسجّلة — ربنا يديم الصحة 🌿</span>`;
 
-  // مهام اليوم المختار
-  const isToday = state.selDate === TODAY();
-  $("dayTasksTitle").textContent = isToday ? "مهام النهاردة" : `مهام ${fmtDate(state.selDate)}`;
-  const sel = (byDate[state.selDate] || []).slice().sort((a, b) => (a.due_time || "99") < (b.due_time || "99") ? -1 : 1);
-  renderTaskRows($("dayTasks"), sel, "مفيش مهام في اليوم ده — ضيف واحدة فوق ✍️");
+  // تقرير الدكتور: آخر تدوينات صحية كخط زمني
+  const toneOf = (c) => c === "عرض" ? "danger" : c === "نوم" ? "warning" : c === "تمرين" ? "success" : c === "نفسية" ? "health" : "goals";
+  const tl = state.health.slice(0, 6);
+  $("healthTimeline").innerHTML = tl.length
+    ? tl.map((h) => `
+      <div class="tl-row">
+        <span class="badge ${toneOf(h.category)}"><span class="dot"></span>${fmtShort(h.entry_date)}</span>
+        <span class="tl-text">${escapeHtml(h.detail)}</span>
+      </div>`).join("")
+    : `<span class="muted" style="font-size:var(--text-sm)">لسه مفيش تدوينات صحية.</span>`;
+
+  renderBodyMap();
+  renderConditions();
+  renderMeals();
 }
 
-function renderTaskRows(el, tasks, emptyMsg) {
-  if (!el) return;
-  if (!tasks.length) {
-    el.innerHTML = `<div class="empty sm"><div class="empty-emoji">📅</div><p class="muted">${emptyMsg}</p></div>`;
+// مزاجك آخر أسبوع — خط مرسوم باليد (SVG)
+function renderMoodChart() {
+  const el = $("moodChart");
+  const moodByDate = {};
+  for (const e of state.journal) if (e.mood) moodByDate[e.entry_date] = e.mood;
+  const days = lastNDays(7);
+  const pts = days.map((d) => ({ date: d, mood: moodByDate[d] ? moodInfo(moodByDate[d]) : null }));
+  if (!pts.some((p) => p.mood)) {
+    el.innerHTML = `<div class="empty sm">${DOODLE}<p>مفيش مزاج متسجّل — احكيلي عن يومك وهرسمهولك هنا.</p></div>`;
     return;
   }
-  el.innerHTML = tasks.map((t) => `
-    <div class="task-row ${t.status === "done" ? "done" : ""}">
-      <button class="task-check" onclick="toggleTask(${t.id}, '${t.status}')" title="${t.status === "done" ? "رجّعها" : "خلصت"}">${t.status === "done" ? "✓" : ""}</button>
-      <div class="lr-main">
-        <span class="task-title">${escapeHtml(t.title)}</span>
-        ${t.note ? `<span class="lr-note">${escapeHtml(t.note)}</span>` : ""}
-      </div>
-      <div class="row-actions">
-        ${t.due_time ? `<span class="time-chip">⏰ ${t.due_time}</span>` : ""}
-        <button class="del-btn" onclick="delTask(${t.id})" title="حذف">🗑️</button>
-      </div>
-    </div>`).join("");
-}
-async function toggleTask(id, status) {
-  await api(`/api/tasks/${id}/${status === "done" ? "reopen" : "done"}`, { method: "PUT" });
-  await loadAll();
-  renderCalendar();
-  renderOverview();
-}
-window.toggleTask = toggleTask;
-async function delTask(id) {
-  if (!(await askConfirm())) return;
-  await api(`/api/tasks/${id}`, { method: "DELETE" });
-  await loadAll();
-  renderCalendar();
-}
-window.delTask = delTask;
-$("taskForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const title = $("taskTitle").value.trim();
-  const dueTime = $("taskTime").value || null;
-  if (!title) return;
-  await api("/api/tasks", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, dueDate: state.selDate || TODAY(), dueTime }),
-  });
-  e.target.reset();
-  await loadAll();
-  renderCalendar();
-});
-$("calPrev").addEventListener("click", () => { state.calM--; if (state.calM < 0) { state.calM = 11; state.calY--; } renderCalendar(); });
-$("calNext").addEventListener("click", () => { state.calM++; if (state.calM > 11) { state.calM = 0; state.calY++; } renderCalendar(); });
-$("calToday").addEventListener("click", () => {
-  const n = new Date();
-  state.calY = n.getFullYear(); state.calM = n.getMonth(); state.selDate = TODAY();
-  renderCalendar();
-});
-
-/* ===================== تكلفة الـAI ===================== */
-const USAGE_KINDS = {
-  transcribe: { label: "تفريغ الصوت", emoji: "🎙️" },
-  agent: { label: "الـ Agent (فهم وتسجيل ورد)", emoji: "🧠" },
-  classify: { label: "تصنيف الكلام (قديم)", emoji: "🗂️" },
-  reflect: { label: "رد البوت (قديم)", emoji: "💬" },
-  analyze: { label: "تحليل اليوميات", emoji: "📈" },
-  report: { label: "التقرير الشامل", emoji: "📋" },
-  doctor: { label: "تقرير الدكتور", emoji: "🩺" },
-  other: { label: "غير ذلك", emoji: "⚙️" },
-};
-const usd = (n) => "$" + (Number(n || 0)).toFixed(Number(n) >= 1 ? 2 : 4);
-const egp = (n) => fmtNum(Math.round(Number(n || 0) * USD_TO_EGP)) + " ج";
-
-function renderUsage() {
-  const u = state.usage;
-  if (!u) {
-    $("usageSummary").innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-emoji">🤖</div><p class="muted">بحمّل بيانات التكلفة...</p></div>`;
-    $("usageBreakdown").innerHTML = ""; $("usageNote").textContent = "";
-    return;
-  }
-  const t = u.totals || {};
-  const total = t.cost_usd || 0;
-  const monthCost = u.month?.cost_usd || 0;
-  const tokens = (t.input_tokens || 0) + (t.output_tokens || 0);
-  const minutes = (t.audio_seconds || 0) / 60;
-
-  $("usageSummary").innerHTML = `
-    <div class="fin-card neg"><span class="fc-label">إجمالي التكلفة</span><span class="fc-num">${usd(total)}</span><span class="fc-cur">≈ ${egp(total)}</span></div>
-    <div class="fin-card"><span class="fc-label">الشهر ده</span><span class="fc-num">${usd(monthCost)}</span><span class="fc-cur">≈ ${egp(monthCost)}</span></div>
-    <div class="fin-card pos"><span class="fc-label">عدد النداءات</span><span class="fc-num">${fmtNum(t.calls || 0)}</span><span class="fc-cur">${fmtNum(tokens)} توكن · ${minutes.toFixed(1)} دقيقة صوت</span></div>`;
-
-  drawCostChart($("usageChart"), u.daily || []);
-
-  const byKind = {};
-  (u.byKind || []).forEach((r) => {
-    const k = USAGE_KINDS[r.kind] ? r.kind : "other";
-    if (!byKind[k]) byKind[k] = { calls: 0, cost: 0 };
-    byKind[k].calls += r.calls; byKind[k].cost += r.cost_usd;
-  });
-  const rows = Object.entries(byKind).sort((a, b) => b[1].cost - a[1].cost);
-  const el = $("usageBreakdown");
-  if (!rows.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-emoji">🧮</div><p class="muted">لسه مفيش استهلاك متسجّل.</p></div>`;
-  } else {
-    el.innerHTML = rows.map(([k, v]) => {
-      const meta = USAGE_KINDS[k];
-      const pct = total ? Math.round((v.cost / total) * 100) : 0;
-      return `<div class="list-row">
-        <div class="lr-main">
-          <span class="hcat">${meta.emoji} ${meta.label}</span>
-          <span class="lr-note">${fmtNum(v.calls)} نداء · ${pct}% من التكلفة</span>
-        </div>
-        <span class="lr-amount">${usd(v.cost)}</span>
-      </div>`;
-    }).join("");
-  }
-
-  const since = t.since ? `بيتتبّع من ${fmtShort(t.since)} · ` : "";
-  $("usageNote").textContent = `${since}الأرقام تقديرية حسب أسعار OpenAI، والتحويل للجنيه على سعر ${USD_TO_EGP}.`;
+  const W = 560, H = 180, padX = 26, padTop = 18, padBot = 30;
+  const X = (i) => padX + (i * (W - padX * 2)) / (days.length - 1);
+  const Y = (s) => padTop + (1 - (s - 1) / 4) * (H - padTop - padBot);
+  const known = pts.map((p, i) => ({ ...p, i })).filter((p) => p.mood);
+  const path = known.map((p, k) => `${k ? "L" : "M"}${X(p.i).toFixed(1)} ${Y(p.mood.score).toFixed(1)}`).join(" ");
+  const area = known.length > 1
+    ? `${path} L${X(known[known.length - 1].i).toFixed(1)} ${H - padBot} L${X(known[0].i).toFixed(1)} ${H - padBot} Z`
+    : "";
+  const health = cssVar("--health");
+  const dots = known.map((p) => `
+    <circle cx="${X(p.i).toFixed(1)}" cy="${Y(p.mood.score).toFixed(1)}" r="11" fill="var(--surface-card)" stroke="${health}" stroke-width="2.4"/>
+    <text x="${X(p.i).toFixed(1)}" y="${(Y(p.mood.score) + 4.5).toFixed(1)}" text-anchor="middle" font-size="12">${p.mood.emoji}</text>`).join("");
+  const labels = days.map((d, i) => `
+    <text x="${X(i).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="12" font-family="Tajawal, sans-serif" fill="var(--ink-muted)">${DAY_LETTER[new Date(d + "T00:00:00").getDay()]}</text>`).join("");
+  el.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
+      ${area ? `<path d="${area}" fill="${health}" fill-opacity="0.13"/>` : ""}
+      <path d="${path}" fill="none" stroke="${health}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}${labels}
+    </svg>`;
 }
 
-function drawCostChart(canvas, daily) {
-  if (!canvas) return;
-  const { ctx, w, h } = prep(canvas);
-  const map = {}; daily.forEach((d) => (map[d.usage_date] = d.cost_usd));
-  const days = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
-    days.push({ date: d, cost: map[d] || 0 });
-  }
-  const max = Math.max(0.0001, ...days.map((d) => d.cost));
-  if (max <= 0.0001 && !daily.length) {
-    ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.font = "13px Cairo"; ctx.textAlign = "center";
-    ctx.fillText("مفيش استهلاك لسه", w / 2, h / 2); return;
-  }
-  const slot = w / days.length;
-  days.forEach((d, i) => {
-    const bh = (d.cost / max) * (h - 32);
-    const x = i * slot, y = h - 20 - bh;
-    const grad = ctx.createLinearGradient(0, y, 0, h);
-    grad.addColorStop(0, cssVar("--violet")); grad.addColorStop(1, "rgba(139,92,246,0.12)");
-    ctx.fillStyle = grad;
-    roundRect(ctx, x + slot * 0.18, y, slot * 0.64, Math.max(1, bh), 4); ctx.fill();
-    if (i % 5 === 0) {
-      ctx.fillStyle = "rgba(245,245,247,.5)"; ctx.font = "10px Cairo"; ctx.textAlign = "center";
-      ctx.fillText(fmtShort(d.date), x + slot / 2, h - 5);
-    }
-  });
-}
-
-/* ===================== الصحة — body map ===================== */
+/* ---- خريطة الجسم (نفس المنطق، ستايل دفتر) ---- */
 const REGION_CENTERS = { "راس": [100, 32], "صدر": [100, 90], "معدة": [100, 137], "بطن": [100, 178], "ذراعين": [153, 120], "ساقين": [116, 270] };
-const REGION_ICON = { "تمرين": "🏃", "دواء": "💊", "أكل": "🍽️", "عرض": "🤒", "نوم": "😴", "نفسية": "🧠", "ملاحظة": "📝" };
 const SVGNS = "http://www.w3.org/2000/svg";
 let pageFilter = null;
 function healthDates() { return [...new Set(state.health.map((h) => h.entry_date))].sort(); }
 function shiftPageDate(delta) {
   if (!state.pageDate) return;
   const d = new Date(state.pageDate + "T00:00:00"); d.setDate(d.getDate() + delta);
-  state.pageDate = d.toISOString().slice(0, 10); pageFilter = null; renderPage();
+  state.pageDate = d.toISOString().slice(0, 10); pageFilter = null; renderBodyMap();
 }
-function renderPage() {
+function renderBodyMap() {
   const dayLabel = $("dayLabel");
   if (!dayLabel) return;
   if (!state.pageDate) {
@@ -780,70 +401,45 @@ function renderPage() {
       el.classList.add("hot"); if (pageFilter === region) el.classList.add("picked");
     });
     const [cx, cy] = REGION_CENTERS[region];
-    const g = document.createElementNS(SVGNS, "g"); g.setAttribute("class", "badge");
+    const g = document.createElementNS(SVGNS, "g");
     const circle = document.createElementNS(SVGNS, "circle");
     circle.setAttribute("cx", cx); circle.setAttribute("cy", cy); circle.setAttribute("r", "11");
     const txt = document.createElementNS(SVGNS, "text");
     txt.setAttribute("x", cx); txt.setAttribute("y", cy + 4); txt.setAttribute("text-anchor", "middle");
-    txt.textContent = list.length;
+    txt.textContent = arNum(list.length);
     g.appendChild(circle); g.appendChild(txt); badges.appendChild(g);
   }
   const general = byRegion["عام"] || [];
-  $("generalChips").innerHTML = general.map((h) => `<span class="gen-chip">${REGION_ICON[h.category] || "🩺"} ${escapeHtml(h.detail)}</span>`).join("");
+  $("generalChips").innerHTML = general.map((h) => `<span class="chip health">${HEALTH_ICON[h.category] || "🩺"} ${escapeHtml(h.detail)}</span>`).join("");
   const listEl = $("healthList");
   const shown = pageFilter ? items.filter((h) => (h.body_region || "عام") === pageFilter) : items;
   if (!items.length) {
-    listEl.innerHTML = `<div class="empty"><div class="empty-emoji">🧘</div><p class="muted">مفيش حاجات صحية في اليوم ده.</p><p class="muted">قول للبوت "جريت ١٠ دقايق" أو "أخدت العلاج".</p></div>`;
+    listEl.innerHTML = `<div class="empty sm">${DOODLE}<p>مفيش حاجات صحية في اليوم ده. قول للبوت «جريت ١٠ دقايق» أو «أخدت العلاج».</p></div>`;
     return;
   }
   listEl.innerHTML =
-    (pageFilter ? `<button class="ghost-btn sm" onclick="clearPageFilter()">↺ كل المناطق</button>` : "") +
+    (pageFilter ? `<button class="btn ghost sm" onclick="clearPageFilter()">↺ كل المناطق</button>` : "") +
     shown.map((h) => `
       <div class="list-row">
-        <div class="lr-main">
-          <span class="hcat">${REGION_ICON[h.category] || "🩺"} ${escapeHtml(h.category || "ملاحظة")}${h.body_region ? " · " + escapeHtml(h.body_region) : ""}</span>
-          <span class="lr-note">${escapeHtml(h.detail)}</span>
+        <div class="lm">
+          <span class="l1">${HEALTH_ICON[h.category] || "🩺"} ${escapeHtml(h.category || "ملاحظة")}${h.body_region && h.body_region !== "عام" ? " · " + escapeHtml(h.body_region) : ""}</span>
+          <span class="l2">${escapeHtml(h.detail)}</span>
         </div>
-        <div class="row-actions"><button class="del-btn" onclick="del('health', ${h.id})" title="حذف">🗑️</button></div>
+        <div class="row-actions"><button class="icon-btn" onclick="del('health', ${h.id})" title="حذف">🗑️</button></div>
       </div>`).join("");
 }
-function clearPageFilter() { pageFilter = null; renderPage(); }
+function clearPageFilter() { pageFilter = null; renderBodyMap(); }
 window.clearPageFilter = clearPageFilter;
 $("bodySvg")?.addEventListener("click", (e) => {
   const part = e.target.closest(".bodypart");
   if (!part || !part.classList.contains("hot")) return;
   const region = part.dataset.region;
-  pageFilter = pageFilter === region ? null : region; renderPage();
+  pageFilter = pageFilter === region ? null : region; renderBodyMap();
 });
 $("dayPrev")?.addEventListener("click", () => shiftPageDate(-1));
 $("dayNext")?.addEventListener("click", () => shiftPageDate(1));
 
-/* ===================== الصحة — المزاج والنفسية ===================== */
-function renderMood() {
-  const moodByDate = {};
-  for (const e of state.journal) if (e.mood) moodByDate[e.entry_date] = e.mood;
-  const points = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
-    const mood = moodByDate[d];
-    points.push(mood ? { date: d, ...moodInfo(mood) } : { date: d, score: null, emoji: "" });
-  }
-  drawMoodChart($("moodChart"), points);
-
-  const mental = state.health.filter((h) => h.category === "نفسية").slice(0, 10);
-  $("mentalList").innerHTML = mental.length
-    ? mental.map((h) => `
-      <div class="list-row">
-        <div class="lr-main">
-          <span class="hcat">🧠 نفسية · ${fmtShort(h.entry_date)}</span>
-          <span class="lr-note">${escapeHtml(h.detail)}</span>
-        </div>
-        <div class="row-actions"><button class="del-btn" onclick="del('health', ${h.id})" title="حذف">🗑️</button></div>
-      </div>`).join("")
-    : "";
-}
-
-/* ===================== الصحة — conditions ===================== */
+/* ---- المتابعات ---- */
 function daysLeft(endDate) {
   const end = new Date(endDate + "T00:00:00");
   const t = new Date(TODAY() + "T00:00:00");
@@ -854,22 +450,22 @@ function renderConditions() {
   if (!el) return;
   const data = state.conditions;
   if (!data.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-emoji">🩹</div><p class="muted">مفيش متابعات لسه.</p></div>`;
+    el.innerHTML = `<span class="muted" style="font-size:var(--text-sm)">مفيش متابعات شغّالة.</span>`;
     return;
   }
   el.innerHTML = data.map((c) => {
     const closed = c.status === "closed";
     const left = daysLeft(c.end_date);
-    const status = closed ? `<span class="cond-status closed">مقفولة</span>`
-      : left >= 0 ? `<span class="cond-status active">باقي ${left} يوم</span>`
-      : `<span class="cond-status done">خلصت المدة</span>`;
+    const status = closed ? `<span class="badge"><span class="dot"></span>مقفولة</span>`
+      : left >= 0 ? `<span class="badge health"><span class="dot"></span>باقي ${arNum(left)} يوم</span>`
+      : `<span class="badge warning"><span class="dot"></span>خلصت المدة</span>`;
     return `<div class="cond-card">
       <div class="cond-head"><span class="cond-title">🩹 ${escapeHtml(c.title)}</span>${status}</div>
-      <div class="cond-meta muted">من ${fmtDate(c.start_date)} لـ ${fmtDate(c.end_date)}</div>
+      <div class="cond-meta">من ${fmtShort(c.start_date)} لـ ${fmtShort(c.end_date)}</div>
       <div class="cond-actions">
-        <button class="primary-btn sm" onclick="doctorReport(${c.id})">📄 تقرير للدكتور</button>
-        ${!closed ? `<button class="ghost-btn sm" onclick="closeCondition(${c.id})">إقفال المتابعة</button>` : ""}
-        <button class="del-btn" onclick="del('conditions', ${c.id})" title="حذف">🗑️</button>
+        <button class="btn health sm" onclick="doctorReport(${c.id})">📄 تقرير للدكتور</button>
+        ${!closed ? `<button class="btn ghost sm" onclick="closeCondition(${c.id})">إقفال</button>` : ""}
+        <button class="icon-btn" onclick="del('conditions', ${c.id})" title="حذف">🗑️</button>
       </div>
       <div class="cond-report hidden" id="report-${c.id}"></div>
     </div>`;
@@ -878,23 +474,23 @@ function renderConditions() {
 async function doctorReport(id) {
   const box = $(`report-${id}`); if (!box) return;
   box.classList.remove("hidden");
-  box.innerHTML = `<div class="loading"><span class="spinner"></span> بحضّر التقرير...</div>`;
+  box.innerHTML = `<div class="loading"><span class="spinner"></span> بحضّر التقرير…</div>`;
   try {
     const res = await api(`/api/conditions/${id}/report`);
     const data = await res.json();
     if (data.error) { box.innerHTML = `<p class="muted">${escapeHtml(data.error)}</p>`; return; }
     const timeline = (data.timeline || []).map((h) =>
-      `<div class="tl-row"><span class="tl-date">${fmtDate(h.entry_date)}</span><span class="tl-text">${REGION_ICON[h.category] || "🩺"} ${escapeHtml(h.detail)}</span></div>`).join("");
-    box.innerHTML = `<div class="report-summary">${renderRich(data.summary)}</div>
-      <h4 class="report-h">الخط الزمني للأعراض</h4>
-      <div class="timeline">${timeline || `<p class="muted">مفيش أعراض في الفترة.</p>`}</div>`;
+      `<div class="tl-row"><span class="badge health"><span class="dot"></span>${fmtShort(h.entry_date)}</span><span class="tl-text">${escapeHtml(h.detail)}</span></div>`).join("");
+    box.innerHTML = `<div class="analysis-result" style="margin-top:0">${renderRich(data.summary)}</div>
+      <h4 style="font:var(--type-h3);font-size:var(--text-base);margin:14px 0 10px">الخط الزمني للأعراض</h4>
+      <div class="tl-rows">${timeline || `<p class="muted">مفيش أعراض في الفترة.</p>`}</div>`;
   } catch { box.innerHTML = `<p class="muted">حصل خطأ في توليد التقرير.</p>`; }
 }
 window.doctorReport = doctorReport;
 async function closeCondition(id) { await api(`/api/conditions/${id}/close`, { method: "PUT" }); loadAll(); }
 window.closeCondition = closeCondition;
 
-/* ===================== الصحة — الأكل ===================== */
+/* ---- الأكل ---- */
 function mealDates() { return [...new Set(state.meals.map((m) => m.entry_date))].sort(); }
 function shiftMealDate(delta) {
   if (!state.mealDate) return;
@@ -910,78 +506,589 @@ function renderMeals() {
   dayLabel.textContent = fmtDate(state.mealDate);
   const items = state.meals.filter((m) => m.entry_date === state.mealDate);
   const el = $("meals");
-  if (!items.length) { el.innerHTML = `<div class="empty sm"><div class="empty-emoji">🍽️</div><p class="muted">مفيش أكل مسجّل في اليوم ده.</p></div>`; return; }
+  if (!items.length) { el.innerHTML = `<span class="muted" style="font-size:var(--text-sm)">مفيش أكل مسجّل في اليوم ده.</span>`; return; }
   el.innerHTML = items.map((m) => `
     <div class="list-row">
-      <div class="lr-main"><span class="hcat">🍽️ ${m.at_time ? escapeHtml(m.at_time) : "أكل"}</span>
-        <span class="lr-note">${escapeHtml(m.items)}${m.note ? " · " + escapeHtml(m.note) : ""}</span></div>
-      <div class="row-actions"><button class="del-btn" onclick="del('meals', ${m.id})" title="حذف">🗑️</button></div>
+      <div class="lm">
+        <span class="l1">🍽️ ${m.at_time ? escapeHtml(m.at_time) : "أكل"}</span>
+        <span class="l2">${escapeHtml(m.items)}${m.note ? " · " + escapeHtml(m.note) : ""}</span>
+      </div>
+      <div class="row-actions"><button class="icon-btn" onclick="del('meals', ${m.id})" title="حذف">🗑️</button></div>
     </div>`).join("");
 }
 $("mealPrev")?.addEventListener("click", () => shiftMealDate(-1));
 $("mealNext")?.addEventListener("click", () => shiftMealDate(1));
+
+/* ===================== العادات ===================== */
+function renderHabitsPage() {
+  const data = state.habits;
+  const best = [...data].sort((a, b) => b.streak - a.streak)[0];
+
+  // لوحة الستريك (أحسن عادة)
+  const days = lastNDays(7);
+  if (best) {
+    const logset = new Set(best.logs || []);
+    $("streakPanel").innerHTML = `
+      <h3 style="font:var(--type-h3);margin:0 0 16px">${best.emoji || "🔁"} ${escapeHtml(best.title)}</h3>
+      <div class="streak-head">
+        <span class="fl">🔥</span>
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <b>${arNum(best.streak)}</b><span>يوم ورا بعض</span>
+        </div>
+      </div>
+      <div class="streak-days">
+        ${days.map((d) => `
+          <div class="sd">
+            <div class="sd-cell ${logset.has(d) ? "done" : ""}">${logset.has(d) ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>` : ""}</div>
+            <small>${DAY_LETTER[new Date(d + "T00:00:00").getDay()]}</small>
+          </div>`).join("")}
+      </div>`;
+  } else {
+    $("streakPanel").innerHTML = emptyState("لسه مفيش عادات", "ضيف عادة جنب، أو قول للبوت «بلعب رياضة كل يوم».");
+  }
+
+  // هيت ماب ٨ أسابيع: كل الأيام اللي اتعملت فيها أي عادة
+  const allLogs = {};
+  for (const h of data) for (const d of h.logs || []) allLogs[d] = (allLogs[d] || 0) + 1;
+  const WEEKS = 8;
+  // أول عمود (يمين) = الأسبوع الحالي، وكل صف يوم من السبت للجمعة
+  const todayD = new Date(TODAY() + "T00:00:00");
+  const satOffset = (todayD.getDay() + 1) % 7; // أيام مرّت من السبت
+  const weekStart = (wAgo) => {
+    const d = new Date(todayD);
+    d.setDate(d.getDate() - satOffset - wAgo * 7);
+    return d;
+  };
+  let cells = "";
+  for (let row = 0; row < 7; row++) {
+    for (let col = 0; col < WEEKS; col++) {
+      const wAgo = col; // العمود الأول يمين = الأسبوع الحالي
+      const d = weekStart(wAgo);
+      d.setDate(d.getDate() + row);
+      const iso = d.toISOString().slice(0, 10);
+      const future = iso > TODAY();
+      const n = allLogs[iso] || 0;
+      const lv = future ? 0 : n >= 3 ? 3 : n;
+      cells += `<span class="hm-cell ${lv ? "l" + lv : ""}" title="${fmtShort(iso)}${n ? " · " + arNum(n) : ""}" style="${future ? "opacity:.35" : ""}"></span>`;
+    }
+  }
+  $("habitHeatmap").innerHTML = `
+    <div class="heatmap" style="grid-template-columns:repeat(${WEEKS}, 1fr)">${cells}</div>
+    <div class="hm-legend"><span>أقل</span><i></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><span>أكتر</span></div>`;
+
+  // صفوف العادات
+  $("habitRows").innerHTML = data.length
+    ? data.map((h) => {
+        const logset = new Set(h.logs || []);
+        const dots = days.map((d) => `<i class="${logset.has(d) ? "on" : ""}" title="${fmtShort(d)}"></i>`).join("");
+        return `<div class="habit-row lift">
+          <div class="hr-top">
+            <span class="hr-title">${h.emoji || (h.kind === "quit" ? "🚭" : "🔁")} ${escapeHtml(h.title)}</span>
+            <span class="badge habits"><span class="dot"></span>${arNum(h.streak)} يوم 🔥</span>
+          </div>
+          <div class="hr-dots">${dots}</div>
+          <div class="hr-foot">
+            <button class="btn ${h.doneToday ? "secondary" : "habits"} sm" onclick="toggleHabit(${h.id}, ${h.doneToday})">
+              ${h.doneToday ? "✓ اتعملت النهاردة" : "علّمها للنهاردة"}
+            </button>
+            <button class="icon-btn" onclick="del('habits', ${h.id})" title="حذف">🗑️</button>
+          </div>
+        </div>`;
+      }).join("")
+    : "";
+}
+async function toggleHabit(id, doneToday) {
+  if (doneToday) await api(`/api/habits/${id}/log?date=${TODAY()}`, { method: "DELETE" });
+  else await api(`/api/habits/${id}/log`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: TODAY() }) });
+  await loadAll(false);
+  renderHabitsPage();
+  renderOverview();
+}
+window.toggleHabit = toggleHabit;
+$("habitForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("habitTitle").value.trim();
+  const kind = $("habitKind").value;
+  if (!title) return;
+  await api("/api/habits", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, kind }) });
+  e.target.reset();
+  await loadAll(false);
+  renderHabitsPage();
+});
+
+/* ===================== الأهداف ===================== */
+function ringSVG(pct, size = 130, stroke = 12) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const off = circ * (1 - Math.min(Math.max(pct, 0), 100) / 100);
+  return `
+    <div class="ring-wrap" style="width:${size}px;height:${size}px">
+      <svg width="${size}" height="${size}" style="transform:rotate(-90deg)">
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--goals-tint)" stroke-width="${stroke}"/>
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--goals)" stroke-width="${stroke}"
+          stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${off}"
+          style="transition:stroke-dashoffset var(--dur-draw) var(--ease-pen)"/>
+      </svg>
+      <div class="ring-center" style="font-size:${Math.round(size * 0.2)}px">${arNum(Math.round(pct))}٪</div>
+    </div>`;
+}
+function renderGoalsPage() {
+  const el = $("ringGrid");
+  const data = state.goals;
+  if (!data.length) {
+    el.innerHTML = emptyState("لسه مفيش أهداف", "ضيف هدف فوق، أو قول للبوت «هدفي أوصل ٥٠٠ ألف».");
+    return;
+  }
+  el.innerHTML = data.map((g) => {
+    const pct = g.target ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
+    const unit = g.unit ? " " + escapeHtml(g.unit) : "";
+    return `<div class="ring-card lift">
+      ${g.target ? ringSVG(pct) : `<div style="font-size:44px">🎯</div>`}
+      <div class="rc-caption">${escapeHtml(g.title)}</div>
+      <div class="rc-meta">${arNum(g.current)}${g.target ? ` / ${arNum(g.target)}` : ""}${unit}${g.target ? ` · باقي ${arNum(Math.max(0, g.target - g.current))}` : ""}</div>
+      <div class="rc-update">
+        <input type="number" placeholder="حدّث الرقم" id="gc-${g.id}" class="field" style="flex:1" />
+        <button class="btn goals sm" onclick="updateGoal(${g.id})">تحديث</button>
+        <button class="icon-btn" onclick="del('goals', ${g.id})" title="حذف">🗑️</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+async function updateGoal(id) {
+  const v = $(`gc-${id}`).value;
+  if (v === "") return;
+  await api(`/api/goals/${id}/current`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ current: Number(v) }) });
+  await loadAll(false);
+  renderGoalsPage();
+}
+window.updateGoal = updateGoal;
+$("goalForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("goalTitle").value.trim();
+  const target = $("goalTarget").value;
+  const unit = $("goalUnit").value.trim();
+  if (!title) return;
+  await api("/api/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, target, unit }) });
+  e.target.reset();
+  await loadAll(false);
+  renderGoalsPage();
+});
+
+/* ===================== الفلوس ===================== */
+function renderFinancesPage() {
+  const data = state.finance;
+  const week = lastNDays(7);
+  const monthStart = TODAY().slice(0, 8) + "01";
+  const weekExpense = data.filter((f) => f.direction === "expense" && week.includes(f.entry_date)).reduce((a, f) => a + f.amount, 0);
+  const mIncome = data.filter((f) => f.direction === "income" && f.entry_date >= monthStart).reduce((a, f) => a + f.amount, 0);
+  const mExpense = data.filter((f) => f.direction === "expense" && f.entry_date >= monthStart).reduce((a, f) => a + f.amount, 0);
+  const net = mIncome - mExpense;
+
+  $("finStats").innerHTML = [
+    { label: "مصاريف الأسبوع", value: arNum(weekExpense), unit: "جنيه", ico: "💸", delta: "آخر ٧ أيام", trend: "" },
+    { label: "دخل الشهر", value: arNum(mIncome), unit: "جنيه", ico: "💰", delta: "من أول الشهر", trend: "up" },
+    { label: "الصافي", value: arNum(net), unit: "جنيه", ico: "🌱", delta: net >= 0 ? "نبتتك بخير" : "اصرف بالراحة", trend: net >= 0 ? "up" : "down" },
+  ].map((s) => `
+    <div class="stat-card finances">
+      <div class="sc-top"><span class="sc-ico">${s.ico}</span><span class="sc-label">${s.label}</span></div>
+      <div class="sc-value"><b>${s.value}</b><span class="sc-unit">${s.unit}</span></div>
+      <div class="sc-delta ${s.trend}">${s.delta}</div>
+    </div>`).join("");
+
+  // أعمدة الأسبوع — مرسومة باليد على canvas
+  const weekData = week.map((d) => ({
+    label: DAY_LETTER[new Date(d + "T00:00:00").getDay()],
+    value: data.filter((f) => f.entry_date === d && f.direction === "expense").reduce((a, f) => a + f.amount, 0),
+  }));
+  drawSketchBars($("finBars"), weekData, "finances", 200);
+
+  // على إيه بتصرف — آخر ٣٠ يوم
+  const month = lastNDays(30);
+  const byCat = {};
+  for (const f of data.filter((f) => f.direction === "expense" && month.includes(f.entry_date))) {
+    const c = f.category || "أخرى";
+    byCat[c] = (byCat[c] || 0) + f.amount;
+  }
+  const rows = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 7);
+  const total = rows.reduce((a, [, v]) => a + v, 0);
+  const accents = ["finances", "health", "goals", "habits", "coin", "", ""];
+  $("catBars").innerHTML = rows.length
+    ? rows.map(([c, v], i) => {
+        const pct = total ? Math.round((v / total) * 100) : 0;
+        return `<div class="cat-bar ${accents[i] || ""}">
+          <div class="cb-top">
+            <span>${CAT_ICONS[c] || "📦"} ${escapeHtml(c)}</span>
+            <span class="cb-amount">${arNum(v)} جنيه · ${arNum(pct)}٪</span>
+          </div>
+          <div class="cb-track"><div class="cb-fill" style="width:${pct}%"></div></div>
+        </div>`;
+      }).join("")
+    : `<span class="muted" style="font-size:var(--text-sm)">قول للبوت «صرفت ٢٠٠ على أكل» وهيتصنّف هنا لوحده.</span>`;
+
+  // آخر حركات
+  $("finTx").innerHTML = data.slice(0, 5).map((f) => `
+    <div class="tl-row">
+      <span class="tl-text" style="flex:1">${escapeHtml(f.note || f.category || "عملية")}</span>
+      <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}" style="font:var(--type-label)">${f.direction === "income" ? "+" : "-"}${arNum(f.amount)} ج</span>
+    </div>`).join("") || `<span class="muted" style="font-size:var(--text-sm)">لسه مفيش حركات.</span>`;
+
+  // كل العمليات
+  const el = $("finList");
+  el.innerHTML = data.length
+    ? data.slice(0, 60).map((f) => `
+      <div class="list-row">
+        <div class="lm">
+          <span class="l1">${f.direction === "income" ? "➕ دخل" : "➖ صرف"} · ${fmtShort(f.entry_date)}${f.category ? ` · ${CAT_ICONS[f.category] || ""} ${escapeHtml(f.category)}` : ""}</span>
+          <span class="l2">${escapeHtml(f.note || "—")}</span>
+        </div>
+        <div class="row-actions">
+          <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}">${arNum(f.amount)} ${escapeHtml(f.currency || "جنيه")}</span>
+          <button class="icon-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
+        </div>
+      </div>`).join("")
+    : emptyState("مفيش عمليات لسه", "قول للبوت «صرفت ٢٠٠ على أكل» أو ضيف عملية فوق.");
+}
+$("finForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const direction = $("finDir").value;
+  const amount = $("finAmount").value;
+  const category = $("finCategory").value;
+  const note = $("finNote").value.trim();
+  if (amount === "") return;
+  await api("/api/finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ direction, amount, category, note }) });
+  e.target.reset();
+  fillCategorySelect();
+  await loadAll(false);
+  renderFinancesPage();
+});
+function fillCategorySelect() {
+  const sel = $("finCategory");
+  if (!sel || !state.categories.length) return;
+  sel.innerHTML = state.categories.map((c) => `<option value="${c}">${CAT_ICONS[c] || ""} ${c}</option>`).join("");
+}
+
+/* أعمدة مرسومة باليد — مقتبسة من BarChart بتاع الـ design system */
+function drawSketchBars(canvas, data, accent = "finances", height = 200) {
+  if (!canvas) return;
+  const wrap = canvas.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  const W = wrap.clientWidth || 320;
+  const H = height;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const stroke = cssVar(`--${accent}-deep`) || "#527F35";
+  const fillBottom = cssVar(`--${accent}-tint`) || "#CFE3BD";
+  const fillTop = cssVar(`--${accent}`) || "#6FA84A";
+  const ink = cssVar("--ink-muted");
+  const hair = cssVar("--hairline");
+
+  const padX = 18, padTop = 16, padBottom = 34;
+  const max = Math.max(...data.map((d) => d.value), 1);
+  const n = data.length || 1;
+  const slot = (W - padX * 2) / n;
+  const bw = Math.min(slot * 0.56, 48);
+  const jit = (i, k) => ((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1) * 2 - 1;
+
+  // خط القاعدة المرسوم باليد
+  ctx.strokeStyle = hair;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(padX, H - padBottom + 0.5);
+  for (let x = padX; x <= W - padX; x += 14) ctx.lineTo(x, H - padBottom + Math.sin(x) * 0.6);
+  ctx.stroke();
+
+  data.forEach((d, i) => {
+    const cx = padX + slot * i + slot / 2;
+    const bh = Math.max((d.value / max) * (H - padTop - padBottom), 0.01);
+    const x = cx - bw / 2 + jit(i, 1) * 1.2;
+    const y = H - padBottom - bh;
+
+    const grad = ctx.createLinearGradient(0, y, 0, H - padBottom);
+    grad.addColorStop(0, fillTop);
+    grad.addColorStop(1, fillBottom);
+    ctx.fillStyle = grad;
+    roundRect(ctx, x, y, bw, bh, 7);
+    ctx.fill();
+
+    if (d.value > 0) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(x + jit(i, 2), y + 6 + jit(i, 3));
+      ctx.lineTo(x + jit(i, 4), y + jit(i, 2) - 0.5);
+      ctx.lineTo(x + bw + jit(i, 5), y + jit(i, 6));
+      ctx.lineTo(x + bw + jit(i, 7), H - padBottom);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = ink;
+    ctx.font = "13px Tajawal, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(String(d.label), cx, H - padBottom + 20);
+  });
+}
+function roundRect(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, Math.abs(h) / 2 || r);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, 0);
+  ctx.arcTo(x, y + h, x, y, 0);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/* ===================== اليوميات ===================== */
+function renderJournal() {
+  const el = $("entries");
+  const data = state.journal;
+  if (!data.length) {
+    el.innerHTML = emptyState("لسه ما دوّنتش حاجة", "ابعت voice أو اكتب للبوت على تيليجرام عن يومك.");
+    return;
+  }
+  el.innerHTML = data.map((e) => {
+    const tags = (e.tags || []).map((t) => `<span class="chip">${escapeHtml(t)}</span>`).join("");
+    return `<article class="entry-card">
+      <div class="e-head">
+        <span class="e-date">${fmtDate(e.entry_date)}</span>
+        <div class="row-actions">
+          <span class="badge health"><span class="dot"></span>${moodInfo(e.mood).emoji} ${escapeHtml(e.mood || "")}</span>
+          <button class="icon-btn" onclick="del('entries', ${e.id})" title="حذف">🗑️</button>
+        </div>
+      </div>
+      <p class="e-summary">${escapeHtml(e.summary || "")}</p>
+      ${tags ? `<div class="tags">${tags}</div>` : ""}
+      <details><summary>النص الكامل</summary><p>${escapeHtml(e.transcript || "")}</p></details>
+    </article>`;
+  }).join("");
+}
+async function analyze() {
+  const days = $("days").value;
+  const analysisEl = $("analysis");
+  analysisEl.classList.remove("hidden");
+  analysisEl.innerHTML = `<div class="loading"><span class="spinner"></span> بحلّل أيامك…</div>`;
+  $("analyzeBtn").disabled = true;
+  try {
+    const res = await api(`/api/analyze?days=${days}`);
+    const data = await res.json();
+    analysisEl.innerHTML = renderRich(data.analysis || data.error || "");
+  } catch { analysisEl.innerHTML = `<p class="muted">حصل خطأ في التحليل.</p>`; }
+  finally { $("analyzeBtn").disabled = false; }
+}
+$("analyzeBtn").addEventListener("click", analyze);
 
 /* ===================== التقرير الشامل ===================== */
 async function makeReport() {
   const days = $("reportDays").value;
   const box = $("reportResult");
   box.classList.remove("hidden");
-  box.innerHTML = `<div class="loading"><span class="spinner"></span> بجمّع كل كلامك وبجهّز التقرير... ممكن ياخد شوية</div>`;
+  box.innerHTML = `<div class="loading"><span class="spinner"></span> بجمّع كل كلامك وبجهّز التقرير… ممكن ياخد شوية</div>`;
   $("reportBtn").disabled = true;
   try {
     const res = await api(`/api/report?days=${days}`);
     const data = await res.json();
-    box.innerHTML = data.report
-      ? `<div class="analysis-text">${renderRich(data.report)}</div>`
-      : `<p class="muted">${escapeHtml(data.error || "حصل خطأ")}</p>`;
+    box.innerHTML = data.report ? renderRich(data.report) : `<p class="muted">${escapeHtml(data.error || "حصل خطأ")}</p>`;
   } catch { box.innerHTML = `<p class="muted">حصل خطأ في توليد التقرير.</p>`; }
   finally { $("reportBtn").disabled = false; }
 }
 $("reportBtn").addEventListener("click", makeReport);
 
+/* ===================== المهام والتقويم ===================== */
+const AR_WD = ["سبت", "حد", "اتنين", "تلات", "أربع", "خميس", "جمعة"];
+const wdIndex = (jsDay) => (jsDay + 1) % 7; // السبت أول الأسبوع
+function isoOf(y, m, d) {
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+function renderCalendar() {
+  if (!state.selDate) state.selDate = TODAY();
+  $("calWeekdays").innerHTML = AR_WD.map((w) => `<span>${w}</span>`).join("");
+  const { calY: y, calM: m } = state;
+  $("calTitle").textContent = new Date(y, m, 1).toLocaleDateString("ar-EG", { month: "long", year: "numeric" });
+
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const lead = wdIndex(new Date(y, m, 1).getDay());
+  const byDate = {};
+  for (const t of state.tasks) (byDate[t.due_date] = byDate[t.due_date] || []).push(t);
+
+  let cells = "";
+  for (let i = 0; i < lead; i++) cells += `<span class="cal-cell blank"></span>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = isoOf(y, m, d);
+    const dayTasks = byDate[iso] || [];
+    const pending = dayTasks.filter((t) => t.status === "pending").length;
+    const done = dayTasks.filter((t) => t.status === "done").length;
+    const cls = ["cal-cell", iso === TODAY() ? "today" : "", iso === state.selDate ? "sel" : ""].filter(Boolean).join(" ");
+    const dots = (pending ? `<i class="cd p"></i>` : "") + (done ? `<i class="cd d"></i>` : "");
+    cells += `<button class="${cls}" data-date="${iso}"><span class="cal-num">${arNum(d)}</span><span class="cal-dots">${dots}</span></button>`;
+  }
+  $("calGrid").innerHTML = cells;
+  $("calGrid").querySelectorAll(".cal-cell[data-date]").forEach((c) =>
+    c.addEventListener("click", () => { state.selDate = c.dataset.date; renderCalendar(); })
+  );
+
+  const isToday = state.selDate === TODAY();
+  $("dayTasksTitle").textContent = isToday ? "مهام النهاردة" : `مهام ${fmtDate(state.selDate)}`;
+  const sel = (byDate[state.selDate] || []).slice().sort((a, b) => ((a.due_time || "99") < (b.due_time || "99") ? -1 : 1));
+  renderTaskRows($("dayTasks"), sel);
+}
+function renderTaskRows(el, tasks) {
+  if (!el) return;
+  if (!tasks.length) {
+    el.innerHTML = `<div class="empty sm">${DOODLE}<p>مفيش مهام في اليوم ده — ضيف واحدة فوق ✍️</p></div>`;
+    return;
+  }
+  el.innerHTML = tasks.map((t) => `
+    <div class="task-row ${t.status === "done" ? "done" : ""}">
+      <button class="task-check" onclick="toggleTask(${t.id}, '${t.status}')" title="${t.status === "done" ? "رجّعها" : "خلصت"}">${t.status === "done" ? "✓" : ""}</button>
+      <div class="lm" style="flex:1">
+        <span class="task-title">${escapeHtml(t.title)}</span>
+        ${t.note ? `<span class="task-note">${escapeHtml(t.note)}</span>` : ""}
+      </div>
+      <div class="row-actions">
+        ${t.due_time ? `<span class="time-chip">⏰ ${t.due_time}</span>` : ""}
+        <button class="icon-btn" onclick="delTask(${t.id})" title="حذف">🗑️</button>
+      </div>
+    </div>`).join("");
+}
+async function toggleTask(id, status) {
+  await api(`/api/tasks/${id}/${status === "done" ? "reopen" : "done"}`, { method: "PUT" });
+  await loadAll(false);
+  renderCalendar();
+}
+window.toggleTask = toggleTask;
+async function delTask(id) {
+  if (!(await askConfirm())) return;
+  await api(`/api/tasks/${id}`, { method: "DELETE" });
+  await loadAll(false);
+  renderCalendar();
+}
+window.delTask = delTask;
+$("taskForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("taskTitle").value.trim();
+  const dueTime = $("taskTime").value || null;
+  if (!title) return;
+  await api("/api/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, dueDate: state.selDate || TODAY(), dueTime }),
+  });
+  e.target.reset();
+  await loadAll(false);
+  renderCalendar();
+});
+$("calPrev").addEventListener("click", () => { state.calM--; if (state.calM < 0) { state.calM = 11; state.calY--; } renderCalendar(); });
+$("calNext").addEventListener("click", () => { state.calM++; if (state.calM > 11) { state.calM = 0; state.calY++; } renderCalendar(); });
+$("calToday").addEventListener("click", () => {
+  const n = new Date();
+  state.calY = n.getFullYear(); state.calM = n.getMonth(); state.selDate = TODAY();
+  renderCalendar();
+});
+
 /* ===================== المحادثات ===================== */
-const KIND_ICON = { voice: "🎙️", text: "⌨️", command: "⚙️", checkin: "⏰" };
+const KIND_LABEL = { voice: "🎙️ صوت", text: "⌨️ كتابة", command: "⚙️ أمر", checkin: "⏰ سؤال اليوم", dashboard: "✎ من الداشبورد" };
 function renderChats() {
   const el = $("chats");
   const data = state.conversations;
-  if (!data.length) { el.innerHTML = `<div class="empty"><div class="empty-emoji">💬</div><p class="muted">لسه مفيش محادثات.</p></div>`; return; }
-  el.innerHTML = data.map((c) => `
+  if (!data.length) { el.innerHTML = emptyState("لسه مفيش محادثات", "أول ما تكلم البوت هتلاقي كل حاجة هنا."); return; }
+  el.innerHTML = data.slice(0, 60).map((c) => `
     <div class="chat-card">
       <div class="chat-head">
-        <span class="kind-chip">${KIND_ICON[c.kind] || "💬"} ${escapeHtml(c.kind === "checkin" ? "سؤال اليوم" : c.kind || "")}</span>
-        <div class="row-actions"><span class="lr-date">${fmtDateTime(c.created_at)}</span>
-          <button class="del-btn" onclick="del('conversations', ${c.id})" title="حذف">🗑️</button></div>
+        <span class="badge"><span class="dot"></span>${KIND_LABEL[c.kind] || "💬"}</span>
+        <div class="row-actions">
+          <span class="chat-date">${fmtDateTime(c.created_at)}</span>
+          <button class="icon-btn" onclick="del('conversations', ${c.id})" title="حذف">🗑️</button>
+        </div>
       </div>
       ${c.user_text ? `<div class="bubble user"><span class="who">أنت</span>${escapeHtml(c.user_text)}</div>` : ""}
       ${c.ai_reply ? `<div class="bubble ai"><span class="who">دوّنلي</span>${escapeHtml(c.ai_reply)}</div>` : ""}
     </div>`).join("");
 }
 
-/* ===================== Analyze ===================== */
-async function analyze() {
-  const days = $("days").value;
-  const analysisEl = $("analysis");
-  analysisEl.classList.remove("hidden");
-  analysisEl.innerHTML = `<div class="loading"><span class="spinner"></span> بحلّل أيامك...</div>`;
-  $("analyzeBtn").disabled = true;
-  try {
-    const res = await api(`/api/analyze?days=${days}`);
-    const data = await res.json();
-    analysisEl.innerHTML = `<div class="analysis-text">${renderRich(data.analysis || data.error || "")}</div>`;
-  } catch { analysisEl.innerHTML = `<p class="muted">حصل خطأ في التحليل.</p>`; }
-  finally { $("analyzeBtn").disabled = false; }
-}
-$("analyzeBtn").addEventListener("click", analyze);
+/* ===================== تكلفة الـAI ===================== */
+const USAGE_KINDS = {
+  transcribe: { label: "تفريغ الصوت", emoji: "🎙️" },
+  agent: { label: "الـ Agent (فهم وتسجيل ورد)", emoji: "🧠" },
+  classify: { label: "تصنيف الكلام (قديم)", emoji: "🗂️" },
+  reflect: { label: "رد البوت (قديم)", emoji: "💬" },
+  analyze: { label: "تحليل اليوميات", emoji: "📈" },
+  report: { label: "التقرير الشامل", emoji: "📋" },
+  doctor: { label: "تقرير الدكتور", emoji: "🩺" },
+  other: { label: "غير ذلك", emoji: "⚙️" },
+};
+const usd = (n) => "$" + Number(n || 0).toFixed(Number(n) >= 1 ? 2 : 4);
+const egp = (n) => arNum(Math.round(Number(n || 0) * USD_TO_EGP)) + " ج";
 
+function renderUsage() {
+  const u = state.usage;
+  if (!u) { $("usageSummary").innerHTML = ""; return; }
+  const t = u.totals || {};
+  const total = t.cost_usd || 0;
+  const monthCost = u.month?.cost_usd || 0;
+  const tokens = (t.input_tokens || 0) + (t.output_tokens || 0);
+  const minutes = (t.audio_seconds || 0) / 60;
+
+  $("usageSummary").innerHTML = [
+    { label: "إجمالي التكلفة", value: usd(total), unit: "", delta: "≈ " + egp(total), ico: "🧮" },
+    { label: "الشهر ده", value: usd(monthCost), unit: "", delta: "≈ " + egp(monthCost), ico: "🗓" },
+    { label: "النداءات", value: arNum(t.calls || 0), unit: "", delta: `${arNum(tokens)} توكن · ${arNum(minutes.toFixed(1))} دقيقة صوت`, ico: "🤖" },
+  ].map((s) => `
+    <div class="stat-card">
+      <div class="sc-top"><span class="sc-ico">${s.ico}</span><span class="sc-label">${s.label}</span></div>
+      <div class="sc-value"><b style="font-size:var(--text-h3)">${s.value}</b></div>
+      <div class="sc-delta">${s.delta}</div>
+    </div>`).join("");
+
+  // التكلفة اليومية — آخر ٣٠ يوم
+  const map = {};
+  (u.daily || []).forEach((d) => (map[d.usage_date] = d.cost_usd));
+  const days = lastNDays(30).map((d, i) => ({
+    label: i % 5 === 0 ? fmtShort(d) : "",
+    value: map[d] || 0,
+  }));
+  drawSketchBars($("usageChart"), days, "", 180);
+
+  const byKind = {};
+  (u.byKind || []).forEach((r) => {
+    const k = USAGE_KINDS[r.kind] ? r.kind : "other";
+    if (!byKind[k]) byKind[k] = { calls: 0, cost: 0 };
+    byKind[k].calls += r.calls; byKind[k].cost += r.cost_usd;
+  });
+  const rows = Object.entries(byKind).sort((a, b) => b[1].cost - a[1].cost);
+  $("usageBreakdown").innerHTML = rows.length
+    ? rows.map(([k, v]) => {
+        const meta = USAGE_KINDS[k];
+        const pct = total ? Math.round((v.cost / total) * 100) : 0;
+        return `<div class="list-row">
+          <div class="lm">
+            <span class="l1">${meta.emoji} ${meta.label}</span>
+            <span class="l2">${arNum(v.calls)} نداء · ${arNum(pct)}٪ من التكلفة</span>
+          </div>
+          <span class="l-amount">${usd(v.cost)}</span>
+        </div>`;
+      }).join("")
+    : `<span class="muted" style="font-size:var(--text-sm)">لسه مفيش استهلاك متسجّل.</span>`;
+
+  const since = t.since ? `بيتتبّع من ${fmtShort(t.since)} · ` : "";
+  $("usageNote").textContent = `${since}الأرقام تقديرية حسب أسعار OpenAI، والتحويل للجنيه على سعر ${USD_TO_EGP}.`;
+}
+
+/* ===================== خروج + تحميل ===================== */
 async function logout() {
   await fetch("/api/logout", { method: "POST" }).catch(() => {});
   window.location.href = "/login";
 }
 $("logoutBtn").addEventListener("click", logout);
-$("refreshBtn").addEventListener("click", () => loadAll());
 
-/* ===================== Load ===================== */
-async function loadAll() {
+async function loadAll(rerender = true) {
   try {
     const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, usg] = await Promise.all([
       api("/api/me").then((r) => r.json()),
@@ -1002,56 +1109,25 @@ async function loadAll() {
     state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin;
     state.tasks = tasks; state.categories = cats; state.usage = usg;
   } catch { return; }
-  $("pageDateLabel").textContent = fmtDate(TODAY());
+
+  const first = (state.me?.name || "د").trim()[0] || "د";
+  $("userAvatar").textContent = first;
+  $("userName").textContent = state.me?.name || "صاحب الدفتر";
   fillCategorySelect();
+
+  if (!rerender) return;
+  renderOverview();
   renderJournal();
-  renderGoals();
-  renderHabits();
-  renderPage();
-  renderMood();
-  renderConditions();
-  renderMeals();
   renderChats();
-  const active = document.querySelector(".nav-item.active")?.dataset.tab;
-  if (active === "finance") renderFinance();
+  const active = document.querySelector('.nav-btn[data-active="true"]')?.dataset.tab;
+  if (active === "health") renderHealthPage();
+  if (active === "habits") renderHabitsPage();
+  if (active === "goals") renderGoalsPage();
+  if (active === "finances") renderFinancesPage();
   if (active === "tasks") renderCalendar();
   if (active === "usage") renderUsage();
-  renderOverview();
 }
 
-/* ===================== Ambient background ===================== */
-(function bg() {
-  const canvas = $("bgCanvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  let W, H, orbs;
-  function resize() {
-    W = canvas.width = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-  }
-  function init() {
-    orbs = Array.from({ length: 5 }, () => ({
-      x: Math.random() * W, y: Math.random() * H,
-      r: 120 + Math.random() * 180,
-      dx: (Math.random() - 0.5) * 0.25, dy: (Math.random() - 0.5) * 0.25,
-      c: ["#6366f1", "#8b5cf6", "#a855f7", "#ec4899"][Math.floor(Math.random() * 4)],
-    }));
-  }
-  function tick() {
-    ctx.clearRect(0, 0, W, H);
-    for (const o of orbs) {
-      o.x += o.dx; o.y += o.dy;
-      if (o.x < -o.r) o.x = W + o.r; if (o.x > W + o.r) o.x = -o.r;
-      if (o.y < -o.r) o.y = H + o.r; if (o.y > H + o.r) o.y = -o.r;
-      const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
-      g.addColorStop(0, o.c + "22"); g.addColorStop(1, o.c + "00");
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill();
-    }
-    requestAnimationFrame(tick);
-  }
-  resize(); init(); tick();
-  window.addEventListener("resize", () => { resize(); init(); });
-})();
-
-loadAll();
+loadAll().then(() => {
+  renderJournal();
+});

@@ -4,21 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>دوّنلي — تسجيل الدخول</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="icon" href="/assets/logo/dawwenli-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body class="auth-body">
     <main class="auth-card">
-      <div class="brand">
-        <div class="brand-mark"><img src="/assets/logo/dawwenli-mark.svg" alt="دوّنلي" /></div>
-        <h1>دوّنلي</h1>
-      </div>
-      <p class="auth-sub">يومياتك في مكان واحد — سجّل دخولك للوحة التحكم</p>
+      <img class="auth-logo" src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" />
+      <p class="auth-sub">دفترك الشخصي — سجّل دخولك تشوف حياتك مرتّبة</p>
 
       <div class="auth-tabs">
         <button id="tabCode" class="auth-tab active" type="button">دخول بكود 🔑</button>
@@ -28,31 +20,28 @@
       <form id="loginForm" class="auth-form" autocomplete="off">
         <div id="codeField">
           <label for="code">الكود من البوت</label>
-          <div class="field">
-            <input
-              type="text"
-              id="code"
-              name="code"
-              inputmode="numeric"
-              placeholder="ابعت ‎/code للبوت على تليجرام"
-            />
-          </div>
+          <input
+            type="text"
+            id="code"
+            name="code"
+            class="field"
+            inputmode="numeric"
+            placeholder="ابعت ‎/code للبوت على تيليجرام"
+          />
         </div>
         <div id="passwordField" hidden>
           <label for="password">كلمة السر</label>
-          <div class="field">
-            <input type="password" id="password" name="password" placeholder="••••••••" />
-          </div>
+          <input type="password" id="password" name="password" class="field" placeholder="••••••••" />
         </div>
         <label class="remember">
           <input type="checkbox" id="remember" checked />
           <span>فكّرني (سيبني داخل ٣٠ يوم)</span>
         </label>
-        <button type="submit" id="submitBtn">دخول</button>
+        <button type="submit" id="submitBtn" class="btn">دخول</button>
         <p id="error" class="auth-error" hidden></p>
       </form>
 
-      <footer class="auth-foot">دوّنلي — رفيق التدوين الذكي</footer>
+      <footer class="auth-foot">دوّنلي — احكيلي يومك وأنا أرتّبه ✎</footer>
     </main>
     <script src="/login.js"></script>
   </body>

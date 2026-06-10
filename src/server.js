@@ -44,6 +44,7 @@ import {
 } from "./db.js";
 import { analyzeEntries, doctorReport, unifiedReport } from "./openai.js";
 import { buildReportData } from "./report.js";
+import { runAgent } from "./agent.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
@@ -135,6 +136,7 @@ export function startServer() {
   // أصول عامة (مفيهاش بيانات حسّاسة)
   app.get("/style.css", (_req, res) => res.sendFile(join(publicDir, "style.css")));
   app.get("/login.js", (_req, res) => res.sendFile(join(publicDir, "login.js")));
+  app.use("/assets", express.static(join(publicDir, "assets")));
 
   app.get(["/login", "/login.html"], (req, res) => {
     if (sessionUser(req)) return res.redirect("/");
@@ -248,6 +250,21 @@ export function startServer() {
     const user = gate(req, res);
     if (!user) return;
     res.json({ ok: deleteTask(user.id, Number(req.params.id)) });
+  });
+
+  // الكومبوزر في الداشبورد: "رتّبهالي" — نفس الـ agent بتاع البوت
+  app.post("/api/log", async (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const text = String(req.body?.text || "").trim();
+    if (!text) return res.status(400).json({ error: "اكتب حاجة الأول" });
+    try {
+      const { reply, receipts } = await runAgent({ user, text, kind: "dashboard" });
+      res.json({ reply, receipts });
+    } catch (err) {
+      console.error("dashboard log error:", err);
+      res.status(500).json({ error: "حصل خطأ أثناء المعالجة، جرّب تاني" });
+    }
   });
 
   /* ===== التحليل والتقارير ===== */

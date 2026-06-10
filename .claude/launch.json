@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "dawenli",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["start"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--experimental-sqlite", "src/index.js"],
       "autoPort": true
     }
   ]

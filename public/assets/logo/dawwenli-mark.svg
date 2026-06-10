@@ -1,22 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none" role="img" aria-label="دوّنلي">
-  <g stroke="#2F7D4F" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
-    <!-- book cover (open outline with a binding notch on the right edge) -->
-    <path d="M188 102 L188 80 Q188 58 166 56 Q120 48 74 56 Q52 58 52 80 L52 160 Q52 182 74 184 Q120 192 166 184 Q188 182 188 160 L188 138"/>
-    <!-- spine -->
-    <path d="M120 62 L120 178" stroke-width="20"/>
-  </g>
-  <!-- left page: ruler ticks -->
-  <g stroke="#2F7D4F" stroke-width="13" stroke-linecap="round">
-    <path d="M76 66 L76 90"/>
-    <path d="M92 66 L92 100"/>
-    <path d="M108 66 L108 90"/>
-    <path d="M120 120 L92 120"/>
-    <path d="M120 144 L92 144"/>
-    <path d="M120 168 L92 168"/>
-  </g>
-  <!-- right page: two flowing waves -->
-  <g stroke="#E2641E" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M132 116 q8 -10 16 0 q8 10 16 0 q8 -10 16 0"/>
-    <path d="M132 150 q8 -10 16 0 q8 10 16 0 q8 -10 16 0"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Dawwenli">
+  <g stroke="#5C8A6B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 16c14-3 26-3 40 0 1 12 1 28 0 40-14 3-26 3-40 0-1-12-1-28 0-40Z" fill="#FFFCF5"></path>
+    <path d="M32 14c1 14 1 30 0 44"></path>
+    <path d="M18 14v6M25 14v6M12 30h6M12 40h6"></path>
+    <path d="M38 30c4-3 8 4 12 0s6-3 6-1" stroke="#E0705C"></path>
+    <path d="M38 40c5-2 9 3 13-1" stroke="#E0705C"></path>
   </g>
 </svg>

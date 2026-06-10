@@ -3,317 +3,409 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>دوّنلي — مساحتك الشخصية</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
-      rel="stylesheet"
-    />
+    <title>دوّنلي — احكيلي يومك وأنا أرتّبه</title>
+    <link rel="icon" href="/assets/logo/dawwenli-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <canvas id="bgCanvas" class="bg-canvas" aria-hidden="true"></canvas>
+    <div class="dw-app">
+      <div id="sideScrim" class="dash-scrim"></div>
 
-    <div class="app-shell">
-      <!-- ===================== Sidebar ===================== -->
-      <aside class="sidebar" id="sidebar">
-        <div class="side-brand">
-          <span class="brand-mark">✍️</span>
-          <div class="brand-text">
-            <span class="brand-name">دوّنلي</span>
-            <span class="brand-sub">مساحتك الشخصية</span>
-          </div>
-        </div>
+      <!-- ===================== السايدبار ===================== -->
+      <aside class="dw-sidebar" id="sidebar">
+        <img class="side-logo" src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" />
+        <nav id="sideNav" style="display:flex;flex-direction:column;gap:4px">
+          <button class="nav-btn" data-tab="overview" data-active="true">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+            <span>النظرة العامة</span>
+          </button>
+          <button class="nav-btn health" data-tab="health">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.5-1.5 3-3.3 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3.4 1-4.5 2.1A6.2 6.2 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.2 1.5 4 3 5.5l7 7Z"/><path d="M3.5 12h4l1.5-2.5L11.5 14l1.5-2.5h3"/></svg></span>
+            <span>الصحة</span>
+          </button>
+          <button class="nav-btn habits" data-tab="habits">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.6-2.2-1.2-3-.7-.9-1.3-1.7-1.3-3 0-.5.1-1 .3-1.5C5.6 6 4 9 4 12a8 8 0 0 0 16 0c0-4.8-3.5-8.5-6.5-10 .5 1.5.5 3-.3 4.2-.5.8-1.2 1.4-1.2 2.8 0 1.5 1 2.5 1 4a2.5 2.5 0 0 1-4.5 1.5Z"/></svg></span>
+            <span>العادات</span>
+          </button>
+          <button class="nav-btn goals" data-tab="goals">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+            <span>الأهداف</span>
+          </button>
+          <button class="nav-btn finances" data-tab="finances">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></span>
+            <span>الفلوس</span>
+          </button>
 
-        <nav class="side-nav" id="sideNav">
-          <button class="nav-item active" data-tab="overview"><span class="ni-ico">🏠</span><span class="ni-label">الرئيسية</span></button>
-          <button class="nav-item" data-tab="journal"><span class="ni-ico">📝</span><span class="ni-label">اليوميات</span></button>
-          <div class="nav-group">المحاور</div>
-          <button class="nav-item" data-tab="finance"><span class="ni-ico">💰</span><span class="ni-label">الماليات</span></button>
-          <button class="nav-item" data-tab="health"><span class="ni-ico">🩺</span><span class="ni-label">الصحة والنفسية</span></button>
-          <button class="nav-item" data-tab="goalshabits"><span class="ni-ico">🎯</span><span class="ni-label">الأهداف والعادات</span></button>
-          <button class="nav-item" data-tab="tasks"><span class="ni-ico">📅</span><span class="ni-label">المهام والتقويم</span></button>
-          <div class="nav-group">كمان</div>
-          <button class="nav-item" data-tab="chats"><span class="ni-ico">💬</span><span class="ni-label">المحادثات</span></button>
-          <button class="nav-item" data-tab="usage"><span class="ni-ico">🤖</span><span class="ni-label">تكلفة الـAI</span></button>
+          <div class="nav-group">دفترك</div>
+          <button class="nav-btn" data-tab="journal">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c3-2 7-2 10 0v13c-3-2-7-2-10 0Z"/><path d="M12 6c3-2 7-2 10 0v13c-3-2-7-2-10 0"/></svg></span>
+            <span>اليوميات</span>
+          </button>
+          <button class="nav-btn goals" data-tab="tasks">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 9h18M9 15l2 2 4-4"/></svg></span>
+            <span>المهام والتقويم</span>
+          </button>
+          <button class="nav-btn" data-tab="chats">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-3-.4-4.2-1L3 21l1.5-5.3a8.5 8.5 0 1 1 16.5-3.7Z"/></svg></span>
+            <span>المحادثات</span>
+          </button>
+          <button class="nav-btn" data-tab="usage">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.1 9.9a6 6 0 1 1-8.2 8.2"/><path d="M7 6h2v4"/></svg></span>
+            <span>تكلفة الـAI</span>
+          </button>
         </nav>
 
-        <div class="side-foot">
-          <a class="side-link" href="/landing" target="_blank">عن دوّنلي ↗</a>
-          <button id="logoutBtn" class="ghost-btn block">خروج</button>
+        <div class="side-tip">
+          <b>✈ دوّن بسرعة</b>
+          <span>ابعتلي صوت أو رسالة على تيليجرام وأنا أرتّبها في عوالمك.</span>
+        </div>
+
+        <div class="side-user">
+          <span class="avatar" id="userAvatar">د</span>
+          <div style="line-height:1.3;flex:1;min-width:0">
+            <div class="su-name" id="userName">—</div>
+            <div class="su-sub">دفترك الشخصي</div>
+          </div>
+          <button class="su-logout" id="logoutBtn" title="خروج">⎋</button>
         </div>
       </aside>
 
-      <!-- ===================== Main ===================== -->
-      <main class="main">
-        <header class="topbar">
-          <button id="menuBtn" class="icon-btn only-mobile" aria-label="القائمة">☰</button>
-          <div class="topbar-titles">
-            <h1 id="pageTitle" class="page-title">الرئيسية</h1>
-            <span id="pageDateLabel" class="page-date">—</span>
-          </div>
-          <button id="refreshBtn" class="ghost-btn sm">↻ تحديث</button>
-        </header>
+      <!-- ===================== المحتوى ===================== -->
+      <div class="dw-content">
+        <div class="dw-topbar">
+          <img src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" />
+          <button class="menu-btn" id="menuBtn" aria-label="القائمة">☰</button>
+        </div>
 
-        <!-- ========== الرئيسية ========== -->
-        <section class="tab-panel" data-panel="overview">
-          <div class="hero-card">
-            <div class="hero-text">
-              <h2 id="heroGreeting">أهلاً بيك 👋</h2>
-              <p class="muted" id="heroSub">كل يومياتك ومحاورك في مكان واحد.</p>
-            </div>
-            <div class="hero-streak">
-              <div class="ring-wrap"><canvas id="streakRing" width="120" height="120"></canvas>
-                <div class="ring-center"><span id="streakNum">0</span><small>يوم متتالي</small></div>
+        <main class="dw-main" id="main">
+          <!-- ========== النظرة العامة ========== -->
+          <section class="tab-panel" data-panel="overview">
+            <div class="page-head">
+              <div>
+                <h1 id="heroGreeting">صباح الخير 👋</h1>
+                <p class="ph-sub" id="heroSub">دي حياتك مرتّبة — لحد دلوقتي.</p>
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <span class="date-chip" id="todayChip">—</span>
+                <span class="streak-chip" id="streakChip">🔥 —</span>
               </div>
             </div>
-          </div>
 
-          <div class="stat-grid" id="overviewStats"></div>
-
-          <div class="panel" id="todayTasksPanel">
-            <div class="panel-head"><h2>مهام النهاردة</h2><button class="ghost-btn sm" data-go="tasks">التقويم ←</button></div>
-            <div id="todayTasks" class="list"></div>
-          </div>
-
-          <h3 class="block-title">محاورك</h3>
-          <div class="pillar-grid">
-            <div class="pillar-card" data-go="finance">
-              <div class="pillar-head"><span class="pillar-ico">💰</span><span>الماليات</span></div>
-              <canvas class="pillar-chart" id="chartFinance" width="280" height="90"></canvas>
-              <div class="pillar-meta" id="metaFinance">—</div>
-            </div>
-            <div class="pillar-card" data-go="health">
-              <div class="pillar-head"><span class="pillar-ico">🩺</span><span>الصحة والنفسية</span></div>
-              <canvas class="pillar-chart" id="chartHealth" width="280" height="90"></canvas>
-              <div class="pillar-meta" id="metaHealth">—</div>
-            </div>
-            <div class="pillar-card" data-go="goalshabits">
-              <div class="pillar-head"><span class="pillar-ico">🎯</span><span>الأهداف</span></div>
-              <canvas class="pillar-chart" id="chartGoals" width="280" height="90"></canvas>
-              <div class="pillar-meta" id="metaGoals">—</div>
-            </div>
-            <div class="pillar-card" data-go="goalshabits">
-              <div class="pillar-head"><span class="pillar-ico">🔁</span><span>العادات</span></div>
-              <canvas class="pillar-chart" id="chartHabits" width="280" height="90"></canvas>
-              <div class="pillar-meta" id="metaHabits">—</div>
-            </div>
-          </div>
-
-          <h3 class="block-title">آخر النشاط</h3>
-          <div id="recentFeed" class="feed"></div>
-        </section>
-
-        <!-- ========== اليوميات ========== -->
-        <section class="tab-panel hidden" data-panel="journal">
-          <div class="panel analyze-panel">
-            <div class="panel-head">
-              <h2>تحليل أيامك</h2>
-              <div class="analyze-controls">
-                <select id="days" class="select">
-                  <option value="7">آخر ٧ أيام</option>
-                  <option value="14">آخر ١٤ يوم</option>
-                  <option value="30">آخر شهر</option>
-                </select>
-                <button id="analyzeBtn" class="primary-btn">حلّلي</button>
+            <div class="composer" style="margin-bottom:26px">
+              <div style="display:flex;gap:14px;align-items:flex-start">
+                <span style="font-size:20px;color:var(--brand-deep)">✎</span>
+                <div style="flex:1;min-width:0">
+                  <textarea id="composerText" rows="2" placeholder="احكيلي عملت إيه النهاردة…"></textarea>
+                  <div class="comp-foot">
+                    <span class="comp-hint">أو ابعتلي رسالة صوتية على تيليجرام ✈</span>
+                    <button class="btn" id="composerBtn">✎ رتّبهالي</button>
+                  </div>
+                  <div id="composerResult"></div>
+                </div>
               </div>
             </div>
-            <div id="analysis" class="analysis-result hidden"></div>
-          </div>
-          <h2 class="section-title">يومياتك</h2>
-          <div id="entries" class="entries"><p class="muted center">بحمّل اليوميات...</p></div>
-        </section>
 
-        <!-- ========== الماليات ========== -->
-        <section class="tab-panel hidden" data-panel="finance">
-          <div class="fin-summary" id="finSummary"></div>
-          <div class="duo-grid">
-            <div class="panel">
-              <div class="panel-head"><h2>الدخل مقابل الصرف</h2><span class="muted" id="finRangeLabel">آخر ١٤ يوم</span></div>
-              <canvas id="finChart" class="fin-chart" width="900" height="240"></canvas>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+              <h2 class="section-title" style="margin:0">العوالم الأربعة</h2>
+              <span class="muted" style="font-size:var(--text-sm)">اضغط أي عالم تشوف تفاصيله</span>
             </div>
-            <div class="panel">
-              <div class="panel-head"><h2>صرفت في إيه؟</h2><span class="muted">آخر ٣٠ يوم</span></div>
-              <div id="catBreakdown" class="cat-breakdown"></div>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><h2>إضافة عملية</h2></div>
-            <form id="finForm" class="inline-form">
-              <select id="finDir" class="select">
-                <option value="expense">صرف ➖</option>
-                <option value="income">دخل ➕</option>
-              </select>
-              <input id="finAmount" class="select gf" type="number" placeholder="المبلغ" required />
-              <select id="finCategory" class="select"></select>
-              <input id="finNote" class="select gf" placeholder="ملاحظة (غدا مع أصحابي...)" />
-              <button type="submit" class="primary-btn">إضافة</button>
-            </form>
-          </div>
-          <h2 class="section-title">العمليات</h2>
-          <div id="finList" class="list"></div>
-        </section>
+            <div class="world-grid" id="worldGrid" style="margin-bottom:30px"></div>
 
-        <!-- ========== الصحة والنفسية ========== -->
-        <section class="tab-panel hidden" data-panel="health">
-          <div class="panel report-panel">
-            <div class="panel-head">
-              <h2>📋 التقرير الشامل</h2>
-              <div class="analyze-controls">
-                <select id="reportDays" class="select">
+            <h2 class="section-title">آخر ما دوّنته</h2>
+            <div class="list" id="recentFeed"></div>
+          </section>
+
+          <!-- ========== الصحة ========== -->
+          <section class="tab-panel hidden" data-panel="health">
+            <div class="page-head">
+              <div>
+                <span class="world-pill health">عالم الصحة</span>
+                <h1>جسمك بيحكيلك</h1>
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                <select id="reportDays" class="field">
                   <option value="7">آخر ٧ أيام</option>
                   <option value="14">آخر ١٤ يوم</option>
                   <option value="30" selected>آخر شهر</option>
                   <option value="90">آخر ٣ شهور</option>
                 </select>
-                <button id="reportBtn" class="primary-btn">طلّع التقرير</button>
+                <button id="reportBtn" class="btn health sm">📋 التقرير الشامل</button>
               </div>
             </div>
-            <p class="muted">تقرير واحد من كل كلامك: نفسيتك ومزاجك، صحتك وأدويتك، عاداتك وأهدافك، وفلوسك.</p>
-            <div id="reportResult" class="analysis-result hidden"></div>
-          </div>
 
-          <div class="panel">
-            <div class="panel-head">
-              <h2>صحتك على الجسم</h2>
-              <div class="day-nav">
-                <button id="dayPrev" class="ghost-btn sm" title="اليوم اللي قبله">‹</button>
-                <span id="dayLabel" class="day-label">—</span>
-                <button id="dayNext" class="ghost-btn sm" title="اليوم اللي بعده">›</button>
-              </div>
-            </div>
-            <div class="bodymap">
-              <div class="body-wrap">
-                <svg id="bodySvg" viewBox="0 0 200 360" class="body-svg" aria-label="جسم الإنسان">
-                  <circle class="bodypart" data-region="راس" cx="100" cy="32" r="24" />
-                  <rect class="body-neutral" x="92" y="54" width="16" height="12" rx="4" />
-                  <rect class="bodypart" data-region="صدر" x="62" y="66" width="76" height="50" rx="14" />
-                  <rect class="bodypart" data-region="معدة" x="66" y="118" width="68" height="38" rx="10" />
-                  <rect class="bodypart" data-region="بطن" x="68" y="158" width="64" height="40" rx="10" />
-                  <rect class="bodypart" data-region="ذراعين" x="38" y="70" width="18" height="106" rx="9" />
-                  <rect class="bodypart" data-region="ذراعين" x="144" y="70" width="18" height="106" rx="9" />
-                  <rect class="bodypart" data-region="ساقين" x="72" y="202" width="24" height="146" rx="11" />
-                  <rect class="bodypart" data-region="ساقين" x="104" y="202" width="24" height="146" rx="11" />
-                  <g id="bodyBadges"></g>
-                </svg>
-              </div>
-              <div class="health-side">
-                <div id="generalChips" class="general-chips"></div>
-                <div id="healthList" class="list"></div>
-              </div>
-            </div>
-          </div>
+            <div id="reportResult" class="analysis-result hidden" style="margin:0 0 20px"></div>
 
-          <div class="panel">
-            <div class="panel-head"><h2>🧠 مزاجك عبر الأيام</h2><span class="muted">آخر ١٤ يوم</span></div>
-            <canvas id="moodChart" class="fin-chart" width="900" height="180"></canvas>
-            <div id="mentalList" class="list" style="margin-top:14px"></div>
-          </div>
+            <div class="stat-grid" id="healthStats" style="margin-bottom:20px"></div>
 
-          <div class="panel">
-            <div class="panel-head"><h2>🍽️ الأكل</h2>
-              <div class="day-nav">
-                <button id="mealPrev" class="ghost-btn sm" title="اليوم اللي قبله">‹</button>
-                <span id="mealDayLabel" class="day-label">—</span>
-                <button id="mealNext" class="ghost-btn sm" title="اليوم اللي بعده">›</button>
-              </div>
-            </div>
-            <div id="meals" class="list"></div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-head"><h2>متابعة الحالات + تقرير الطبيب</h2></div>
-            <p class="muted">قول للبوت «عندي ارتجاع مريئي وعايز أتابع حالتي» وهيفتحلك متابعة، يجمّع الأعراض، وتطلّع تقرير جاهز للدكتور.</p>
-            <div id="conditions" class="conditions"></div>
-          </div>
-        </section>
-
-        <!-- ========== الأهداف والعادات ========== -->
-        <section class="tab-panel hidden" data-panel="goalshabits">
-          <h2 class="section-title">🎯 الأهداف</h2>
-          <div class="panel">
-            <div class="panel-head"><h2>أضف هدف</h2></div>
-            <form id="goalForm" class="inline-form">
-              <input id="goalTitle" class="select gf" placeholder="اسم الهدف (أوصل ٥٠٠ ألف)" required />
-              <input id="goalTarget" class="select gf" type="number" placeholder="الرقم المستهدف" />
-              <input id="goalUnit" class="select gf" placeholder="الوحدة (جنيه)" />
-              <button type="submit" class="primary-btn">إضافة</button>
-            </form>
-            <p class="muted" style="margin-top:10px">أو قول للبوت «عايز أوصل ٥٠٠ ألف» وكل ما تتقدّم قوله «عملت ٥ آلاف النهاردة».</p>
-          </div>
-          <div id="goals" class="goals-grid"></div>
-
-          <h2 class="section-title">🔁 العادات</h2>
-          <div class="panel">
-            <div class="panel-head"><h2>أضف عادة</h2></div>
-            <form id="habitForm" class="inline-form">
-              <input id="habitTitle" class="select gf" placeholder="اسم العادة (رياضة، قراءة...)" required />
-              <select id="habitKind" class="select">
-                <option value="do">عادة أعملها 🔁</option>
-                <option value="quit">عادة أبطّلها 🚭</option>
-              </select>
-              <button type="submit" class="primary-btn">إضافة</button>
-            </form>
-            <p class="muted" style="margin-top:10px">أو قول للبوت «بلعب رياضة كل يوم» وكل ما تعملها قوله وهيعلّمها لوحده.</p>
-          </div>
-          <div id="habits" class="habits-grid"></div>
-        </section>
-
-        <!-- ========== المهام والتقويم ========== -->
-        <section class="tab-panel hidden" data-panel="tasks">
-          <div class="duo-grid">
-            <div class="panel">
-              <div class="panel-head">
-                <h2 id="calTitle">التقويم</h2>
-                <div class="day-nav">
-                  <button id="calPrev" class="ghost-btn sm" title="الشهر اللي فات">‹</button>
-                  <button id="calToday" class="ghost-btn sm">النهاردة</button>
-                  <button id="calNext" class="ghost-btn sm" title="الشهر الجاي">›</button>
+            <div class="grid-2-side">
+              <div class="stack">
+                <div class="card">
+                  <div class="card-head"><h3>مزاجك آخر أسبوع</h3><span class="badge health"><span class="dot"></span>من يومياتك</span></div>
+                  <div id="moodChart"></div>
+                </div>
+                <div class="card">
+                  <div class="card-head"><h3>أعراض دوّنتها</h3><span class="muted" style="font-size:var(--text-sm)">آخر ٣٠ يوم</span></div>
+                  <div id="symptomChips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+                </div>
+                <div class="card">
+                  <div class="card-head">
+                    <h3>صحتك على الجسم</h3>
+                    <div class="day-nav">
+                      <button id="dayPrev" class="btn ghost sm">‹</button>
+                      <span id="dayLabel" class="day-label">—</span>
+                      <button id="dayNext" class="btn ghost sm">›</button>
+                    </div>
+                  </div>
+                  <div class="bodymap">
+                    <div>
+                      <svg id="bodySvg" viewBox="0 0 200 360" class="body-svg" aria-label="جسم الإنسان">
+                        <circle class="bodypart" data-region="راس" cx="100" cy="32" r="24" />
+                        <rect class="body-neutral" x="92" y="54" width="16" height="12" rx="4" />
+                        <rect class="bodypart" data-region="صدر" x="62" y="66" width="76" height="50" rx="14" />
+                        <rect class="bodypart" data-region="معدة" x="66" y="118" width="68" height="38" rx="10" />
+                        <rect class="bodypart" data-region="بطن" x="68" y="158" width="64" height="40" rx="10" />
+                        <rect class="bodypart" data-region="ذراعين" x="38" y="70" width="18" height="106" rx="9" />
+                        <rect class="bodypart" data-region="ذراعين" x="144" y="70" width="18" height="106" rx="9" />
+                        <rect class="bodypart" data-region="ساقين" x="72" y="202" width="24" height="146" rx="11" />
+                        <rect class="bodypart" data-region="ساقين" x="104" y="202" width="24" height="146" rx="11" />
+                        <g id="bodyBadges"></g>
+                      </svg>
+                    </div>
+                    <div>
+                      <div id="generalChips" class="general-chips"></div>
+                      <div id="healthList" class="list"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-head">
+                    <h3>🍽️ الأكل</h3>
+                    <div class="day-nav">
+                      <button id="mealPrev" class="btn ghost sm">‹</button>
+                      <span id="mealDayLabel" class="day-label">—</span>
+                      <button id="mealNext" class="btn ghost sm">›</button>
+                    </div>
+                  </div>
+                  <div id="meals" class="list"></div>
                 </div>
               </div>
-              <div class="cal-weekdays" id="calWeekdays"></div>
-              <div class="cal-grid" id="calGrid"></div>
-            </div>
-            <div class="panel">
-              <div class="panel-head"><h2 id="dayTasksTitle">مهام اليوم</h2></div>
-              <form id="taskForm" class="task-form">
-                <input id="taskTitle" class="select gf" placeholder="مهمة جديدة..." required />
-                <div class="task-form-row">
-                  <input id="taskTime" class="select" type="time" />
-                  <button type="submit" class="primary-btn">إضافة</button>
+
+              <div class="stack">
+                <div class="sketch-box" style="background:var(--health-wash);border-color:var(--health);padding:24px;display:flex;flex-direction:column;align-items:center;gap:10px">
+                  <img src="/assets/illustrations/world-health.svg" alt="عالم الصحة" style="width:150px;height:150px" />
                 </div>
+                <div class="card">
+                  <div class="card-head"><h3>تقرير الدكتور</h3></div>
+                  <div id="healthTimeline" class="tl-rows"></div>
+                </div>
+                <div class="card">
+                  <div class="card-head"><h3>متابعة الحالات</h3></div>
+                  <p class="muted" style="font-size:var(--text-sm);margin:0 0 12px">قول للبوت «عندي ارتجاع وعايز أتابع حالتي» وهيجمّع الأعراض ويطلّع تقرير للدكتور.</p>
+                  <div id="conditions"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ========== العادات ========== -->
+          <section class="tab-panel hidden" data-panel="habits">
+            <div class="page-head">
+              <div>
+                <span class="world-pill habits">عالم العادات</span>
+                <h1>كل يوم بتكمّل، النار بتكبر</h1>
+              </div>
+            </div>
+
+            <div class="grid-2-equal">
+              <div class="stack">
+                <div class="card sketch" id="streakPanel"></div>
+                <div class="card">
+                  <div class="card-head"><h3>آخر ٨ أسابيع</h3></div>
+                  <div id="habitHeatmap"></div>
+                </div>
+              </div>
+              <div class="stack">
+                <div class="card">
+                  <div class="card-head"><h3>عادة جديدة</h3></div>
+                  <form id="habitForm" class="inline-form">
+                    <input id="habitTitle" class="field grow" placeholder="اسم العادة (رياضة، قراءة...)" required />
+                    <select id="habitKind" class="field">
+                      <option value="do">أعملها 🔁</option>
+                      <option value="quit">أبطّلها 🚭</option>
+                    </select>
+                    <button type="submit" class="btn habits sm">＋ إضافة</button>
+                  </form>
+                </div>
+                <div id="habitRows" class="stack" style="gap:12px"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ========== الأهداف ========== -->
+          <section class="tab-panel hidden" data-panel="goals">
+            <div class="page-head">
+              <div>
+                <span class="world-pill goals">عالم الأهداف</span>
+                <h1>قرّبت على القمة</h1>
+              </div>
+            </div>
+
+            <div class="card sketch" style="margin-bottom:20px">
+              <div class="card-head"><h3>هدف جديد</h3></div>
+              <form id="goalForm" class="inline-form">
+                <input id="goalTitle" class="field grow" placeholder="اسم الهدف (أوصل ٥٠٠ ألف)" required />
+                <input id="goalTarget" class="field" type="number" placeholder="المستهدف" style="width:120px" />
+                <input id="goalUnit" class="field" placeholder="الوحدة" style="width:100px" />
+                <button type="submit" class="btn goals sm">＋ إضافة</button>
               </form>
-              <div id="dayTasks" class="list"></div>
+              <p class="muted" style="font-size:var(--text-sm);margin:10px 0 0">أو قول للبوت «عايز أوصل ٥٠٠ ألف» وكل ما تتقدّم قوله «عملت ٥ آلاف».</p>
             </div>
-          </div>
-          <p class="muted center">قول للبوت «عندي ميتنج بكرة الساعة ٥» وهتلاقيها هنا في التقويم، وهيفكّرك في معادها ⏰</p>
-        </section>
 
-        <!-- ========== المحادثات ========== -->
-        <section class="tab-panel hidden" data-panel="chats">
-          <h2 class="section-title">سجل المحادثات</h2>
-          <p class="muted">كل رسالة بعتّها ورد دوّنلي عليها — دي ذاكرة الـ agent.</p>
-          <div id="chats" class="chats"></div>
-        </section>
+            <div class="ring-grid" id="ringGrid"></div>
+          </section>
 
-        <!-- ========== تكلفة الـAI ========== -->
-        <section class="tab-panel hidden" data-panel="usage">
-          <div class="fin-summary" id="usageSummary"></div>
-          <div class="panel">
-            <div class="panel-head"><h2>التكلفة اليومية</h2><span class="muted" id="usageRangeLabel">آخر ٣٠ يوم</span></div>
-            <canvas id="usageChart" class="fin-chart" width="900" height="240"></canvas>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><h2>التفصيل حسب العملية</h2></div>
-            <div id="usageBreakdown" class="list"></div>
-          </div>
-          <p class="muted center" id="usageNote"></p>
-        </section>
-      </main>
+          <!-- ========== الفلوس ========== -->
+          <section class="tab-panel hidden" data-panel="finances">
+            <div class="page-head">
+              <div>
+                <span class="world-pill finances">عالم الفلوس</span>
+                <h1>نبتتك بتكبر 🌱</h1>
+              </div>
+            </div>
+
+            <div class="stat-grid" id="finStats" style="margin-bottom:20px"></div>
+
+            <div class="grid-2-side">
+              <div class="stack">
+                <div class="card">
+                  <div class="card-head"><h3>مصاريف الأسبوع</h3></div>
+                  <div id="finBarsWrap"><canvas id="finBars"></canvas></div>
+                </div>
+                <div class="card">
+                  <div class="card-head"><h3>على إيه بتصرف</h3><span class="muted" style="font-size:var(--text-sm)">آخر ٣٠ يوم</span></div>
+                  <div id="catBars" class="cat-bars"></div>
+                </div>
+                <div class="card">
+                  <div class="card-head"><h3>عملية جديدة</h3></div>
+                  <form id="finForm" class="inline-form">
+                    <select id="finDir" class="field">
+                      <option value="expense">صرف ➖</option>
+                      <option value="income">دخل ➕</option>
+                    </select>
+                    <input id="finAmount" class="field" type="number" placeholder="المبلغ" required style="width:110px" />
+                    <select id="finCategory" class="field"></select>
+                    <input id="finNote" class="field grow" placeholder="ملاحظة" />
+                    <button type="submit" class="btn finances sm">＋ إضافة</button>
+                  </form>
+                </div>
+                <div class="card">
+                  <div class="card-head"><h3>كل العمليات</h3></div>
+                  <div id="finList" class="list"></div>
+                </div>
+              </div>
+              <div class="stack">
+                <div class="sketch-box alt" style="background:var(--finances-wash);border-color:var(--finances);padding:24px;display:flex;flex-direction:column;align-items:center;gap:10px">
+                  <img src="/assets/illustrations/world-finances.svg" alt="عالم الفلوس" style="width:150px;height:150px" />
+                  <span style="font-family:var(--font-display);font-weight:700;color:var(--finances-deep)">مدّخراتك بتكبر</span>
+                </div>
+                <div class="card">
+                  <div class="card-head"><h3>آخر حركات</h3></div>
+                  <div id="finTx" class="tl-rows"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ========== اليوميات ========== -->
+          <section class="tab-panel hidden" data-panel="journal">
+            <div class="page-head">
+              <div>
+                <span class="world-pill">دفترك</span>
+                <h1>يومياتك</h1>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center">
+                <select id="days" class="field">
+                  <option value="7">آخر ٧ أيام</option>
+                  <option value="14">آخر ١٤ يوم</option>
+                  <option value="30">آخر شهر</option>
+                </select>
+                <button id="analyzeBtn" class="btn sm">✨ حلّلي أيامي</button>
+              </div>
+            </div>
+            <div id="analysis" class="analysis-result hidden" style="margin:0 0 20px"></div>
+            <div id="entries" class="entries"></div>
+          </section>
+
+          <!-- ========== المهام والتقويم ========== -->
+          <section class="tab-panel hidden" data-panel="tasks">
+            <div class="page-head">
+              <div>
+                <span class="world-pill goals">دفترك</span>
+                <h1>المهام والتقويم</h1>
+              </div>
+            </div>
+            <div class="grid-2-equal">
+              <div class="card">
+                <div class="card-head">
+                  <h3 id="calTitle">التقويم</h3>
+                  <div class="day-nav">
+                    <button id="calPrev" class="btn ghost sm">‹</button>
+                    <button id="calToday" class="btn ghost sm">النهاردة</button>
+                    <button id="calNext" class="btn ghost sm">›</button>
+                  </div>
+                </div>
+                <div class="cal-weekdays" id="calWeekdays"></div>
+                <div class="cal-grid" id="calGrid"></div>
+              </div>
+              <div class="card">
+                <div class="card-head"><h3 id="dayTasksTitle">مهام اليوم</h3></div>
+                <form id="taskForm" class="task-form">
+                  <input id="taskTitle" class="field" placeholder="مهمة جديدة…" required />
+                  <div class="task-form-row">
+                    <input id="taskTime" class="field" type="time" />
+                    <button type="submit" class="btn goals sm">＋ إضافة</button>
+                  </div>
+                </form>
+                <div id="dayTasks" class="list"></div>
+              </div>
+            </div>
+            <p class="muted center" style="margin-top:18px;font-size:var(--text-sm)">قول للبوت «عندي ميتنج بكرة الساعة ٥» وهتلاقيها هنا، وهيفكّرك في معادها ⏰</p>
+          </section>
+
+          <!-- ========== المحادثات ========== -->
+          <section class="tab-panel hidden" data-panel="chats">
+            <div class="page-head">
+              <div>
+                <span class="world-pill">دفترك</span>
+                <h1>المحادثات</h1>
+              </div>
+            </div>
+            <p class="muted" style="margin:0 0 16px">كل اللي قلته لدوّنلي ورد عليه — دي ذاكرته معاك.</p>
+            <div id="chats" class="chats"></div>
+          </section>
+
+          <!-- ========== تكلفة الـAI ========== -->
+          <section class="tab-panel hidden" data-panel="usage">
+            <div class="page-head">
+              <div>
+                <span class="world-pill">دفترك</span>
+                <h1>تكلفة الـAI</h1>
+              </div>
+            </div>
+            <div class="usage-cards" id="usageSummary" style="margin-bottom:20px"></div>
+            <div class="card" style="margin-bottom:20px">
+              <div class="card-head"><h3>التكلفة اليومية</h3><span class="muted" style="font-size:var(--text-sm)">آخر ٣٠ يوم</span></div>
+              <div id="usageChartWrap"><canvas id="usageChart"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>التفصيل حسب العملية</h3></div>
+              <div id="usageBreakdown" class="list"></div>
+            </div>
+            <p class="muted center" id="usageNote" style="margin-top:14px;font-size:var(--text-sm)"></p>
+          </section>
+        </main>
+      </div>
     </div>
-
-    <div id="sideScrim" class="side-scrim hidden"></div>
 
     <div id="confirmOverlay" class="modal-overlay hidden">
       <div class="modal" role="dialog" aria-modal="true">
@@ -321,8 +413,8 @@
         <h3 class="modal-title">متأكد إنك عايز تمسحها؟</h3>
         <p class="modal-text">مش هتقدر ترجّعها بعد كده.</p>
         <div class="modal-actions">
-          <button id="confirmCancel" class="ghost-btn">إلغاء</button>
-          <button id="confirmOk" class="danger-btn">امسح</button>
+          <button id="confirmCancel" class="btn secondary">إلغاء</button>
+          <button id="confirmOk" class="btn danger">امسح</button>
         </div>
       </div>
     </div>
