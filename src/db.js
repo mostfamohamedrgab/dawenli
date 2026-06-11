@@ -1,11 +1,17 @@
-import { DatabaseSync } from "node:sqlite";
+import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { config } from "./config.js";
 
 mkdirSync(dirname(config.dbPath), { recursive: true });
 
-const db = new DatabaseSync(config.dbPath);
+const db = new Database(config.dbPath);
+// إعدادات إنتاج: WAL = قراءة وكتابة بالتوازي من غير قفل، busy_timeout يمنع
+// أخطاء القفل اللحظي، synchronous=NORMAL توازن أمان/سرعة كويس مع WAL.
+db.pragma("journal_mode = WAL");
+db.pragma("busy_timeout = 5000");
+db.pragma("synchronous = NORMAL");
+db.pragma("foreign_keys = ON");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (

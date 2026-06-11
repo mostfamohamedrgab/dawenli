@@ -4,13 +4,13 @@
     {
       "name": "dawenli",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["--experimental-sqlite", "src/index.js"],
+      "runtimeArgs": ["src/index.js"],
       "autoPort": true
     },
     {
       "name": "dawenli-preview",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["--experimental-sqlite", "src/preview-server.js"],
+      "runtimeArgs": ["src/preview-server.js"],
       "port": 3000
     }
   ]
