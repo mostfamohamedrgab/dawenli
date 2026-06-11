@@ -1243,19 +1243,33 @@ select.field { cursor: pointer; }
   .tabbar-btn.finances[data-active="true"]         { color: var(--finances-deep); }
   .tabbar-btn.finances[data-active="true"] .tb-ico { background: var(--finances-wash); }
 
-  /* ===== تصغير العناصر على الموبايل — تبقى مريحة مش ضخمة ===== */
-  .page-head { margin-bottom: 16px; }
-  .page-head h1 { font-size: clamp(20px, 6vw, 25px); line-height: 1.25; }
-  .page-head .ph-sub { font-size: var(--text-sm); line-height: 1.55; }
-  .section-title { font-size: clamp(18px, 5.4vw, 22px); }
-  .world-pill { font-size: var(--text-xs); padding: 3px 11px; margin-bottom: 8px; }
-  .card { padding: 16px; }
-  .card-head { margin-bottom: 12px; }
-  .stat-card { padding: 14px; }
-  .stat-card .sc-value b { font-size: 1.6rem; }
-  .stat-card .sc-ico { width: 32px; height: 32px; font-size: 15px; }
-  .composer { padding: 14px; }
-  .streak-head b { font-size: 1.6rem; }
+  /* ===== إحكام الموبايل — أصغر وأقل اسكرول ===== */
+  .dw-main { padding: 14px 14px calc(84px + env(safe-area-inset-bottom)); }
+  .page-head { margin-bottom: 12px; }
+  .page-head h1 { font-size: clamp(19px, 5.4vw, 23px); line-height: 1.25; }
+  .page-head .ph-sub { font-size: var(--text-sm); line-height: 1.5; margin-top: 2px; }
+  .section-title { font-size: clamp(17px, 4.8vw, 20px); margin: 2px 0 10px; }
+  .world-pill { font-size: var(--text-xs); padding: 3px 10px; margin-bottom: 6px; }
+  .card { padding: 14px; }
+  .card-head { margin-bottom: 10px; }
+  .card-head h3 { font-size: var(--text-h4); }
+  .stat-grid { gap: 10px; }
+  .stat-card { padding: 12px; }
+  .stat-card .sc-top { margin-bottom: 6px; }
+  .stat-card .sc-value b { font-size: 1.5rem; }
+  .stat-card .sc-ico { width: 30px; height: 30px; font-size: 14px; }
+  /* العوالم الأربعة: شبكة 2×2 بدل عمود واحد — بتقصّر الاسكرول كتير */
+  .world-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px !important; }
+  .world-card .wc-art { min-height: 78px; padding: 10px; }
+  .world-card .wc-art img { width: 62px; height: 62px; }
+  .world-card .wc-body { padding: 10px 12px 12px; }
+  .world-card .wc-tag { font-size: var(--text-xs); padding: 2px 8px; margin-bottom: 5px; }
+  .world-card .wc-metric { font-size: var(--text-lg); }
+  .world-card .wc-caption { font-size: var(--text-xs); line-height: 1.4; }
+  .composer { padding: 13px; margin-bottom: 16px !important; }
+  .stack { gap: 14px; }
+  .list { gap: 8px; }
+  .streak-head b { font-size: 1.5rem; }
 }
 
 /* ===========================================================================
