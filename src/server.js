@@ -333,7 +333,8 @@ export function startServer() {
   );
 
   app.get("/", (req, res) => {
-    if (!sessionUser(req)) return res.redirect("/login");
+    // الزائر الجديد يشوف صفحة الهبوط (وفيها «نزّل التطبيق») أول حاجة؛ المسجّل يدخل الداشبورد.
+    if (!sessionUser(req)) return res.redirect("/landing");
     res.sendFile(join(publicDir, "index.html"));
   });
 
