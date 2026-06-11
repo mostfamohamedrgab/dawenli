@@ -210,7 +210,7 @@ function fmtRecTime(ms) {
 }
 async function startRecording() {
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-    $("composerResult").innerHTML = `<div class="comp-reply">متصفحك مش بيدعم التسجيل — اكتب أو ابعت صوت على تيليجرام 🙏</div>`;
+    $("composerResult").innerHTML = `<div class="comp-reply">متصفحك مش بيدعم التسجيل الصوتي — اكتب عن يومك في الخانة فوق وأنا أرتّبه 🙏</div>`;
     return;
   }
   let stream;
@@ -277,20 +277,6 @@ $("micBtn").addEventListener("click", startRecording);
 $("recStop").addEventListener("click", stopRecording);
 $("recCancel").addEventListener("click", cancelRecording);
 
-/* ===================== ربط تيليجرام ===================== */
-async function linkTelegram() {
-  try {
-    const res = await api("/api/link-telegram", { method: "POST" });
-    const data = await res.json();
-    if (data.linked) { $("tgBanner").classList.add("hidden"); return; }
-    window.open(data.url, "_blank");
-    $("tgBannerText").textContent = "فتحنالك البوت — دوس Start هناك وارجع هنا ودوس تحديث ✌️";
-    $("tgRefreshBtn").classList.remove("hidden");
-  } catch {}
-}
-$("tgLinkBtn").addEventListener("click", linkTelegram);
-$("tgRefreshBtn").addEventListener("click", () => window.location.reload());
-
 /* ===================== النظرة العامة ===================== */
 function computeStreak(entries) {
   const days = new Set(entries.map((e) => e.entry_date));
@@ -326,7 +312,7 @@ function renderProfile() {
   if (!el) return;
   const data = state.profile || [];
   if (!data.length) {
-    el.innerHTML = `<p class="muted" style="font-size:var(--text-sm)">لسه فاضية — كل ما تحكي للبوت حاجة ثابتة عنك (بدرس إيه، عندك مرض مزمن...) هيفتكرها هنا. أو ضيفها بنفسك بزرار «معلومة».</p>`;
+    el.innerHTML = `<p class="muted" style="font-size:var(--text-sm)">لسه فاضية — كل ما تحكي لدوّنلي حاجة ثابتة عنك (بدرس إيه، عندك مرض مزمن...) هيفتكرها هنا. أو ضيفها بنفسك بزرار «معلومة».</p>`;
     return;
   }
   const byCat = {};
@@ -387,17 +373,17 @@ function renderOverview() {
     {
       w: "habits", title: "العادات",
       metric: bestHabit ? `ستريك ${arNum(bestHabit.streak)} ${bestHabit.streak === 1 ? "يوم" : "أيام"} 🔥` : "ابدأ عادة",
-      caption: bestHabit ? `${bestHabit.title} · ${arNum(habitsDone)}/${arNum(state.habits.length)} النهاردة` : "قول للبوت «بلعب رياضة كل يوم»",
+      caption: bestHabit ? `${bestHabit.title} · ${arNum(habitsDone)}/${arNum(state.habits.length)} النهاردة` : "قول لدوّنلي «بلعب رياضة كل يوم»",
     },
     {
       w: "goals", title: "الأهداف",
       metric: topGoal && topGoal.target ? `${arNum(Math.min(100, Math.round((topGoal.current / topGoal.target) * 100)))}٪ من هدفك` : (topGoal ? topGoal.title : "حدّد هدف"),
-      caption: topGoal ? topGoal.title : "قول للبوت «عايز أوصل…»",
+      caption: topGoal ? topGoal.title : "قول لدوّنلي «عايز أوصل…»",
     },
     {
       w: "finances", title: "الفلوس",
       metric: monthFin.length ? `${mIncome - mExpense >= 0 ? "صافي +" : "صافي -"}${arNum(Math.abs(mIncome - mExpense))}` : "سجّل أول عملية",
-      caption: monthFin.length ? `دخل ${arNum(mIncome)} · صرف ${arNum(mExpense)} الشهر ده` : "قول للبوت «صرفت ٢٠٠ على أكل»",
+      caption: monthFin.length ? `دخل ${arNum(mIncome)} · صرف ${arNum(mExpense)} الشهر ده` : "قول لدوّنلي «صرفت ٢٠٠ على أكل»",
     },
   ];
   $("worldGrid").innerHTML = worlds.map((x) => `
@@ -432,7 +418,7 @@ function renderFeed() {
         </div>
         <div class="lr-chips">${x.chips.map((c) => `<span class="chip ${c.c}">${escapeHtml(c.t)}</span>`).join("")}</div>
       </div>`).join("")
-    : emptyState("لسه ما دوّنتش حاجة هنا", "ابعتلي رسالة على تيليجرام أو اكتب فوق وأنا هبدأ أرتّبلك.");
+    : emptyState("لسه ما دوّنتش حاجة هنا", "سجّل صوتك أو اكتب فوق عن يومك وأنا هبدأ أرتّبلك.");
 }
 
 /* ===================== الصحة ===================== */
@@ -560,7 +546,7 @@ function renderBodyMap() {
   const listEl = $("healthList");
   const shown = pageFilter ? items.filter((h) => (h.body_region || "عام") === pageFilter) : items;
   if (!items.length) {
-    listEl.innerHTML = `<div class="empty sm">${DOODLE}<p>مفيش حاجات صحية في اليوم ده. قول للبوت «جريت ١٠ دقايق» أو «أخدت العلاج».</p></div>`;
+    listEl.innerHTML = `<div class="empty sm">${DOODLE}<p>مفيش حاجات صحية في اليوم ده. قول لدوّنلي «جريت ١٠ دقايق» أو «أخدت العلاج».</p></div>`;
     return;
   }
   listEl.innerHTML =
@@ -690,7 +676,7 @@ function renderHabitsPage() {
           </div>`).join("")}
       </div>`;
   } else {
-    $("streakPanel").innerHTML = emptyState("لسه مفيش عادات", "ضيف عادة جنب، أو قول للبوت «بلعب رياضة كل يوم».");
+    $("streakPanel").innerHTML = emptyState("لسه مفيش عادات", "ضيف عادة جنب، أو قول لدوّنلي «بلعب رياضة كل يوم».");
   }
 
   // هيت ماب ٨ أسابيع: كل الأيام اللي اتعملت فيها أي عادة
@@ -782,7 +768,7 @@ function renderGoalsPage() {
   const el = $("ringGrid");
   const data = state.goals;
   if (!data.length) {
-    el.innerHTML = emptyState("لسه مفيش أهداف", "ضيف هدف فوق، أو قول للبوت «هدفي أوصل ٥٠٠ ألف».");
+    el.innerHTML = emptyState("لسه مفيش أهداف", "ضيف هدف فوق، أو قول لدوّنلي «هدفي أوصل ٥٠٠ ألف».");
     return;
   }
   el.innerHTML = data.map((g) => {
@@ -869,7 +855,7 @@ function renderFinancesPage() {
           <div class="cb-track"><div class="cb-fill" style="width:${pct}%"></div></div>
         </div>`;
       }).join("")
-    : `<span class="muted" style="font-size:var(--text-sm)">قول للبوت «صرفت ٢٠٠ على أكل» وهيتصنّف هنا لوحده.</span>`;
+    : `<span class="muted" style="font-size:var(--text-sm)">قول لدوّنلي «صرفت ٢٠٠ على أكل» وهيتصنّف هنا لوحده.</span>`;
 
   // آخر حركات
   $("finTx").innerHTML = data.slice(0, 5).map((f) => `
@@ -892,7 +878,7 @@ function renderFinancesPage() {
           <button class="icon-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
         </div>
       </div>`).join("")
-    : emptyState("مفيش عمليات لسه", "قول للبوت «صرفت ٢٠٠ على أكل» أو ضيف عملية فوق.");
+    : emptyState("مفيش عمليات لسه", "قول لدوّنلي «صرفت ٢٠٠ على أكل» أو ضيف عملية فوق.");
 }
 $("finForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -997,7 +983,7 @@ function renderJournal() {
   const el = $("entries");
   const data = state.journal;
   if (!data.length) {
-    el.innerHTML = emptyState("لسه ما دوّنتش حاجة", "ابعت voice أو اكتب للبوت على تيليجرام عن يومك.");
+    el.innerHTML = emptyState("لسه ما دوّنتش حاجة", "سجّل صوتك أو اكتب عن يومك وأنا أرتّبه.");
     return;
   }
   el.innerHTML = data.map((e) => {
@@ -1144,7 +1130,7 @@ const KIND_LABEL = { voice: "🎙️ صوت", text: "⌨️ كتابة", command
 function renderChats() {
   const el = $("chats");
   const data = state.conversations;
-  if (!data.length) { el.innerHTML = emptyState("لسه مفيش محادثات", "أول ما تكلم البوت هتلاقي كل حاجة هنا."); return; }
+  if (!data.length) { el.innerHTML = emptyState("لسه مفيش محادثات", "أول ما تحكي لدوّنلي هتلاقي كل حاجة هنا."); return; }
   el.innerHTML = data.slice(0, 60).map((c) => `
     <div class="chat-card">
       <div class="chat-head">
@@ -1191,7 +1177,6 @@ async function loadAll(rerender = true) {
   const first = (state.me?.name || "د").trim()[0] || "د";
   $("userAvatar").textContent = first;
   $("userName").textContent = state.me?.name || "صاحب الدفتر";
-  $("tgBanner").classList.toggle("hidden", !!state.me?.hasTelegram);
   fillCategorySelect();
 
   if (!rerender) return;

@@ -245,29 +245,14 @@ const today = localToday;
 
 /* ===================== Users ===================== */
 
-const getUserByChatIdStmt = db.prepare(`SELECT * FROM users WHERE chat_id = ?`);
 const getUserByIdStmt = db.prepare(`SELECT * FROM users WHERE id = ?`);
 const insertUserStmt = db.prepare(
   `INSERT INTO users (created_at, chat_id, name, is_owner, last_seen) VALUES (?, ?, ?, ?, ?)`
 );
-const touchUserStmt = db.prepare(`UPDATE users SET last_seen = ?, name = COALESCE(?, name) WHERE id = ?`);
 const ownerStmt = db.prepare(`SELECT * FROM users WHERE is_owner = 1 ORDER BY id LIMIT 1`);
 
-export function getUserByChatId(chatId) {
-  return getUserByChatIdStmt.get(String(chatId)) || null;
-}
 export function getUserById(id) {
   return getUserByIdStmt.get(Number(id)) || null;
-}
-export function ensureUser(chatId, name) {
-  const existing = getUserByChatId(chatId);
-  if (existing) {
-    touchUserStmt.run(now(), name || null, existing.id);
-    return getUserByIdStmt.get(existing.id);
-  }
-  const isOwner = config.allowedChatId && String(chatId) === config.allowedChatId ? 1 : 0;
-  const info = insertUserStmt.run(now(), String(chatId), name || null, isOwner, now());
-  return getUserByIdStmt.get(Number(info.lastInsertRowid));
 }
 export function ownerUser() {
   return ownerStmt.get() || null;
@@ -275,8 +260,13 @@ export function ownerUser() {
 export function listUsers() {
   return db.prepare(`SELECT * FROM users ORDER BY id`).all();
 }
+// المستخدمين النشطين بس (آخر ظهور خلال N يوم) — للمبادرة (check-in اليومي + التأمّل الأسبوعي)
+export function activeUsers(days = 14) {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  return db.prepare(`SELECT * FROM users WHERE last_seen >= ? ORDER BY id`).all(cutoff);
+}
 
-/* ---- حسابات الإيميل + ربط تيليجرام ---- */
+/* ---- حسابات الإيميل ---- */
 
 const getUserByEmailStmt = db.prepare(`SELECT * FROM users WHERE email = ?`);
 export function getUserByEmail(email) {
@@ -293,32 +283,12 @@ export function createEmailUser({ name, email, passwordHash }) {
   return getUserByIdStmt.get(Number(info.lastInsertRowid));
 }
 
-// بيربط شات تيليجرام بحساب ويب موجود — بيرفض لو الشات مربوط بحساب تاني
-export function linkTelegram(userId, chatId, name) {
-  const existing = getUserByChatId(chatId);
-  if (existing && existing.id !== Number(userId)) return { ok: false, reason: "taken" };
-  db.prepare(`UPDATE users SET chat_id = ?, name = COALESCE(name, ?), last_seen = ? WHERE id = ?`)
-    .run(String(chatId), name || null, now(), Number(userId));
-  return { ok: true, user: getUserByIdStmt.get(Number(userId)) };
-}
-
 // bootstrap: نضمن وجود "صاحب" المنصة ونلحق البيانات القديمة (اللي من قبل multi-user) بيه
 (function bootstrapOwner() {
   let owner = ownerStmt.get();
   if (!owner) {
-    if (config.allowedChatId) {
-      const existing = getUserByChatId(config.allowedChatId);
-      if (existing) {
-        db.prepare(`UPDATE users SET is_owner = 1 WHERE id = ?`).run(existing.id);
-        owner = getUserByIdStmt.get(existing.id);
-      } else {
-        const info = insertUserStmt.run(now(), config.allowedChatId, "Owner", 1, now());
-        owner = getUserByIdStmt.get(Number(info.lastInsertRowid));
-      }
-    } else {
-      const info = insertUserStmt.run(now(), null, "Owner", 1, now());
-      owner = getUserByIdStmt.get(Number(info.lastInsertRowid));
-    }
+    const info = insertUserStmt.run(now(), null, "Owner", 1, now());
+    owner = getUserByIdStmt.get(Number(info.lastInsertRowid));
   }
   for (const t of ["entries", "finance", "health", "conversations", "goals", "conditions", "meals", "habits", "tasks", "ai_usage"]) {
     db.prepare(`UPDATE ${t} SET user_id = ? WHERE user_id IS NULL`).run(owner.id);
@@ -354,7 +324,8 @@ export function getAdminById(id) {
 export function listUsersWithStats() {
   return db
     .prepare(
-      `SELECT u.id, u.name, u.email, u.chat_id, u.last_seen, u.created_at, u.is_owner,
+      `SELECT u.id, u.name, u.email, u.last_seen, u.created_at, u.is_owner,
+         (SELECT COUNT(*) FROM push_subscriptions p WHERE p.user_id = u.id) AS push,
          (SELECT COUNT(*) FROM entries e       WHERE e.user_id  = u.id) AS entries,
          (SELECT COUNT(*) FROM finance f       WHERE f.user_id  = u.id) AS finance,
          (SELECT COUNT(*) FROM health h        WHERE h.user_id  = u.id) AS health,
@@ -374,7 +345,7 @@ export function platformStats() {
   const one = (sql, ...p) => db.prepare(sql).get(...p);
   return {
     users: one(`SELECT COUNT(*) AS n FROM users`).n,
-    with_telegram: one(`SELECT COUNT(*) AS n FROM users WHERE chat_id IS NOT NULL`).n,
+    with_push: one(`SELECT COUNT(DISTINCT user_id) AS n FROM push_subscriptions`).n,
     with_email: one(`SELECT COUNT(*) AS n FROM users WHERE email IS NOT NULL`).n,
     active_14d: one(`SELECT COUNT(*) AS n FROM users WHERE last_seen >= ?`, cutoff).n,
     entries: one(`SELECT COUNT(*) AS n FROM entries`).n,
@@ -716,12 +687,11 @@ export function deleteTask(userId, id) {
   return db.prepare(`DELETE FROM tasks WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
 }
 
-// المهام اللي معادها دلوقتي ومحدش اتفكّر بيها — للتذكير من البوت
+// المهام اللي معادها دلوقتي ومحدش اتفكّر بيها — للتذكير (إشعار داخل التطبيق + موبايل)
 const dueTasksStmt = db.prepare(`
-  SELECT t.*, u.chat_id FROM tasks t JOIN users u ON u.id = t.user_id
+  SELECT t.* FROM tasks t
   WHERE t.status = 'pending' AND t.reminded_at IS NULL
     AND t.due_date = ? AND t.due_time IS NOT NULL AND t.due_time <= ?
-    AND u.chat_id IS NOT NULL
 `);
 export function dueTaskReminders(date, time) {
   return dueTasksStmt.all(date, time);

@@ -60,8 +60,8 @@
         </nav>
 
         <div class="side-tip">
-          <b>✈ دوّن بسرعة</b>
-          <span>ابعتلي صوت أو رسالة على تيليجرام وأنا أرتّبها في عوالمك.</span>
+          <b>🎙️ دوّن بسرعة</b>
+          <span>سجّل صوتك أو اكتب عن يومك وأنا أرتّبه في عوالمك.</span>
         </div>
 
         <div class="side-user">
@@ -105,27 +105,13 @@
               </div>
             </div>
 
-            <div id="tgBanner" class="card sketch hidden" style="margin-bottom:26px;background:var(--brand-wash)">
-              <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-                <span style="font-size:34px">✈</span>
-                <div style="flex:1;min-width:200px">
-                  <h3 style="font:var(--type-h3);font-size:var(--text-h4);margin:0 0 4px">اربط تيليجرام بحسابك</h3>
-                  <p class="muted" style="margin:0;font-size:var(--text-sm)" id="tgBannerText">زرار واحد: هيفتح البوت، دوس Start، وخلاص — تدوّن بالصوت من أي مكان وأنا أرتّب.</p>
-                </div>
-                <div style="display:flex;gap:8px">
-                  <button class="btn sm" id="tgLinkBtn">✈ اربط دلوقتي</button>
-                  <button class="btn secondary sm hidden" id="tgRefreshBtn">اتربطت؟ تحديث ↻</button>
-                </div>
-              </div>
-            </div>
-
             <div class="composer" style="margin-bottom:26px">
               <div style="display:flex;gap:14px;align-items:flex-start">
                 <span style="font-size:20px;color:var(--brand-deep)">✎</span>
                 <div style="flex:1;min-width:0">
                   <textarea id="composerText" rows="2" placeholder="احكيلي عملت إيه النهاردة…"></textarea>
                   <div class="comp-foot">
-                    <span class="comp-hint">اكتب، أو سجّل صوتك من هنا 🎙️ أو ابعتلي على تيليجرام ✈</span>
+                    <span class="comp-hint">اكتب عن يومك، أو سجّل صوتك من هنا 🎙️ وأنا أرتّبه</span>
                     <div style="display:flex;gap:8px;align-items:center">
                       <button class="btn secondary" id="micBtn" title="سجّل صوتك">🎙️ سجّل</button>
                       <button class="btn" id="composerBtn">✎ رتّبهالي</button>
@@ -150,7 +136,7 @@
                 <button class="btn ghost sm" id="profileAddBtn" title="ضيف معلومة">＋ معلومة</button>
               </div>
               <p class="muted" style="font-size:var(--text-sm);margin:-6px 0 14px">
-                أهم الحاجات الثابتة عنك (دراستك، شغلك، أمراضك المزمنة، أدويتك...) — البوت بيفتكرها ويتعامل معاك على أساسها.
+                أهم الحاجات الثابتة عنك (دراستك، شغلك، أمراضك المزمنة، أدويتك...) — دوّنلي بيفتكرها ويتعامل معاك على أساسها.
               </p>
               <form id="profileForm" class="inline-form hidden" style="margin-bottom:14px">
                 <select id="profileCategory" class="field">
@@ -263,7 +249,7 @@
                 </div>
                 <div class="card">
                   <div class="card-head"><h3>متابعة الحالات</h3></div>
-                  <p class="muted" style="font-size:var(--text-sm);margin:0 0 12px">قول للبوت «عندي ارتجاع وعايز أتابع حالتي» وهيجمّع الأعراض ويطلّع تقرير للدكتور.</p>
+                  <p class="muted" style="font-size:var(--text-sm);margin:0 0 12px">قول لدوّنلي «عندي ارتجاع وعايز أتابع حالتي» وهيجمّع الأعراض ويطلّع تقرير للدكتور.</p>
                   <div id="conditions"></div>
                 </div>
               </div>
@@ -321,7 +307,7 @@
                 <input id="goalUnit" class="field" placeholder="الوحدة" style="width:100px" />
                 <button type="submit" class="btn goals sm">＋ إضافة</button>
               </form>
-              <p class="muted" style="font-size:var(--text-sm);margin:10px 0 0">أو قول للبوت «عايز أوصل ٥٠٠ ألف» وكل ما تتقدّم قوله «عملت ٥ آلاف».</p>
+              <p class="muted" style="font-size:var(--text-sm);margin:10px 0 0">أو قول لدوّنلي «عايز أوصل ٥٠٠ ألف» وكل ما تتقدّم قوله «عملت ٥ آلاف».</p>
             </div>
 
             <div class="ring-grid" id="ringGrid"></div>
@@ -432,7 +418,7 @@
                 <div id="dayTasks" class="list"></div>
               </div>
             </div>
-            <p class="muted center" style="margin-top:18px;font-size:var(--text-sm)">قول للبوت «عندي ميتنج بكرة الساعة ٥» وهتلاقيها هنا، وهيفكّرك في معادها ⏰</p>
+            <p class="muted center" style="margin-top:18px;font-size:var(--text-sm)">قول لدوّنلي «عندي ميتنج بكرة الساعة ٥» وهتلاقيها هنا، وهيفكّرك في معادها ⏰</p>
           </section>
 
           <!-- ========== المحادثات ========== -->

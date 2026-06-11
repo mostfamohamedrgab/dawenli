@@ -1,6 +1,6 @@
-import { startBot } from "./bot.js";
 import { startServer } from "./server.js";
+import { startScheduler } from "./scheduler.js";
 
 console.log("✍️  دوّنلي — بيبدأ...");
-startBot();
 startServer();
+startScheduler();

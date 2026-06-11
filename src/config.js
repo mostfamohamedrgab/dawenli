@@ -10,15 +10,7 @@ function required(name) {
 }
 
 export const config = {
-  telegramToken: required("TELEGRAM_BOT_TOKEN"),
-  // اسم البوت من غير @ — لزرار "اربط تيليجرام" في الداشبورد (deep link)
-  botUsername: (process.env.TELEGRAM_BOT_USERNAME || "dawenli_bot").replace(/^@/, ""),
   openaiKey: required("OPENAI_API_KEY"),
-  // لو متحدد: ده "صاحب" المنصة (الأدمن). لو OPEN_SIGNUP=true أي حد يكلم البوت بيتسجل له حساب.
-  allowedChatId: process.env.ALLOWED_CHAT_ID
-    ? String(process.env.ALLOWED_CHAT_ID).trim()
-    : null,
-  openSignup: String(process.env.OPEN_SIGNUP || "").toLowerCase() === "true",
   // موديل كويس للصوت العربي + موديل قوي للـ agent (tool calling)
   transcribeModel: process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-transcribe",
   // مهم: مفيش fallback على OPENAI_CHAT_MODEL القديم — كان بيخلي الـ agent يشتغل

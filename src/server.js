@@ -121,25 +121,6 @@ function sessionAdmin(req) {
   return getAdminById(s.adminId);
 }
 
-/* ===================== أكواد الدخول من البوت ===================== */
-
-const CODE_TTL = 10 * 60 * 1000;
-const loginCodes = new Map(); // code -> { userId, expiresAt }
-
-export function issueLoginCode(userId) {
-  const code = String(crypto.randomInt(100000, 999999));
-  loginCodes.set(code, { userId, expiresAt: Date.now() + CODE_TTL });
-  return code;
-}
-
-function redeemLoginCode(code) {
-  const entry = loginCodes.get(String(code).trim());
-  if (!entry) return null;
-  loginCodes.delete(String(code).trim());
-  if (Date.now() > entry.expiresAt) return null;
-  return entry.userId;
-}
-
 /* ===================== كلمات السر (scrypt — من غير مكتبات) ===================== */
 
 function hashPassword(pw) {
@@ -157,26 +138,6 @@ function verifyPassword(pw, stored) {
   } catch {
     return false;
   }
-}
-
-/* ===================== توكنات ربط تيليجرام =====================
-   المستخدم بيدوس "اربط تيليجرام" في الداشبورد → بنطلّع توكن →
-   لينك t.me/البوت?start=التوكن → البوت بيستقبل /start بالتوكن ويربط الشات. */
-
-const LINK_TTL = 15 * 60 * 1000;
-const linkTokens = new Map(); // token -> { userId, expiresAt }
-
-function issueLinkToken(userId) {
-  const token = "lk" + crypto.randomBytes(8).toString("hex");
-  linkTokens.set(token, { userId, expiresAt: Date.now() + LINK_TTL });
-  return token;
-}
-export function redeemLinkToken(token) {
-  const entry = linkTokens.get(String(token).trim());
-  if (!entry) return null;
-  linkTokens.delete(String(token).trim());
-  if (Date.now() > entry.expiresAt) return null;
-  return entry.userId;
 }
 
 /* ===================== السيرفر ===================== */
@@ -249,15 +210,13 @@ export function startServer() {
     res.setHeader("Set-Cookie", `dawenli_admin=${token}; HttpOnly; SameSite=Strict; Path=/${maxAge}`);
   }
 
-  // دخول المستخدمين الموحّد: إيميل+باسورد أو كود من البوت (مفيش أدمن هنا)
+  // دخول المستخدمين: إيميل + باسورد (مفيش أدمن هنا)
   app.post("/api/login", loginLimiter, (req, res) => {
-    const { email, password, code, remember } = req.body || {};
+    const { email, password, remember } = req.body || {};
     let userId = null;
     if (email && password) {
       const user = getUserByEmail(email);
       if (user?.password_hash && verifyPassword(password, user.password_hash)) userId = user.id;
-    } else if (code) {
-      userId = redeemLoginCode(code);
     }
     if (!userId) return res.status(401).json({ ok: false, error: "بيانات الدخول غلط" });
     openSession(res, userId, remember);
@@ -281,7 +240,7 @@ export function startServer() {
     res.json({ ok: true });
   });
 
-  // حساب جديد بالإيميل — وبعد الدخول يقدر يربط تيليجرام بزرار
+  // حساب جديد بالإيميل
   app.post("/api/signup", loginLimiter, (req, res) => {
     const { name, email, password } = req.body || {};
     const cleanEmail = String(email || "").trim().toLowerCase();
@@ -398,7 +357,7 @@ export function startServer() {
     const u = getUserById(uid);
     if (!u) return res.status(404).json({ error: "المستخدم مش موجود" });
     res.json({
-      user: { id: u.id, name: u.name, email: u.email, chat_id: u.chat_id, last_seen: u.last_seen, created_at: u.created_at, is_owner: !!u.is_owner },
+      user: { id: u.id, name: u.name, email: u.email, last_seen: u.last_seen, created_at: u.created_at, is_owner: !!u.is_owner },
       entries: listEntries(uid, 30),
       finance: listFinance(uid, 50),
       health: listHealth(uid, 50),
@@ -416,18 +375,8 @@ export function startServer() {
       id: user.id,
       name: user.name,
       isOwner: !!user.is_owner,
-      hasTelegram: !!user.chat_id,
       today: localToday(),
     });
-  });
-
-  // زرار "اربط تيليجرام": بيرجّع لينك يفتح البوت ومعاه توكن الربط
-  app.post("/api/link-telegram", (req, res) => {
-    const user = gate(req, res);
-    if (!user) return;
-    if (user.chat_id) return res.json({ ok: true, linked: true });
-    const token = issueLinkToken(user.id);
-    res.json({ ok: true, linked: false, url: `https://t.me/${config.botUsername}?start=${token}` });
   });
 
   /* ===== إشعارات PWA (Web Push) ===== */
@@ -573,7 +522,7 @@ export function startServer() {
     res.json({ ok: deleteTask(user.id, Number(req.params.id)) });
   });
 
-  // الكومبوزر في الداشبورد: "رتّبهالي" — نفس الـ agent بتاع البوت
+  // الكومبوزر في الداشبورد: "رتّبهالي" — بيشغّل الـ agent على النص
   app.post("/api/log", async (req, res) => {
     const user = gate(req, res);
     if (!user) return;

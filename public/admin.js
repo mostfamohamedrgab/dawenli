@@ -96,7 +96,7 @@ function renderStats(s, usage) {
   const totalCost = usage?.totals?.cost_usd || 0;
   const cards = [
     { ico: "👥", label: "المستخدمين", value: arNum(s.users), sub: `${arNum(s.active_14d)} نشط آخر ١٤ يوم` },
-    { ico: "✈", label: "مربوطين بتيليجرام", value: arNum(s.with_telegram), sub: `${arNum(s.with_email)} عندهم إيميل` },
+    { ico: "🔔", label: "مفعّلين الإشعارات", value: arNum(s.with_push), sub: `${arNum(s.with_email)} عندهم إيميل` },
     { ico: "📝", label: "إجمالي التدوينات", value: arNum(s.entries), sub: `${arNum(s.health)} سجل صحي · ${arNum(s.finance)} عملية` },
     { ico: "💬", label: "المحادثات", value: arNum(s.conversations), sub: `${arNum(s.tasks)} مهمة` },
     { ico: "🤖", label: "تكلفة الـAI كلها", value: usd(totalCost), sub: `الشهر ده ${usd(s.ai_cost_month)}` },
@@ -117,7 +117,7 @@ function renderUsers(users) {
         <div class="u-name">${escapeHtml(u.name || "—")}${u.is_owner ? " 👑" : ""}</div>
         <div class="muted" style="font-size:var(--text-xs)">${escapeHtml(u.email || "بدون إيميل")}</div>
       </td>
-      <td>${u.chat_id ? `<span class="pill-tg">مربوط</span>` : `<span class="pill-no">لأ</span>`}</td>
+      <td>${u.push ? `<span class="pill-tg">مفعّل</span>` : `<span class="pill-no">لأ</span>`}</td>
       <td>${fmtAgo(u.last_seen)}</td>
       <td>${arNum(u.entries)}</td>
       <td>${arNum(u.finance)}</td>
@@ -164,7 +164,7 @@ async function openUser(id) {
         <button class="icon-btn" id="drawerClose" title="إغلاق" style="font-size:18px">✕</button>
       </div>
       <p class="muted" style="font-size:var(--text-sm);margin:0 0 4px">
-        ${escapeHtml(u.email || "بدون إيميل")} · ${u.chat_id ? "تيليجرام مربوط ✈" : "مش مربوط بتيليجرام"}
+        ${escapeHtml(u.email || "بدون إيميل")}
       </p>
       <p class="muted" style="font-size:var(--text-xs)">اتسجّل ${fmtDate(u.created_at)} · آخر ظهور ${fmtAgo(u.last_seen)}</p>
       ${d.profile.length ? sec("🧠 دوّنلي يعرف عنه", facts) : ""}

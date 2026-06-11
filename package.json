@@ -1,7 +1,7 @@
 {
   "name": "dawenli",
   "version": "0.1.0",
-  "description": "دوّنلي — مساعد يوميات شخصي عبر تليجرام بالصوت",
+  "description": "دوّنلي — مساعد يوميات شخصي (PWA) بالصوت والكتابة بالعامية",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
@@ -13,7 +13,6 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "openai": "^4.67.0",
-    "telegraf": "^4.16.3",
     "web-push": "^3.6.7"
   }
 }
