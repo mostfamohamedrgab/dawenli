@@ -6,7 +6,7 @@
 import { config } from "./config.js";
 import { analyzeEntries } from "./openai.js";
 import { composeCheckin } from "./agent.js";
-import { entriesSince, dueTaskReminders, markTaskReminded, activeUsers } from "./db.js";
+import { entriesSince, dueTaskReminders, markTaskReminded, activeUsers, activeUsersWithoutEntry } from "./db.js";
 import { notifyUser } from "./push.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -15,6 +15,7 @@ export function startScheduler() {
   let lastCheckin = "";
   let lastWeekly = "";
   let lastReminderMinute = "";
+  let lastJournalReminder = "";
 
   setInterval(async () => {
     const c = cairoParts();
@@ -60,6 +61,22 @@ export function startScheduler() {
       }
     }
 
+    // تذكير اليوميات الساعة 10م — لكل مستخدم نشط مسجّلش أي يومية النهاردة بس.
+    if (c.hour === config.journalReminderHour && c.minute === 0 && lastJournalReminder !== c.date) {
+      lastJournalReminder = c.date;
+      const targets = activeUsersWithoutEntry(c.date, 14);
+      console.log(`✍️ تذكير اليوميات 10م — ${targets.length} مستخدم مسجّلش النهاردة`);
+      for (const user of targets) {
+        await notifyUser(user.id, {
+          title: "✍️ متنسيش تدوّن يومك",
+          body: "عدّى اليوم وانت لسه مدوّنتش حاجة — احكيلي يومك عدى إزاي؟ 🌙",
+          url: "/",
+          icon: "✍️",
+        }).catch(() => {});
+        await sleep(400);
+      }
+    }
+
     // التأمّل الأسبوعي
     if (
       c.weekday === config.weeklyDay &&
@@ -76,7 +93,7 @@ export function startScheduler() {
   }, 30 * 1000);
 
   console.log(
-    `⏰ المبادرة شغّالة — check-in يومي ${config.checkinHour}:00، تأمّل أسبوعي يوم ${config.weeklyDay} الساعة ${config.weeklyHour}:00، وتذكير مهام لحظي (${config.timezone})`
+    `⏰ المبادرة شغّالة — check-in يومي ${config.checkinHour}:00، تذكير اليوميات ${config.journalReminderHour}:00، تأمّل أسبوعي يوم ${config.weeklyDay} الساعة ${config.weeklyHour}:00، وتذكير مهام لحظي (${config.timezone})`
   );
 }
 

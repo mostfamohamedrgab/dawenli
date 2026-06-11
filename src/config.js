@@ -23,6 +23,8 @@ export const config = {
   // مواعيد المبادرة (بتوقيت القاهرة)
   timezone: process.env.TIMEZONE || "Africa/Cairo",
   checkinHour: Number(process.env.CHECKIN_HOUR ?? 21), // الـ agent بيسأل يوميًا 9 مساءً
+  // تذكير 10م لكل مستخدم نشط مسجّلش يوميات النهاردة
+  journalReminderHour: Number(process.env.JOURNAL_REMINDER_HOUR ?? 22),
   weeklyDay: Number(process.env.WEEKLY_DAY ?? 5), // 0=الأحد .. 5=الجمعة
   weeklyHour: Number(process.env.WEEKLY_HOUR ?? 20), // تأمّل أسبوعي 8 مساءً
   // إشعارات PWA (Web Push) — اختياري؛ لو المفاتيح ناقصة الميزة بتتعطّل بهدوء.

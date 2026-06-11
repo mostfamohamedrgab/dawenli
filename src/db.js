@@ -266,6 +266,19 @@ export function activeUsers(days = 14) {
   return db.prepare(`SELECT * FROM users WHERE last_seen >= ? ORDER BY id`).all(cutoff);
 }
 
+// المستخدمين النشطين اللي مسجّلوش أي يومية في تاريخ معيّن — لتذكير اليوميات اليومي
+export function activeUsersWithoutEntry(date, days = 14) {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  return db
+    .prepare(
+      `SELECT u.* FROM users u
+       WHERE u.last_seen >= ?
+         AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.user_id = u.id AND e.entry_date = ?)
+       ORDER BY u.id`
+    )
+    .all(cutoff, date);
+}
+
 /* ---- حسابات الإيميل ---- */
 
 const getUserByEmailStmt = db.prepare(`SELECT * FROM users WHERE email = ?`);
