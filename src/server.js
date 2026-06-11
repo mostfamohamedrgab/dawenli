@@ -285,9 +285,11 @@ export function startServer() {
     res.sendFile(join(publicDir, "login.html"));
   });
 
-  app.get(["/landing", "/landing.html", "/welcome"], (_req, res) =>
-    res.sendFile(join(publicDir, "landing.html"))
-  );
+  app.get(["/landing", "/landing.html", "/welcome"], (req, res) => {
+    // اللي مسجّل دخول مايشوفش صفحة الهبوط — يروح الداشبورد على طول
+    if (sessionUser(req)) return res.redirect("/");
+    res.sendFile(join(publicDir, "landing.html"));
+  });
 
   // محمي: السكربت والصفحة والبيانات
   app.get("/app.js", (req, res) =>

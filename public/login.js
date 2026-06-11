@@ -2,17 +2,24 @@ const form = document.getElementById("loginForm");
 const errorEl = document.getElementById("error");
 const submitBtn = document.getElementById("submitBtn");
 const nameField = document.getElementById("nameField");
-const modeToggle = document.getElementById("modeToggle");
+const authSub = document.getElementById("authSub");
+const tabLogin = document.getElementById("tabLogin");
+const tabSignup = document.getElementById("tabSignup");
 
 let signup = false; // دخول ولا حساب جديد
 
 function refresh() {
-  nameField.hidden = !signup;
-  modeToggle.textContent = signup ? "عندك حساب؟ ادخل عادي" : "مفيش حساب؟ اعمل واحد جديد";
-  submitBtn.textContent = signup ? "إنشاء حساب" : "دخول";
+  tabLogin.classList.toggle("active", !signup);
+  tabSignup.classList.toggle("active", signup);
+  nameField.classList.toggle("show", signup); // collapse ناعم
+  submitBtn.textContent = signup ? "إنشاء حساب جديد" : "دخول";
+  authSub.textContent = signup
+    ? "اعمل حسابك في ثانية وابدأ تدوّن يومك"
+    : "أهلاً بيك تاني — سجّل دخولك تكمّل دفترك";
   errorEl.hidden = true;
 }
-modeToggle.addEventListener("click", (e) => { e.preventDefault(); signup = !signup; refresh(); });
+tabLogin.addEventListener("click", () => { signup = false; refresh(); });
+tabSignup.addEventListener("click", () => { signup = true; refresh(); });
 refresh();
 
 form.addEventListener("submit", async (e) => {

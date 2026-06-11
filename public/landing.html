@@ -227,6 +227,10 @@
     @media (max-width: 760px) {
       .lp-nav { display: none; }
       .worlds-bento { grid-template-columns: 1fr; }
+      /* الهيدر على الموبايل: لوجو + زرار "دخول" بس — نخفي زرار التنزيل الطويل عشان ميخرجش بره */
+      .lp-header { padding: 12px 16px; gap: 10px; }
+      .lp-header img { height: 32px; }
+      .lp-header-cta #installHeaderBtn { display: none; }
     }
   </style>
 </head>
@@ -239,8 +243,8 @@
       <a href="#worlds">العوالم</a>
       <a href="#why">ليه دوّنلي</a>
     </nav>
-    <div style="display:flex;gap:10px;align-items:center">
-      <a class="btn ghost sm" href="/login">افتح الداشبورد</a>
+    <div class="lp-header-cta" style="display:flex;gap:10px;align-items:center">
+      <a class="btn ghost sm" href="/login">دخول</a>
       <button class="btn sm" id="installHeaderBtn" type="button">📲 نزّل التطبيق</button>
     </div>
   </header>
@@ -251,11 +255,11 @@
     <img class="lp-float" src="/assets/illustrations/world-goals.svg" alt="" style="bottom:6%;inset-inline-end:3%;width:110px;--rot:10deg;animation-delay:1.2s" />
 
     <div style="position:relative;z-index:1">
-      <span class="lp-pill">✎ دفترك الشخصي، بيرتّب نفسه</span>
+      <span class="lp-pill">✎ أول دفتر بيرتّب نفسه</span>
       <h1 class="lp-h1">احكيلي يومك…<br /><span class="squiggle">وأنا أرتّبه</span>.</h1>
       <p class="lp-lead">
-        كلّم دوّنلي بالعامية — صوت أو كتابة — وهو يفهم كلامك ويحطّه في مكانه:
-        صحتك، عاداتك، أهدافك، وفلوسك. من غير فورم ولا خانات.
+        بتحكي بالعامية زي ما بتكلّم صاحبك — صوت أو كتابة — ودوّنلي يفهمك ويرتّب حياتك لوحده:
+        <b>صحتك وعاداتك وأهدافك وفلوسك</b> في مكان واحد. من غير فورم، من غير مجهود، ومن غير ما تنسى حاجة.
       </p>
       <div class="lp-cta">
         <button class="btn lg" id="installHeroBtn" type="button">📲 نزّل التطبيق</button>

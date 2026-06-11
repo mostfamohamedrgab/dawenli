@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>دوّنلي — تسجيل الدخول</title>
     <link rel="icon" href="/assets/logo/dawwenli-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
@@ -10,22 +10,22 @@
   <body class="auth-body">
     <main class="auth-card">
       <img class="auth-logo" src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" />
-      <p class="auth-sub">دفترك الشخصي — سجّل دخولك تشوف حياتك مرتّبة</p>
+      <p class="auth-sub" id="authSub">أهلاً بيك تاني — سجّل دخولك تكمّل دفترك</p>
+
+      <div class="auth-tabs">
+        <button id="tabLogin" class="auth-tab active" type="button">دخول</button>
+        <button id="tabSignup" class="auth-tab" type="button">حساب جديد</button>
+      </div>
 
       <form id="loginForm" class="auth-form" autocomplete="off">
-        <div id="emailFields">
-          <div id="nameField" hidden>
-            <label for="name">اسمك</label>
-            <input type="text" id="name" class="field" placeholder="اسمك إيه؟" style="margin-bottom:14px" />
-          </div>
-          <label for="email">الإيميل</label>
-          <input type="email" id="email" class="field" placeholder="you@example.com" style="margin-bottom:14px" />
-          <label for="emailPassword">كلمة السر</label>
-          <input type="password" id="emailPassword" class="field" placeholder="••••••••" />
-          <p style="margin:12px 0 0;font-size:var(--text-sm);color:var(--ink-muted)">
-            <a href="#" id="modeToggle" style="color:var(--brand-deep);font-weight:700">مفيش حساب؟ اعمل واحد جديد</a>
-          </p>
+        <div id="nameField" class="auth-collapse">
+          <label for="name">اسمك</label>
+          <input type="text" id="name" class="field" placeholder="اسمك إيه؟" />
         </div>
+        <label for="email">الإيميل</label>
+        <input type="email" id="email" class="field" placeholder="you@example.com" style="margin-bottom:14px" />
+        <label for="emailPassword">كلمة السر</label>
+        <input type="password" id="emailPassword" class="field" placeholder="••••••••" />
         <label class="remember">
           <input type="checkbox" id="remember" checked />
           <span>فكّرني (سيبني داخل ٣٠ يوم)</span>

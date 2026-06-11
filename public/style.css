@@ -1116,6 +1116,14 @@ select.field { cursor: pointer; }
   transition: background var(--dur-fast) var(--ease-soft), color var(--dur-fast) var(--ease-soft);
 }
 .auth-tab.active { background: var(--brand); color: var(--on-accent); box-shadow: var(--shadow-sm); }
+/* خانة الاسم بتتفتح بنعومة في وضع "حساب جديد" (collapse) */
+.auth-collapse {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height var(--dur-base) var(--ease-soft), opacity var(--dur-fast) var(--ease-soft), margin var(--dur-base) var(--ease-soft);
+}
+.auth-collapse.show { max-height: 92px; opacity: 1; margin-bottom: 14px; }
 .auth-form { text-align: right; }
 .auth-form label { display: block; font: var(--type-label); color: var(--ink-muted); margin-bottom: 8px; }
 .auth-form .field { width: 100%; padding: 12px 14px; }
@@ -1234,6 +1242,20 @@ select.field { cursor: pointer; }
   .tabbar-btn.goals[data-active="true"] .tb-ico    { background: var(--goals-wash); }
   .tabbar-btn.finances[data-active="true"]         { color: var(--finances-deep); }
   .tabbar-btn.finances[data-active="true"] .tb-ico { background: var(--finances-wash); }
+
+  /* ===== تصغير العناصر على الموبايل — تبقى مريحة مش ضخمة ===== */
+  .page-head { margin-bottom: 16px; }
+  .page-head h1 { font-size: clamp(20px, 6vw, 25px); line-height: 1.25; }
+  .page-head .ph-sub { font-size: var(--text-sm); line-height: 1.55; }
+  .section-title { font-size: clamp(18px, 5.4vw, 22px); }
+  .world-pill { font-size: var(--text-xs); padding: 3px 11px; margin-bottom: 8px; }
+  .card { padding: 16px; }
+  .card-head { margin-bottom: 12px; }
+  .stat-card { padding: 14px; }
+  .stat-card .sc-value b { font-size: 1.6rem; }
+  .stat-card .sc-ico { width: 32px; height: 32px; font-size: 15px; }
+  .composer { padding: 14px; }
+  .streak-head b { font-size: 1.6rem; }
 }
 
 /* ===========================================================================
