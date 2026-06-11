@@ -12,6 +12,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "openai": "^4.67.0",
-    "telegraf": "^4.16.3"
+    "telegraf": "^4.16.3",
+    "web-push": "^3.6.7"
   }
 }

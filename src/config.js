@@ -33,4 +33,8 @@ export const config = {
   checkinHour: Number(process.env.CHECKIN_HOUR ?? 21), // الـ agent بيسأل يوميًا 9 مساءً
   weeklyDay: Number(process.env.WEEKLY_DAY ?? 5), // 0=الأحد .. 5=الجمعة
   weeklyHour: Number(process.env.WEEKLY_HOUR ?? 20), // تأمّل أسبوعي 8 مساءً
+  // إشعارات PWA (Web Push) — اختياري؛ لو المفاتيح ناقصة الميزة بتتعطّل بهدوء.
+  vapidPublic: process.env.VAPID_PUBLIC_KEY || "",
+  vapidPrivate: process.env.VAPID_PRIVATE_KEY || "",
+  vapidSubject: process.env.VAPID_SUBJECT || "mailto:admin@dawenli.app",
 };

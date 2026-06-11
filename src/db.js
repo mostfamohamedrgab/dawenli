@@ -164,6 +164,17 @@ db.exec(`
     UNIQUE(user_id, fact_key)
   );
   CREATE INDEX IF NOT EXISTS idx_profile_user ON profile_facts(user_id);
+
+  -- اشتراكات Web Push (PWA) — كل جهاز فعّل الإشعارات له صف.
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    endpoint    TEXT UNIQUE NOT NULL,
+    p256dh      TEXT NOT NULL,
+    auth        TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
 `);
 
 /* ===================== Migrations ===================== */
@@ -963,7 +974,8 @@ const usageByKindStmt = db.prepare(`
          COUNT(*) AS calls,
          COALESCE(SUM(cost_usd), 0) AS cost_usd,
          COALESCE(SUM(input_tokens), 0)  AS input_tokens,
-         COALESCE(SUM(output_tokens), 0) AS output_tokens
+         COALESCE(SUM(output_tokens), 0) AS output_tokens,
+         COALESCE(SUM(audio_seconds), 0) AS audio_seconds
   FROM ai_usage GROUP BY kind, model ORDER BY cost_usd DESC
 `);
 const usageDailyStmt = db.prepare(`
@@ -990,6 +1002,29 @@ export function aiUsageSummary(days = 30) {
     byKind: usageByKindStmt.all(),
     daily: usageDailyStmt.all(since),
   };
+}
+
+/* ===================== Web Push subscriptions ===================== */
+
+const upsertPushStmt = db.prepare(`
+  INSERT INTO push_subscriptions (created_at, user_id, endpoint, p256dh, auth)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth
+`);
+export function savePushSubscription(userId, sub) {
+  if (!userId || !sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) return false;
+  upsertPushStmt.run(now(), userId, sub.endpoint, sub.keys.p256dh, sub.keys.auth);
+  return true;
+}
+
+const listPushByUserStmt = db.prepare(`SELECT * FROM push_subscriptions WHERE user_id = ?`);
+export function listPushSubscriptions(userId) {
+  return listPushByUserStmt.all(userId);
+}
+
+const deletePushStmt = db.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ?`);
+export function deletePushSubscription(endpoint) {
+  if (endpoint) deletePushStmt.run(endpoint);
 }
 
 /* ===================== Profile facts (ذاكرة دائمة عن الشخص) ===================== */

@@ -52,8 +52,11 @@ import {
   touchAdminLogin,
   listUsersWithStats,
   platformStats,
+  savePushSubscription,
+  deletePushSubscription,
 } from "./db.js";
-import { analyzeEntries, doctorReport, unifiedReport, transcribe } from "./openai.js";
+import { pushEnabled, vapidPublicKey, sendPushToUser } from "./push.js";
+import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING } from "./openai.js";
 import { buildReportData } from "./report.js";
 import { runAgent } from "./agent.js";
 
@@ -304,6 +307,17 @@ export function startServer() {
   app.get("/login.js", (_req, res) => res.sendFile(join(publicDir, "login.js")));
   app.use("/assets", express.static(join(publicDir, "assets")));
 
+  // PWA — الـ manifest و الـ service worker لازم يتقدّموا من الجذر (scope = "/")
+  app.get("/manifest.webmanifest", (_req, res) => {
+    res.type("application/manifest+json");
+    res.sendFile(join(publicDir, "manifest.webmanifest"));
+  });
+  app.get("/sw.js", (_req, res) => {
+    res.set("Cache-Control", "no-cache");
+    res.type("application/javascript");
+    res.sendFile(join(publicDir, "sw.js"));
+  });
+
   app.get(["/login", "/login.html"], (req, res) => {
     if (sessionUser(req)) return res.redirect("/");
     res.sendFile(join(publicDir, "login.html"));
@@ -369,6 +383,7 @@ export function startServer() {
       stats: platformStats(),
       users: listUsersWithStats(),
       usage: aiUsageSummary(30),
+      pricing: PRICING,
     });
   });
   // تفاصيل مستخدم واحد (قراءة فقط للمراقبة)
@@ -411,6 +426,41 @@ export function startServer() {
     res.json({ ok: true, linked: false, url: `https://t.me/${config.botUsername}?start=${token}` });
   });
 
+  /* ===== إشعارات PWA (Web Push) ===== */
+  // مفتاح VAPID العام — العميل بيستخدمه عشان يعمل subscribe
+  app.get("/api/push/key", (req, res) => {
+    if (!gate(req, res)) return;
+    res.json({ enabled: pushEnabled, key: pushEnabled ? vapidPublicKey : null });
+  });
+  // تسجيل اشتراك جهاز
+  app.post("/api/push/subscribe", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    if (!pushEnabled) return res.status(503).json({ error: "push_disabled" });
+    const ok = savePushSubscription(user.id, req.body);
+    if (!ok) return res.status(400).json({ error: "bad_subscription" });
+    res.json({ ok: true });
+  });
+  // إلغاء اشتراك جهاز
+  app.post("/api/push/unsubscribe", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    deletePushSubscription(req.body?.endpoint);
+    res.json({ ok: true });
+  });
+  // إشعار تجريبي للمستخدم الحالي
+  app.post("/api/push/test", async (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    if (!pushEnabled) return res.status(503).json({ error: "push_disabled" });
+    const sent = await sendPushToUser(user.id, {
+      title: "دوّنلي ✍️",
+      body: "التنبيهات شغّالة! هفكّرك تدوّن يومك كل يوم.",
+      url: "/",
+    });
+    res.json({ ok: true, sent });
+  });
+
   /* ===== الأقسام ===== */
   app.get("/api/entries", (req, res) => {
     const user = gate(req, res);
@@ -451,12 +501,6 @@ export function startServer() {
     const user = gate(req, res);
     if (!user) return;
     res.json(listHabits(user.id));
-  });
-  app.get("/api/usage", (req, res) => {
-    const user = gate(req, res);
-    if (!user) return;
-    const days = Number(req.query.days) > 0 ? Number(req.query.days) : 30;
-    res.json(aiUsageSummary(days));
   });
 
   /* ===== الذاكرة الدائمة (دوّنلي يعرف عنك) ===== */

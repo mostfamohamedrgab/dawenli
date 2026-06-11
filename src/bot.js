@@ -13,6 +13,7 @@ import {
   markTaskReminded,
 } from "./db.js";
 import { issueLoginCode, redeemLinkToken } from "./server.js";
+import { sendPushToUser } from "./push.js";
 
 export function startBot() {
   const bot = new Telegraf(config.telegramToken);
@@ -241,6 +242,12 @@ function startSchedulers(bot) {
         try {
           const msg = await composeCheckin(user);
           await bot.telegram.sendMessage(user.chat_id, msg);
+          // وكمان إشعار على الموبايل (PWA) لو فعّل التنبيهات — قناة موازية للتيليجرام
+          await sendPushToUser(user.id, {
+            title: "دوّنلي — check-in 🌙",
+            body: msg.length > 120 ? msg.slice(0, 117) + "…" : msg,
+            url: "/",
+          }).catch(() => {});
         } catch (err) {
           console.error(`checkin send error (user ${user.id}):`, err);
         }

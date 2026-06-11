@@ -56,6 +56,25 @@
       <div class="stat-grid" id="statCards" style="margin-bottom:28px"></div>
 
       <div class="card" style="margin-bottom:24px">
+        <div class="card-head">
+          <h3>🤖 استهلاك الـAI (تفصيلي)</h3>
+          <span class="muted" id="usageTotals" style="font-size:var(--text-sm)"></span>
+        </div>
+        <div class="table-scroll">
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th>العملية</th><th>الموديل</th><th>نداءات</th>
+                <th>توكن إدخال</th><th>توكن إخراج</th><th>دقايق صوت</th><th>التكلفة</th>
+              </tr>
+            </thead>
+            <tbody id="usageBody"></tbody>
+          </table>
+        </div>
+        <p class="muted" id="usageNote" style="font-size:var(--text-xs);margin-top:14px;line-height:1.8"></p>
+      </div>
+
+      <div class="card" style="margin-bottom:24px">
         <div class="card-head"><h3>👥 المستخدمين</h3><span class="muted" id="usersCount" style="font-size:var(--text-sm)"></span></div>
         <div class="table-scroll">
           <table class="users-table">

@@ -36,8 +36,60 @@ async function load() {
     $("adminName").textContent = `👤 ${me.username}`;
     DATA = ov;
     renderStats(ov.stats, ov.usage);
+    renderUsage(ov.usage, ov.pricing);
     renderUsers(ov.users);
   } catch {}
+}
+
+/* ===== استهلاك الـAI التفصيلي ===== */
+const USAGE_KINDS = {
+  transcribe: "🎙️ تفريغ الصوت",
+  agent: "🧠 الـ Agent (فهم + تسجيل + رد)",
+  analyze: "📈 تحليل اليوميات",
+  report: "📋 التقرير الشامل",
+  doctor: "🩺 تقرير الدكتور",
+  classify: "🗂️ تصنيف (قديم)",
+  reflect: "💬 رد (قديم)",
+  other: "⚙️ غير ذلك",
+};
+
+function renderUsage(usage, pricing) {
+  const t = usage?.totals || {};
+  const rows = usage?.byKind || [];
+  const min = (sec) => arNum((Number(sec || 0) / 60).toFixed(1));
+  const totalTokens = (t.input_tokens || 0) + (t.output_tokens || 0);
+
+  $("usageTotals").textContent =
+    `${arNum(t.calls || 0)} نداء · ${arNum(totalTokens)} توكن · ${min(t.audio_seconds)} دقيقة صوت · إجمالي ${usd(t.cost_usd)}`;
+
+  $("usageBody").innerHTML = rows.length
+    ? rows.map((r) => `
+      <tr>
+        <td>${USAGE_KINDS[r.kind] || USAGE_KINDS.other}</td>
+        <td class="muted" style="font-size:var(--text-xs)">${escapeHtml(r.model || "—")}</td>
+        <td>${arNum(r.calls)}</td>
+        <td>${arNum(r.input_tokens)}</td>
+        <td>${arNum(r.output_tokens)}</td>
+        <td>${r.audio_seconds ? min(r.audio_seconds) : "—"}</td>
+        <td><b>${usd(r.cost_usd)}</b></td>
+      </tr>`).join("")
+    : `<tr><td colspan="7" class="muted" style="font-size:var(--text-sm)">لسه مفيش استهلاك متسجّل.</td></tr>`;
+
+  // بطاقة الأسعار — عشان يبان إزاي اتحسبت التكلفة بالظبط
+  const rateCard = Object.entries(pricing || {})
+    .map(([model, p]) => {
+      const parts = [];
+      if (p.in != null) parts.push(`$${p.in}/مليون توكن إدخال`);
+      if (p.out != null) parts.push(`$${p.out}/مليون توكن إخراج`);
+      if (p.perMin != null) parts.push(`$${p.perMin}/دقيقة صوت`);
+      return `<b>${escapeHtml(model)}</b>: ${parts.join(" · ")}`;
+    })
+    .join("<br>");
+
+  const since = t.since ? `بنتتبّع من ${fmtDate(t.since)}. ` : "";
+  $("usageNote").innerHTML =
+    `${since}عدد التوكنز والدقايق دي <b>حقيقية</b> جايّة من الـ response بتاع OpenAI API. ` +
+    `التكلفة محسوبة = التوكنز × سعر الموديل من القايمة دي:<br>${rateCard}`;
 }
 
 function renderStats(s, usage) {

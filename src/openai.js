@@ -9,7 +9,7 @@ export const client = new OpenAI({ apiKey: config.openaiKey });
    الأسعار بتتغيّر، فلو حصل تحديث من OpenAI عدّل الأرقام هنا.
    - الموديلات النصية: السعر لكل مليون توكن (إدخال/إخراج).
    - whisper-1: السعر للدقيقة الصوتية. */
-const PRICING = {
+export const PRICING = {
   "gpt-4o-mini": { in: 0.15, out: 0.6 },
   "gpt-4o": { in: 2.5, out: 10 },
   "gpt-4o-mini-transcribe": { in: 3, out: 5, perMin: 0.003 },

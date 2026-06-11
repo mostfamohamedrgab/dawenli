@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["--experimental-sqlite", "src/index.js"],
       "autoPort": true
+    },
+    {
+      "name": "dawenli-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--experimental-sqlite", "src/preview-server.js"],
+      "port": 3000
     }
   ]
 }

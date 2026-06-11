@@ -10,7 +10,6 @@ const state = {
   habits: [],
   finance: [],
   tasks: [],
-  usage: null,
   profile: [],
   categories: [],
   pageDate: null,
@@ -19,8 +18,6 @@ const state = {
   calM: new Date().getMonth(),
   selDate: null,
 };
-
-const USD_TO_EGP = 50;
 
 const $ = (id) => document.getElementById(id);
 const TODAY = () => new Date().toISOString().slice(0, 10);
@@ -135,7 +132,6 @@ function gotoTab(tab) {
   if (tab === "goals") renderGoalsPage();
   if (tab === "finances") renderFinancesPage();
   if (tab === "tasks") renderCalendar();
-  if (tab === "usage") renderUsage();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 $("sideNav").addEventListener("click", (e) => {
@@ -1163,74 +1159,6 @@ function renderChats() {
     </div>`).join("");
 }
 
-/* ===================== تكلفة الـAI ===================== */
-const USAGE_KINDS = {
-  transcribe: { label: "تفريغ الصوت", emoji: "🎙️" },
-  agent: { label: "الـ Agent (فهم وتسجيل ورد)", emoji: "🧠" },
-  classify: { label: "تصنيف الكلام (قديم)", emoji: "🗂️" },
-  reflect: { label: "رد البوت (قديم)", emoji: "💬" },
-  analyze: { label: "تحليل اليوميات", emoji: "📈" },
-  report: { label: "التقرير الشامل", emoji: "📋" },
-  doctor: { label: "تقرير الدكتور", emoji: "🩺" },
-  other: { label: "غير ذلك", emoji: "⚙️" },
-};
-const usd = (n) => "$" + Number(n || 0).toFixed(Number(n) >= 1 ? 2 : 4);
-const egp = (n) => arNum(Math.round(Number(n || 0) * USD_TO_EGP)) + " ج";
-
-function renderUsage() {
-  const u = state.usage;
-  if (!u) { $("usageSummary").innerHTML = ""; return; }
-  const t = u.totals || {};
-  const total = t.cost_usd || 0;
-  const monthCost = u.month?.cost_usd || 0;
-  const tokens = (t.input_tokens || 0) + (t.output_tokens || 0);
-  const minutes = (t.audio_seconds || 0) / 60;
-
-  $("usageSummary").innerHTML = [
-    { label: "إجمالي التكلفة", value: usd(total), unit: "", delta: "≈ " + egp(total), ico: "🧮" },
-    { label: "الشهر ده", value: usd(monthCost), unit: "", delta: "≈ " + egp(monthCost), ico: "🗓" },
-    { label: "النداءات", value: arNum(t.calls || 0), unit: "", delta: `${arNum(tokens)} توكن · ${arNum(minutes.toFixed(1))} دقيقة صوت`, ico: "🤖" },
-  ].map((s) => `
-    <div class="stat-card">
-      <div class="sc-top"><span class="sc-ico">${s.ico}</span><span class="sc-label">${s.label}</span></div>
-      <div class="sc-value"><b style="font-size:var(--text-h3)">${s.value}</b></div>
-      <div class="sc-delta">${s.delta}</div>
-    </div>`).join("");
-
-  // التكلفة اليومية — آخر ٣٠ يوم
-  const map = {};
-  (u.daily || []).forEach((d) => (map[d.usage_date] = d.cost_usd));
-  const days = lastNDays(30).map((d, i) => ({
-    label: i % 5 === 0 ? fmtShort(d) : "",
-    value: map[d] || 0,
-  }));
-  drawSketchBars($("usageChart"), days, "", 180);
-
-  const byKind = {};
-  (u.byKind || []).forEach((r) => {
-    const k = USAGE_KINDS[r.kind] ? r.kind : "other";
-    if (!byKind[k]) byKind[k] = { calls: 0, cost: 0 };
-    byKind[k].calls += r.calls; byKind[k].cost += r.cost_usd;
-  });
-  const rows = Object.entries(byKind).sort((a, b) => b[1].cost - a[1].cost);
-  $("usageBreakdown").innerHTML = rows.length
-    ? rows.map(([k, v]) => {
-        const meta = USAGE_KINDS[k];
-        const pct = total ? Math.round((v.cost / total) * 100) : 0;
-        return `<div class="list-row">
-          <div class="lm">
-            <span class="l1">${meta.emoji} ${meta.label}</span>
-            <span class="l2">${arNum(v.calls)} نداء · ${arNum(pct)}٪ من التكلفة</span>
-          </div>
-          <span class="l-amount">${usd(v.cost)}</span>
-        </div>`;
-      }).join("")
-    : `<span class="muted" style="font-size:var(--text-sm)">لسه مفيش استهلاك متسجّل.</span>`;
-
-  const since = t.since ? `بيتتبّع من ${fmtShort(t.since)} · ` : "";
-  $("usageNote").textContent = `${since}الأرقام تقديرية حسب أسعار OpenAI، والتحويل للجنيه على سعر ${USD_TO_EGP}.`;
-}
-
 /* ===================== خروج + تحميل ===================== */
 async function logout() {
   await fetch("/api/logout", { method: "POST" }).catch(() => {});
@@ -1240,7 +1168,7 @@ $("logoutBtn").addEventListener("click", logout);
 
 async function loadAll(rerender = true) {
   try {
-    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, usg, prof] = await Promise.all([
+    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof] = await Promise.all([
       api("/api/me").then((r) => r.json()),
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
@@ -1252,13 +1180,12 @@ async function loadAll(rerender = true) {
       api("/api/finance").then((r) => r.json()),
       api("/api/tasks").then((r) => r.json()),
       api("/api/finance-categories").then((r) => r.json()),
-      api("/api/usage").then((r) => r.json()),
       api("/api/profile").then((r) => r.json()),
     ]);
     state.me = me;
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
     state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin;
-    state.tasks = tasks; state.categories = cats; state.usage = usg; state.profile = prof;
+    state.tasks = tasks; state.categories = cats; state.profile = prof;
   } catch { return; }
 
   const first = (state.me?.name || "د").trim()[0] || "د";
@@ -1277,9 +1204,75 @@ async function loadAll(rerender = true) {
   if (active === "goals") renderGoalsPage();
   if (active === "finances") renderFinancesPage();
   if (active === "tasks") renderCalendar();
-  if (active === "usage") renderUsage();
 }
 
 loadAll().then(() => {
   renderJournal();
 });
+
+/* ===================== PWA: تثبيت + إشعارات ===================== */
+function b64ToUint8(base64) {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+async function initPWA() {
+  if (!("serviceWorker" in navigator)) return;
+  let reg;
+  try {
+    reg = await navigator.serviceWorker.register("/sw.js");
+  } catch { return; }
+
+  const btn = $("notifyBtn");
+  if (!btn || !("PushManager" in window) || !("Notification" in window)) return;
+
+  let key = null;
+  try {
+    const info = await api("/api/push/key").then((r) => r.json());
+    if (!info.enabled) return; // الإشعارات متعطّلة على السيرفر — نسيب الزرار مخفي
+    key = info.key;
+  } catch { return; }
+
+  const ready = await navigator.serviceWorker.ready;
+  const existing = await ready.pushManager.getSubscription();
+
+  function showOn() {
+    btn.textContent = "🔔 التنبيهات شغّالة ✓";
+    btn.disabled = true;
+    btn.classList.remove("hidden");
+  }
+  function showOff() {
+    btn.textContent = "🔔 فعّل التنبيهات";
+    btn.disabled = false;
+    btn.classList.remove("hidden");
+  }
+
+  if (existing && Notification.permission === "granted") { showOn(); return; }
+  showOff();
+
+  btn.onclick = async () => {
+    btn.disabled = true;
+    btn.textContent = "🔔 بفعّل…";
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") { showOff(); btn.textContent = "🔔 مرفوض — فعّلها من إعدادات المتصفح"; return; }
+      const sub = existing || (await ready.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: b64ToUint8(key),
+      }));
+      await api("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sub.toJSON()),
+      });
+      await api("/api/push/test", { method: "POST" }).catch(() => {});
+      showOn();
+    } catch (err) {
+      console.error("notify enable error:", err);
+      showOff();
+    }
+  };
+}
+initPWA();

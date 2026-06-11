@@ -7,6 +7,13 @@
   <meta name="description" content="كلّم دوّنلي على تيليجرام بالعامية — صوت أو كتابة — وهو يفهم كلامك ويحطّه في مكانه: صحتك، عاداتك، أهدافك، وفلوسك." />
   <link rel="icon" href="/assets/logo/dawwenli-mark.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/style.css" />
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#5C8A6B" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="دوّنلي" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-180.png" />
   <style>
     /* ===================== Landing-only ===================== */
     .lp-pill {
@@ -234,7 +241,7 @@
     </nav>
     <div style="display:flex;gap:10px;align-items:center">
       <a class="btn ghost sm" href="/">افتح الداشبورد</a>
-      <a class="btn sm" href="https://t.me/dawenli_bot" target="_blank" rel="noopener">✈ ابدأ على تيليجرام</a>
+      <button class="btn sm" id="installHeaderBtn" type="button">📲 نزّل التطبيق</button>
     </div>
   </header>
 
@@ -251,9 +258,13 @@
         صحتك، عاداتك، أهدافك، وفلوسك. من غير فورم ولا خانات.
       </p>
       <div class="lp-cta">
-        <a class="btn lg" href="https://t.me/dawenli_bot" target="_blank" rel="noopener">✈ ابدأ على تيليجرام</a>
-        <a class="btn lg secondary" href="/">شوف الداشبورد</a>
+        <button class="btn lg" id="installHeroBtn" type="button">📲 نزّل التطبيق</button>
+        <a class="btn lg secondary" href="https://t.me/dawenli_bot" target="_blank" rel="noopener">✈ ابدأ على تيليجرام</a>
       </div>
+      <p id="installHint" style="margin:14px 0 0;font-size:var(--text-sm);color:var(--ink-faint)">
+        📱 ثبّته على موبايلك (أندرويد وآيفون) ويفتح زيّ أي تطبيق — أو افتحه على
+        <a href="/" style="color:var(--brand-deep);font-weight:700">الويب</a>.
+      </p>
       <div class="lp-trust">
         <span>✦ بالعامية المصرية</span><span>✦ Agent بيفهمك ويسألك</span><span>✦ خصوصيتك أوّلاً</span>
       </div>
@@ -375,6 +386,20 @@
     </div>
   </section>
 
+  <!-- ===================== مودال التحميل ===================== -->
+  <div id="installModal" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" style="text-align:start;max-width:440px">
+      <div class="modal-icon">📲</div>
+      <h3 class="modal-title" style="text-align:center">نزّل دوّنلي على موبايلك</h3>
+      <p class="modal-text" style="text-align:center" id="installLede">اتبع الخطوات حسب جهازك — التطبيق هيتثبّت في ثواني من غير ستور.</p>
+      <ol id="installSteps" style="margin:0 0 20px;padding-inline-start:20px;display:flex;flex-direction:column;gap:10px;font:var(--type-body);font-size:var(--text-sm);color:var(--ink)"></ol>
+      <div class="modal-actions">
+        <a class="btn secondary" href="/">افتح على الويب</a>
+        <button class="btn" id="installClose" type="button">تمام</button>
+      </div>
+    </div>
+  </div>
+
   <footer class="lp-footer">
     <div class="inner">
       <img src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" style="height:32px" />
@@ -434,6 +459,91 @@
 
       replay.addEventListener("click", run);
       setTimeout(run, 700);
+    })();
+
+    /* ===================== تحميل/تثبيت التطبيق (PWA) ===================== */
+    (function () {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      }
+
+      const heroBtn = document.getElementById("installHeroBtn");
+      const headerBtn = document.getElementById("installHeaderBtn");
+      const hint = document.getElementById("installHint");
+      const modal = document.getElementById("installModal");
+      const steps = document.getElementById("installSteps");
+      const lede = document.getElementById("installLede");
+      let deferredPrompt = null;
+
+      const standalone = () =>
+        window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+
+      function platform() {
+        const ua = navigator.userAgent || "";
+        if (/iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "ios";
+        if (/android/i.test(ua)) return "android";
+        return "desktop";
+      }
+
+      const INSTRUCTIONS = {
+        ios: [
+          "افتح الصفحة دي من متصفّح <b>Safari</b>.",
+          "دوس على زرار المشاركة <b>⬆️</b> تحت في النص.",
+          "انزل لتحت واختار <b>«أضف إلى الشاشة الرئيسية»</b>.",
+          "دوس <b>«إضافة»</b> — والأيقونة هتظهر على موبايلك زيّ أي تطبيق.",
+        ],
+        android: [
+          "دوس على زرار القائمة <b>⋮</b> فوق في كروم.",
+          "اختار <b>«تثبيت التطبيق»</b> أو <b>«الإضافة إلى الشاشة الرئيسية»</b>.",
+          "أكّد، والأيقونة هتظهر على موبايلك.",
+        ],
+        desktop: [
+          "في شريط العنوان فوق، دوس على أيقونة التثبيت <b>⊕</b> (على يمين الرابط).",
+          "أو من قائمة المتصفح ⋮ اختار <b>«تثبيت دوّنلي»</b>.",
+          "هيتفتح في نافذته الخاصة زيّ أي برنامج.",
+        ],
+      };
+
+      function openModal() {
+        const p = platform();
+        const list = INSTRUCTIONS[p] || INSTRUCTIONS.desktop;
+        lede.textContent =
+          p === "ios" ? "على الآيفون: من Safari في خطوتين." :
+          p === "android" ? "على الأندرويد: من كروم في خطوة." :
+          "على الكمبيوتر: من المتصفح في ضغطة.";
+        steps.innerHTML = list.map((s) => `<li>${s}</li>`).join("");
+        modal.classList.remove("hidden");
+      }
+      function closeModal() { modal.classList.add("hidden"); }
+
+      async function handleInstall() {
+        if (standalone()) { openModal(); return; }
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const choice = await deferredPrompt.userChoice.catch(() => ({}));
+          deferredPrompt = null;
+          if (choice && choice.outcome === "accepted") return;
+          return; // المستخدم رفض — نسيبه
+        }
+        openModal(); // مفيش prompt تلقائي (آيفون مثلاً) — نوريه الخطوات
+      }
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+      });
+      window.addEventListener("appinstalled", () => {
+        deferredPrompt = null;
+        if (hint) hint.innerHTML = "✅ التطبيق اتثبّت على جهازك — دوّر على أيقونة «دوّنلي».";
+      });
+
+      if (standalone() && hint) hint.innerHTML = "✅ إنت فاتح التطبيق المثبّت — يا أهلاً!";
+
+      heroBtn && heroBtn.addEventListener("click", handleInstall);
+      headerBtn && headerBtn.addEventListener("click", handleInstall);
+      document.getElementById("installClose").addEventListener("click", closeModal);
+      modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
     })();
   </script>
 </body>
