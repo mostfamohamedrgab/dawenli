@@ -391,7 +391,7 @@ a { color: inherit; }
 /* ===========================================================================
    هيكل التطبيق: سايدبار + محتوى
    =========================================================================== */
-.dw-app { display: flex; min-height: 100vh; background: var(--bg-app); }
+.dw-app { display: flex; min-height: 100vh; min-height: 100dvh; background: var(--bg-app); }
 
 .dw-sidebar {
   width: 256px;
@@ -493,8 +493,9 @@ a { color: inherit; }
   margin: 0 auto;
 }
 
-/* توب بار الموبايل */
+/* توب بار + شريط تابات الموبايل — متخفيين على الديسكتوب */
 .dw-topbar { display: none; }
+.dw-tabbar { display: none; }
 
 /* انتقال بين الصفحات — transform فقط عشان المحتوى ميختفيش لو الأنيميشن اتجمد */
 @keyframes viewFade { from { transform: translateY(10px); } to { transform: translateY(0); } }
@@ -1154,9 +1155,10 @@ select.field { cursor: pointer; }
     position: sticky;
     top: 0;
     z-index: 40;
-    padding: 12px 18px;
-    background: color-mix(in srgb, var(--paper) 88%, transparent);
-    backdrop-filter: blur(8px);
+    padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+    background: color-mix(in srgb, var(--paper) 85%, transparent);
+    backdrop-filter: blur(12px) saturate(1.3);
+    -webkit-backdrop-filter: blur(12px) saturate(1.3);
     border-bottom: 1px solid var(--hairline);
   }
   .dw-topbar img { height: 30px; }
@@ -1170,7 +1172,9 @@ select.field { cursor: pointer; }
     inset-inline-start: 0;
     inset-inline-end: auto;
     top: 0;
-    height: 100vh;
+    height: 100dvh;
+    padding-top: calc(24px + env(safe-area-inset-top));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
     transform: translateX(100%);
     transition: transform var(--dur-base) var(--ease-soft);
     box-shadow: var(--shadow-lg);
@@ -1186,6 +1190,50 @@ select.field { cursor: pointer; }
   .bodymap { grid-template-columns: 1fr; }
   .body-svg { margin: 0 auto; display: block; }
   .page-head { align-items: flex-start; flex-direction: column; }
+
+  /* المحتوى ياخد مساحة من تحت عشان الشريط السفلي ميغطّيهوش */
+  .dw-main { padding: 18px 16px calc(88px + env(safe-area-inset-bottom)); }
+
+  /* ===== شريط التابات السفلي — إحساس تطبيق نيتيف ===== */
+  .dw-tabbar {
+    display: flex;
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 50;
+    gap: 2px;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--surface-card) 90%, transparent);
+    backdrop-filter: blur(18px) saturate(1.5);
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    border-top: 1px solid var(--hairline);
+  }
+  .tabbar-btn {
+    flex: 1; min-width: 0;
+    border: none; background: transparent; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 0; color: var(--ink-faint);
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--dur-fast) var(--ease-soft), transform var(--dur-fast) var(--ease-soft);
+  }
+  .tabbar-btn:active { transform: scale(0.92); }
+  .tabbar-btn .tb-ico {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 56px; max-width: 100%; height: 30px;
+    border-radius: 999px;
+    transition: background var(--dur-base) var(--ease-soft);
+  }
+  .tabbar-btn .tb-label { font: 700 10.5px/1 var(--font-body); letter-spacing: -0.01em; }
+  .tabbar-btn[data-active="true"]                  { color: var(--brand-deep); }
+  .tabbar-btn[data-active="true"] .tb-ico          { background: var(--brand-wash); }
+  .tabbar-btn.health[data-active="true"]           { color: var(--health-deep); }
+  .tabbar-btn.health[data-active="true"] .tb-ico   { background: var(--health-wash); }
+  .tabbar-btn.habits[data-active="true"]           { color: var(--habits-deep); }
+  .tabbar-btn.habits[data-active="true"] .tb-ico   { background: var(--habits-wash); }
+  .tabbar-btn.goals[data-active="true"]            { color: var(--goals-deep); }
+  .tabbar-btn.goals[data-active="true"] .tb-ico    { background: var(--goals-wash); }
+  .tabbar-btn.finances[data-active="true"]         { color: var(--finances-deep); }
+  .tabbar-btn.finances[data-active="true"] .tb-ico { background: var(--finances-wash); }
 }
 
 /* ===========================================================================

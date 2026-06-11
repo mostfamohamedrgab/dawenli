@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>دوّنلي — احكيلي يومك وأنا أرتّبه</title>
     <link rel="icon" href="/assets/logo/dawwenli-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
@@ -435,6 +435,30 @@
 
         </main>
       </div>
+
+      <!-- ===================== تابات الموبايل (شريط سفلي زي التطبيقات) ===================== -->
+      <nav class="dw-tabbar" id="tabBar" aria-label="التنقل السريع">
+        <button class="tabbar-btn" data-tab="overview" data-active="true">
+          <span class="tb-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+          <span class="tb-label">الرئيسية</span>
+        </button>
+        <button class="tabbar-btn health" data-tab="health">
+          <span class="tb-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.5-1.5 3-3.3 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3.4 1-4.5 2.1A6.2 6.2 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.2 1.5 4 3 5.5l7 7Z"/></svg></span>
+          <span class="tb-label">الصحة</span>
+        </button>
+        <button class="tabbar-btn habits" data-tab="habits">
+          <span class="tb-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.6-2.2-1.2-3-.7-.9-1.3-1.7-1.3-3 0-.5.1-1 .3-1.5C5.6 6 4 9 4 12a8 8 0 0 0 16 0c0-4.8-3.5-8.5-6.5-10 .5 1.5.5 3-.3 4.2-.5.8-1.2 1.4-1.2 2.8 0 1.5 1 2.5 1 4a2.5 2.5 0 0 1-4.5 1.5Z"/></svg></span>
+          <span class="tb-label">العادات</span>
+        </button>
+        <button class="tabbar-btn goals" data-tab="goals">
+          <span class="tb-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+          <span class="tb-label">الأهداف</span>
+        </button>
+        <button class="tabbar-btn finances" data-tab="finances">
+          <span class="tb-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></span>
+          <span class="tb-label">الفلوس</span>
+        </button>
+      </nav>
     </div>
 
     <!-- ===================== لوحة الإشعارات (الجرس) ===================== -->

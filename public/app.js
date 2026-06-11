@@ -121,7 +121,7 @@ window.del = del;
 
 /* ===================== Navigation ===================== */
 function gotoTab(tab) {
-  document.querySelectorAll(".nav-btn[data-tab]").forEach((b) => b.dataset.active = String(b.dataset.tab === tab));
+  document.querySelectorAll(".nav-btn[data-tab], .tabbar-btn[data-tab]").forEach((b) => b.dataset.active = String(b.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== tab));
   const panel = document.querySelector(`.tab-panel[data-panel="${tab}"]`);
   if (panel) { panel.classList.remove("view-fade"); void panel.offsetWidth; panel.classList.add("view-fade"); }
@@ -136,6 +136,10 @@ function gotoTab(tab) {
 }
 $("sideNav").addEventListener("click", (e) => {
   const btn = e.target.closest(".nav-btn");
+  if (btn) gotoTab(btn.dataset.tab);
+});
+$("tabBar")?.addEventListener("click", (e) => {
+  const btn = e.target.closest(".tabbar-btn");
   if (btn) gotoTab(btn.dataset.tab);
 });
 document.querySelectorAll("[data-go]").forEach((c) => c.addEventListener("click", () => gotoTab(c.dataset.go)));
