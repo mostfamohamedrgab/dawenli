@@ -175,6 +175,19 @@ db.exec(`
     auth        TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
+
+  -- إشعارات داخل التطبيق — بتتخزّن عشان تظهر في الجرس حتى لو المستخدم مش فاتح.
+  CREATE TABLE IF NOT EXISTS notifications (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    title       TEXT NOT NULL,
+    body        TEXT,
+    url         TEXT,
+    icon        TEXT,
+    read_at     TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, id);
 `);
 
 /* ===================== Migrations ===================== */
@@ -1025,6 +1038,44 @@ export function listPushSubscriptions(userId) {
 const deletePushStmt = db.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ?`);
 export function deletePushSubscription(endpoint) {
   if (endpoint) deletePushStmt.run(endpoint);
+}
+
+/* ===================== In-app notifications (الجرس) ===================== */
+
+const insertNotifStmt = db.prepare(`
+  INSERT INTO notifications (created_at, user_id, title, body, url, icon)
+  VALUES (?, ?, ?, ?, ?, ?)
+`);
+export function addNotification(userId, { title, body = "", url = "/", icon = "🔔" } = {}) {
+  if (!userId || !title) return null;
+  const info = insertNotifStmt.run(now(), userId, title, body, url, icon);
+  return Number(info.lastInsertRowid);
+}
+
+const listNotifStmt = db.prepare(`
+  SELECT id, created_at, title, body, url, icon, read_at
+  FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT ?
+`);
+export function listNotifications(userId, limit = 30) {
+  return listNotifStmt.all(userId, limit);
+}
+
+const unreadCountStmt = db.prepare(
+  `SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND read_at IS NULL`
+);
+export function unreadNotificationCount(userId) {
+  return unreadCountStmt.get(userId).c;
+}
+
+const markAllReadStmt = db.prepare(
+  `UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL`
+);
+const markOneReadStmt = db.prepare(
+  `UPDATE notifications SET read_at = ? WHERE user_id = ? AND id = ? AND read_at IS NULL`
+);
+export function markNotificationsRead(userId, id = null) {
+  if (id) markOneReadStmt.run(now(), userId, id);
+  else markAllReadStmt.run(now(), userId);
 }
 
 /* ===================== Profile facts (ذاكرة دائمة عن الشخص) ===================== */

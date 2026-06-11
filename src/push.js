@@ -2,7 +2,7 @@
 // من غير ما تكسر أي حاجة تانية.
 import webpush from "web-push";
 import { config } from "./config.js";
-import { listPushSubscriptions, deletePushSubscription } from "./db.js";
+import { listPushSubscriptions, deletePushSubscription, addNotification } from "./db.js";
 
 export const pushEnabled = Boolean(config.vapidPublic && config.vapidPrivate);
 
@@ -14,6 +14,20 @@ if (pushEnabled) {
 }
 
 export const vapidPublicKey = config.vapidPublic;
+
+// القناة الموحّدة للإشعار: بيخزّنه في الجرس (يفضل ظاهر) + يبعت push للموبايل.
+// استخدمه في أي مكان عايز تنبّه فيه المستخدم.
+export async function notifyUser(userId, payload = {}) {
+  try {
+    addNotification(userId, {
+      title: payload.title || "دوّنلي",
+      body: payload.body || "",
+      url: payload.url || "/",
+      icon: payload.icon || "🔔",
+    });
+  } catch {}
+  return sendPushToUser(userId, payload);
+}
 
 // بيبعت إشعار لكل أجهزة مستخدم واحد. بيشيل أي اشتراك بقى منتهي (404/410).
 export async function sendPushToUser(userId, payload) {

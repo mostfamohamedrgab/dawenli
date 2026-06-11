@@ -54,8 +54,11 @@ import {
   platformStats,
   savePushSubscription,
   deletePushSubscription,
+  listNotifications,
+  unreadNotificationCount,
+  markNotificationsRead,
 } from "./db.js";
-import { pushEnabled, vapidPublicKey, sendPushToUser } from "./push.js";
+import { pushEnabled, vapidPublicKey, sendPushToUser, notifyUser } from "./push.js";
 import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING } from "./openai.js";
 import { buildReportData } from "./report.js";
 import { runAgent } from "./agent.js";
@@ -449,17 +452,33 @@ export function startServer() {
     deletePushSubscription(req.body?.endpoint);
     res.json({ ok: true });
   });
-  // إشعار تجريبي للمستخدم الحالي
+  // إشعار تجريبي للمستخدم الحالي (بيتخزّن في الجرس كمان)
   app.post("/api/push/test", async (req, res) => {
     const user = gate(req, res);
     if (!user) return;
-    if (!pushEnabled) return res.status(503).json({ error: "push_disabled" });
-    const sent = await sendPushToUser(user.id, {
+    const sent = await notifyUser(user.id, {
       title: "دوّنلي ✍️",
       body: "التنبيهات شغّالة! هفكّرك تدوّن يومك كل يوم.",
       url: "/",
+      icon: "🔔",
     });
     res.json({ ok: true, sent });
+  });
+
+  /* ===== إشعارات داخل التطبيق (الجرس) ===== */
+  app.get("/api/notifications", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({
+      items: listNotifications(user.id, 30),
+      unread: unreadNotificationCount(user.id),
+    });
+  });
+  app.post("/api/notifications/read", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    markNotificationsRead(user.id, req.body?.id || null);
+    res.json({ ok: true, unread: unreadNotificationCount(user.id) });
   });
 
   /* ===== الأقسام ===== */

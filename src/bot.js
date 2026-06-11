@@ -13,7 +13,7 @@ import {
   markTaskReminded,
 } from "./db.js";
 import { issueLoginCode, redeemLinkToken } from "./server.js";
-import { sendPushToUser } from "./push.js";
+import { notifyUser } from "./push.js";
 
 export function startBot() {
   const bot = new Telegraf(config.telegramToken);
@@ -221,10 +221,18 @@ function startSchedulers(bot) {
       try {
         for (const t of dueTaskReminders(c.date, c.hhmm)) {
           markTaskReminded(t.id);
+          const reminderMsg = `⏰ تذكير: ${t.title}${t.due_time ? " — الساعة " + t.due_time : ""}${t.note ? "\n📝 " + t.note : ""}`;
           await bot.telegram.sendMessage(
             t.chat_id,
-            `⏰ تذكير: ${t.title}${t.due_time ? " — الساعة " + t.due_time : ""}${t.note ? "\n📝 " + t.note : ""}\nلما تخلصها قولي "خلصت ${t.title}" وهعلّمها ✅`
+            `${reminderMsg}\nلما تخلصها قولي "خلصت ${t.title}" وهعلّمها ✅`
           );
+          // برضو إشعار داخل التطبيق + الموبايل
+          await notifyUser(t.user_id, {
+            title: "⏰ تذكير بمهمة",
+            body: `${t.title}${t.due_time ? " — الساعة " + t.due_time : ""}`,
+            url: "/",
+            icon: "⏰",
+          }).catch(() => {});
         }
       } catch (err) {
         console.error("task reminder error:", err);
@@ -242,11 +250,12 @@ function startSchedulers(bot) {
         try {
           const msg = await composeCheckin(user);
           await bot.telegram.sendMessage(user.chat_id, msg);
-          // وكمان إشعار على الموبايل (PWA) لو فعّل التنبيهات — قناة موازية للتيليجرام
-          await sendPushToUser(user.id, {
-            title: "دوّنلي — check-in 🌙",
-            body: msg.length > 120 ? msg.slice(0, 117) + "…" : msg,
+          // وكمان إشعار في الجرس + على الموبايل (PWA) — قناة موازية للتيليجرام
+          await notifyUser(user.id, {
+            title: "🌙 check-in اليومي",
+            body: msg.length > 140 ? msg.slice(0, 137) + "…" : msg,
             url: "/",
+            icon: "🌙",
           }).catch(() => {});
         } catch (err) {
           console.error(`checkin send error (user ${user.id}):`, err);

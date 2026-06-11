@@ -1210,7 +1210,7 @@ loadAll().then(() => {
   renderJournal();
 });
 
-/* ===================== PWA: تثبيت + إشعارات ===================== */
+/* ===================== الإشعارات (الجرس) + PWA ===================== */
 function b64ToUint8(base64) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
   const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -1218,60 +1218,141 @@ function b64ToUint8(base64) {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }
 
-async function initPWA() {
-  if (!("serviceWorker" in navigator)) return;
-  let reg;
-  try {
-    reg = await navigator.serviceWorker.register("/sw.js");
-  } catch { return; }
+const notif = { items: [], unread: 0, swReady: null };
 
-  const btn = $("notifyBtn");
-  if (!btn || !("PushManager" in window) || !("Notification" in window)) return;
+function fmtNotifTime(iso) {
+  const diff = (Date.now() - new Date(iso)) / 1000;
+  if (diff < 60) return "دلوقتي";
+  if (diff < 3600) return `من ${arNum(Math.floor(diff / 60))} دقيقة`;
+  if (diff < 86400) return `من ${arNum(Math.floor(diff / 3600))} ساعة`;
+  if (diff < 604800) return `من ${arNum(Math.floor(diff / 86400))} يوم`;
+  try { return new Date(iso).toLocaleDateString("ar-EG", { day: "numeric", month: "short" }); }
+  catch { return ""; }
+}
+
+function setBadge(n) {
+  notif.unread = n;
+  document.querySelectorAll("[data-bell-badge]").forEach((b) => {
+    b.textContent = n > 99 ? "99+" : arNum(n);
+    b.classList.toggle("hidden", !n);
+  });
+}
+
+function renderNotifList() {
+  const list = $("notifList");
+  if (!list) return;
+  if (!notif.items.length) {
+    list.innerHTML = `<div class="notif-empty">لسه مفيش إشعارات.<br>هتوصلك هنا تذكيرات المهام والـ check-in اليومي.</div>`;
+    return;
+  }
+  list.innerHTML = notif.items.map((n) => `
+    <div class="notif-item ${n.read_at ? "" : "unread"}" data-id="${n.id}" data-url="${escapeHtml(n.url || "/")}">
+      <span class="ni-ico">${escapeHtml(n.icon || "🔔")}</span>
+      <div class="ni-body">
+        <div class="ni-title">${escapeHtml(n.title)}</div>
+        ${n.body ? `<div class="ni-text">${escapeHtml(n.body)}</div>` : ""}
+        <div class="ni-time">${fmtNotifTime(n.created_at)}</div>
+      </div>
+      ${n.read_at ? "" : `<span class="ni-dot"></span>`}
+    </div>`).join("");
+}
+
+async function loadNotifications() {
+  try {
+    const d = await api("/api/notifications").then((r) => r.json());
+    notif.items = d.items || [];
+    setBadge(d.unread || 0);
+    renderNotifList();
+  } catch {}
+}
+
+function openNotif() {
+  closeSidebar();
+  $("notifPanel").classList.add("open");
+  $("notifScrim").classList.add("show");
+  $("notifPanel").setAttribute("aria-hidden", "false");
+  loadNotifications();
+}
+function closeNotif() {
+  $("notifPanel").classList.remove("open");
+  $("notifScrim").classList.remove("show");
+  $("notifPanel").setAttribute("aria-hidden", "true");
+}
+
+document.querySelectorAll("[data-bell]").forEach((b) =>
+  b.addEventListener("click", () =>
+    $("notifPanel").classList.contains("open") ? closeNotif() : openNotif()
+  )
+);
+$("notifClose")?.addEventListener("click", closeNotif);
+$("notifScrim")?.addEventListener("click", closeNotif);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeNotif(); });
+
+$("notifMarkAll")?.addEventListener("click", async () => {
+  try {
+    await api("/api/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    notif.items.forEach((n) => (n.read_at = n.read_at || new Date().toISOString()));
+    setBadge(0);
+    renderNotifList();
+  } catch {}
+});
+
+$("notifList")?.addEventListener("click", async (e) => {
+  const item = e.target.closest(".notif-item");
+  if (!item) return;
+  const id = Number(item.dataset.id);
+  const url = item.dataset.url || "/";
+  if (item.classList.contains("unread")) {
+    item.classList.remove("unread");
+    item.querySelector(".ni-dot")?.remove();
+    const row = notif.items.find((n) => n.id === id);
+    if (row) row.read_at = new Date().toISOString();
+    setBadge(Math.max(0, notif.unread - 1));
+    api("/api/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
+  }
+  if (url && url !== "/" && !location.pathname.endsWith(url)) location.href = url;
+});
+
+async function initPWA() {
+  if (!("serviceWorker" in navigator)) { loadNotifications(); return; }
+  try { await navigator.serviceWorker.register("/sw.js"); notif.swReady = await navigator.serviceWorker.ready; } catch {}
+  loadNotifications();
+  // تحديث خفيف للبادج كل دقيقة (من غير ما نقاطع اللوحة وهي مفتوحة)
+  setInterval(() => { if (!$("notifPanel")?.classList.contains("open")) loadNotifications(); }, 60000);
+
+  const pushRow = $("notifPush");
+  const enableBtn = $("enablePushBtn");
+  if (!pushRow || !enableBtn || !("PushManager" in window) || !("Notification" in window)) return;
 
   let key = null;
   try {
     const info = await api("/api/push/key").then((r) => r.json());
-    if (!info.enabled) return; // الإشعارات متعطّلة على السيرفر — نسيب الزرار مخفي
+    if (!info.enabled) return; // الـpush متعطّل على السيرفر — نسيب صف التفعيل مخفي
     key = info.key;
   } catch { return; }
 
-  const ready = await navigator.serviceWorker.ready;
-  const existing = await ready.pushManager.getSubscription();
+  const existing = notif.swReady ? await notif.swReady.pushManager.getSubscription() : null;
+  if (existing && Notification.permission === "granted") return; // مفعّل خلاص
 
-  function showOn() {
-    btn.textContent = "🔔 التنبيهات شغّالة ✓";
-    btn.disabled = true;
-    btn.classList.remove("hidden");
-  }
-  function showOff() {
-    btn.textContent = "🔔 فعّل التنبيهات";
-    btn.disabled = false;
-    btn.classList.remove("hidden");
-  }
-
-  if (existing && Notification.permission === "granted") { showOn(); return; }
-  showOff();
-
-  btn.onclick = async () => {
-    btn.disabled = true;
-    btn.textContent = "🔔 بفعّل…";
+  pushRow.classList.remove("hidden");
+  enableBtn.onclick = async () => {
+    enableBtn.disabled = true;
+    enableBtn.textContent = "بفعّل…";
     try {
       const perm = await Notification.requestPermission();
-      if (perm !== "granted") { showOff(); btn.textContent = "🔔 مرفوض — فعّلها من إعدادات المتصفح"; return; }
-      const sub = existing || (await ready.pushManager.subscribe({
+      if (perm !== "granted") { enableBtn.textContent = "مرفوض"; return; }
+      const sub = existing || (await notif.swReady.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: b64ToUint8(key),
       }));
-      await api("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sub.toJSON()),
-      });
+      await api("/api/push/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sub.toJSON()) });
       await api("/api/push/test", { method: "POST" }).catch(() => {});
-      showOn();
+      pushRow.classList.add("hidden");
+      loadNotifications();
     } catch (err) {
-      console.error("notify enable error:", err);
-      showOff();
+      console.error("push enable error:", err);
+      enableBtn.disabled = false;
+      enableBtn.textContent = "فعّل";
     }
   };
 }
