@@ -29,7 +29,7 @@ export function startScheduler() {
           markTaskReminded(t.id);
           await notifyUser(t.user_id, {
             title: "⏰ تذكير بمهمة",
-            body: `${t.title}${t.due_time ? " — الساعة " + t.due_time : ""}${t.note ? "\n📝 " + t.note : ""}`,
+            body: `${t.title}${t.due_time ? " — الساعة " + t.due_time : ""}${t.note ? "\n📝 " + t.note : ""}`.trim(),
             url: "/",
             icon: "⏰",
           }).catch(() => {});
@@ -49,7 +49,7 @@ export function startScheduler() {
         try {
           const msg = await composeCheckin(user);
           await notifyUser(user.id, {
-            title: "🌙 check-in اليومي",
+            title: "🌙 متابعة يومك",
             body: msg,
             url: "/",
             icon: "🌙",
@@ -68,8 +68,8 @@ export function startScheduler() {
       console.log(`✍️ تذكير اليوميات 10م — ${targets.length} مستخدم مسجّلش النهاردة`);
       for (const user of targets) {
         await notifyUser(user.id, {
-          title: "✍️ متنسيش تدوّن يومك",
-          body: "عدّى اليوم وانت لسه مدوّنتش حاجة — احكيلي يومك عدى إزاي؟ 🌙",
+          title: "✍️ لا تنسَ تدوين يومك",
+          body: "مرّ اليوم ولم تدوّن شيئًا بعد — كيف مرّ يومك؟ 🌙",
           url: "/",
           icon: "✍️",
         }).catch(() => {});

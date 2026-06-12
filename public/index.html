@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>دوّنلي — احكيلي يومك وأنا أرتّبه</title>
+    <title>دوّنلي — احكِ لي يومك وأنا أرتّبه</title>
     <link rel="icon" href="/assets/logo/dawwenli-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
     <!-- PWA -->
@@ -103,7 +103,7 @@
             <div class="page-head">
               <div>
                 <h1 id="heroGreeting">صباح الخير 👋</h1>
-                <p class="ph-sub" id="heroSub">دي حياتك مرتّبة — لحد دلوقتي.</p>
+                <p class="ph-sub" id="heroSub">هذه حياتك مرتّبة — حتى الآن.</p>
               </div>
               <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
                 <span class="date-chip" id="todayChip">—</span>
@@ -115,12 +115,12 @@
               <div style="display:flex;gap:14px;align-items:flex-start">
                 <span style="font-size:20px;color:var(--brand-deep)">✎</span>
                 <div style="flex:1;min-width:0">
-                  <textarea id="composerText" rows="2" placeholder="احكيلي عملت إيه النهاردة…"></textarea>
+                  <textarea id="composerText" rows="2" placeholder="احكِ لي ماذا فعلت اليوم…"></textarea>
                   <div class="comp-foot">
                     <span class="comp-hint">اكتب عن يومك، أو سجّل صوتك من هنا 🎙️ وأنا أرتّبه</span>
                     <div style="display:flex;gap:8px;align-items:center">
                       <button class="btn secondary" id="micBtn" title="سجّل صوتك">🎙️ سجّل</button>
-                      <button class="btn" id="composerBtn">✎ رتّبهالي</button>
+                      <button class="btn" id="composerBtn">✎ رتّبها لي</button>
                     </div>
                   </div>
                   <!-- شريط التسجيل -->
@@ -153,7 +153,7 @@
             <div class="page-head">
               <div>
                 <span class="world-pill health">عالم الصحة</span>
-                <h1>جسمك بيحكيلك</h1>
+                <h1>جسمك يحدّثك</h1>
               </div>
               <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
                 <select id="reportDays" class="field">
@@ -233,7 +233,7 @@
                 </div>
                 <div class="card">
                   <div class="card-head"><h3>متابعة الحالات</h3></div>
-                  <p class="muted" style="font-size:var(--text-sm);margin:0 0 12px">قول لدوّنلي «عندي ارتجاع وعايز أتابع حالتي» وهيجمّع الأعراض ويطلّع تقرير للدكتور.</p>
+                  <p class="muted" style="font-size:var(--text-sm);margin:0 0 12px">قل لدوّنلي «عندي ارتجاع وأريد متابعة حالتي» وسيجمع الأعراض ويُخرج تقريرًا للطبيب.</p>
                   <div id="conditions"></div>
                 </div>
               </div>
@@ -245,7 +245,7 @@
             <div class="page-head">
               <div>
                 <span class="world-pill habits">عالم العادات</span>
-                <h1>كل يوم بتكمّل، النار بتكبر</h1>
+                <h1>كل يوم تُكمل، والشعلة تكبر</h1>
               </div>
             </div>
 
@@ -279,7 +279,7 @@
             <div class="page-head">
               <div>
                 <span class="world-pill goals">عالم الأهداف</span>
-                <h1>قرّبت على القمة</h1>
+                <h1>اقتربت من القمة</h1>
               </div>
             </div>
 
@@ -291,7 +291,7 @@
                 <input id="goalUnit" class="field" placeholder="الوحدة" style="width:100px" />
                 <button type="submit" class="btn goals sm">＋ إضافة</button>
               </form>
-              <p class="muted" style="font-size:var(--text-sm);margin:10px 0 0">أو قول لدوّنلي «عايز أوصل ٥٠٠ ألف» وكل ما تتقدّم قوله «عملت ٥ آلاف».</p>
+              <p class="muted" style="font-size:var(--text-sm);margin:10px 0 0">أو قل لدوّنلي «أريد الوصول إلى ٥٠٠ ألف» وكلما تقدّمت قل له «أنجزت ٥ آلاف».</p>
             </div>
 
             <div class="ring-grid" id="ringGrid"></div>
@@ -302,7 +302,7 @@
             <div class="page-head">
               <div>
                 <span class="world-pill finances">عالم الفلوس</span>
-                <h1>نبتتك بتكبر 🌱</h1>
+                <h1>نبتتك تكبر 🌱</h1>
               </div>
             </div>
 
@@ -315,7 +315,7 @@
                   <div id="finBarsWrap"><canvas id="finBars"></canvas></div>
                 </div>
                 <div class="card">
-                  <div class="card-head"><h3>على إيه بتصرف</h3><span class="muted" style="font-size:var(--text-sm)">آخر ٣٠ يوم</span></div>
+                  <div class="card-head"><h3>على ماذا تُنفق</h3><span class="muted" style="font-size:var(--text-sm)">آخر ٣٠ يومًا</span></div>
                   <div id="catBars" class="cat-bars"></div>
                 </div>
                 <div class="card">
@@ -339,7 +339,7 @@
               <div class="stack">
                 <div class="sketch-box alt" style="background:var(--finances-wash);border-color:var(--finances);padding:24px;display:flex;flex-direction:column;align-items:center;gap:10px">
                   <img src="/assets/illustrations/world-finances.svg" alt="عالم الفلوس" style="width:150px;height:150px" />
-                  <span style="font-family:var(--font-display);font-weight:700;color:var(--finances-deep)">مدّخراتك بتكبر</span>
+                  <span style="font-family:var(--font-display);font-weight:700;color:var(--finances-deep)">مدّخراتك تنمو</span>
                 </div>
                 <div class="card">
                   <div class="card-head"><h3>آخر حركات</h3></div>
@@ -383,7 +383,7 @@
                   <h3 id="calTitle">التقويم</h3>
                   <div class="day-nav">
                     <button id="calPrev" class="btn ghost sm">‹</button>
-                    <button id="calToday" class="btn ghost sm">النهاردة</button>
+                    <button id="calToday" class="btn ghost sm">اليوم</button>
                     <button id="calNext" class="btn ghost sm">›</button>
                   </div>
                 </div>
@@ -402,7 +402,7 @@
                 <div id="dayTasks" class="list"></div>
               </div>
             </div>
-            <p class="muted center" style="margin-top:18px;font-size:var(--text-sm)">قول لدوّنلي «عندي ميتنج بكرة الساعة ٥» وهتلاقيها هنا، وهيفكّرك في معادها ⏰</p>
+            <p class="muted center" style="margin-top:18px;font-size:var(--text-sm)">قل لدوّنلي «عندي اجتماع غدًا الساعة ٥» وستجدها هنا، وسيذكّرك في موعدها ⏰</p>
           </section>
 
           <!-- ========== المحادثات ========== -->
@@ -413,7 +413,7 @@
                 <h1>المحادثات</h1>
               </div>
             </div>
-            <p class="muted" style="margin:0 0 16px">كل اللي قلته لدوّنلي ورد عليه — دي ذاكرته معاك.</p>
+            <p class="muted" style="margin:0 0 16px">كل ما قلته لدوّنلي وردّ عليه — هذه ذاكرته معك.</p>
             <div id="chats" class="chats"></div>
           </section>
 
@@ -446,7 +446,7 @@
     </div>
 
     <!-- ===================== زرار الصوت العائم + شيت الشات ===================== -->
-    <button class="voice-fab" id="voiceFab" aria-label="احكيلي بصوتك">
+    <button class="voice-fab" id="voiceFab" aria-label="احكِ لي بصوتك">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
     </button>
     <div id="chatScrim" class="chat-scrim"></div>
@@ -454,10 +454,10 @@
       <div class="chat-sheet-head">
         <span class="chat-grip"></span>
         <div class="chat-head-row">
-          <b>احكيلي يومك ✍️</b>
+          <b>احكِ لي يومك ✍️</b>
           <button id="chatClose" class="icon-btn" aria-label="إغلاق">✕</button>
         </div>
-        <span class="chat-sub">اكتب أو سجّل صوتك وأنا أرتّبهولك — واسألني أي وقت 🙂</span>
+        <span class="chat-sub">اكتب أو سجّل صوتك وأنا أرتّبها لك — واسألني في أي وقت 🙂</span>
       </div>
       <div id="chatSheetBody" class="chat-sheet-body"><!-- الكومبوزر بيتنقل هنا --></div>
     </div>
@@ -475,7 +475,7 @@
       <div id="notifPush" class="notif-push hidden">
         <div>
           <b>📲 فعّل تنبيهات الموبايل</b>
-          <span>عشان الإشعار يوصلك حتى والتطبيق مقفول.</span>
+          <span>حتى يصلك الإشعار وإن كان التطبيق مغلقًا.</span>
         </div>
         <button id="enablePushBtn" class="btn sm" type="button">فعّل</button>
       </div>
@@ -485,8 +485,8 @@
     <div id="confirmOverlay" class="modal-overlay hidden">
       <div class="modal" role="dialog" aria-modal="true">
         <div class="modal-icon">🗑️</div>
-        <h3 class="modal-title">متأكد إنك عايز تمسحها؟</h3>
-        <p class="modal-text">مش هتقدر ترجّعها بعد كده.</p>
+        <h3 class="modal-title">متأكد أنك تريد حذفها؟</h3>
+        <p class="modal-text">لن تستطيع استرجاعها بعد ذلك.</p>
         <div class="modal-actions">
           <button id="confirmCancel" class="btn secondary">إلغاء</button>
           <button id="confirmOk" class="btn danger">امسح</button>

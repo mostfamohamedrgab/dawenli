@@ -574,7 +574,7 @@ $("profileForm")?.addEventListener("submit", async (e) => {
 function renderOverview() {
   $("heroGreeting").textContent = greeting();
   const streak = computeStreak(state.journal);
-  $("heroSub").textContent = streak > 0 ? "دي حياتك مرتّبة — لحد دلوقتي." : "ابدأ بحاجة صغيرة — احكيلي عن يومك.";
+  $("heroSub").textContent = streak > 0 ? "هذه حياتك مرتّبة — حتى الآن." : "ابدأ بخطوة صغيرة — احكِ لي عن يومك.";
   $("todayChip").textContent = `🗓 ${fmtDate(TODAY())}`;
   $("streakChip").textContent = `🔥 ${arNum(streak)} ${streak === 1 ? "يوم" : "أيام"}`;
   renderProfile();
@@ -594,23 +594,23 @@ function renderOverview() {
   const worlds = [
     {
       w: "health", title: "الصحة",
-      metric: healthWeek.length ? `${arNum(healthWeek.length)} تدوينة الأسبوع ده` : "لسه هادية",
-      caption: lastHealth ? lastHealth.detail : "احكيلي عن نومك وجسمك",
+      metric: healthWeek.length ? `${arNum(healthWeek.length)} تدوينة هذا الأسبوع` : "لا تزال هادئة",
+      caption: lastHealth ? lastHealth.detail : "احكِ لي عن نومك وجسمك",
     },
     {
       w: "habits", title: "العادات",
       metric: bestHabit ? `ستريك ${arNum(bestHabit.streak)} ${bestHabit.streak === 1 ? "يوم" : "أيام"} 🔥` : "ابدأ عادة",
-      caption: bestHabit ? `${bestHabit.title} · ${arNum(habitsDone)}/${arNum(state.habits.length)} النهاردة` : "قول لدوّنلي «بلعب رياضة كل يوم»",
+      caption: bestHabit ? `${bestHabit.title} · ${arNum(habitsDone)}/${arNum(state.habits.length)} اليوم` : "قل لدوّنلي «ألعب رياضة كل يوم»",
     },
     {
       w: "goals", title: "الأهداف",
       metric: topGoal && topGoal.target ? `${arNum(Math.min(100, Math.round((topGoal.current / topGoal.target) * 100)))}٪ من هدفك` : (topGoal ? topGoal.title : "حدّد هدف"),
-      caption: topGoal ? topGoal.title : "قول لدوّنلي «عايز أوصل…»",
+      caption: topGoal ? topGoal.title : "قل لدوّنلي «أريد الوصول…»",
     },
     {
       w: "finances", title: "الفلوس",
       metric: monthFin.length ? `صرفت ${arNum(mExpense)}` : "سجّل أول عملية",
-      caption: monthFin.length ? "اضغط تشوف تفاصيل مصاريفك الشهر ده" : "قول لدوّنلي «صرفت ٢٠٠ على أكل»",
+      caption: monthFin.length ? "اضغط لرؤية تفاصيل مصاريفك هذا الشهر" : "قل لدوّنلي «صرفت ٢٠٠ على الطعام»",
     },
   ];
   $("worldGrid").innerHTML = worlds.map((x) => `
@@ -645,7 +645,7 @@ function renderFeed() {
         </div>
         <div class="lr-chips">${x.chips.map((c) => `<span class="chip ${c.c}">${escapeHtml(c.t)}</span>`).join("")}</div>
       </div>`).join("")
-    : emptyState("لسه ما دوّنتش حاجة هنا", "سجّل صوتك أو اكتب فوق عن يومك وأنا هبدأ أرتّبلك.");
+    : emptyState("لا يوجد تدوين هنا بعد", "سجّل صوتك أو اكتب بالأعلى عن يومك وسأبدأ بترتيبه لك.");
 }
 
 /* ===================== الصحة ===================== */
@@ -691,7 +691,7 @@ function renderHealthPage() {
         <span class="badge ${toneOf(h.category)}"><span class="dot"></span>${fmtShort(h.entry_date)}</span>
         <span class="tl-text">${escapeHtml(h.detail)}</span>
       </div>`).join("")
-    : `<span class="muted" style="font-size:var(--text-sm)">لسه مفيش تدوينات صحية.</span>`;
+    : `<span class="muted" style="font-size:var(--text-sm)">لا توجد تدوينات صحية بعد.</span>`;
 
   renderBodyMap();
   renderConditions();
@@ -706,7 +706,7 @@ function renderMoodChart() {
   const days = lastNDays(7);
   const pts = days.map((d) => ({ date: d, mood: moodByDate[d] ? moodInfo(moodByDate[d]) : null }));
   if (!pts.some((p) => p.mood)) {
-    el.innerHTML = `<div class="empty sm">${DOODLE}<p>مفيش مزاج متسجّل — احكيلي عن يومك وهرسمهولك هنا.</p></div>`;
+    el.innerHTML = `<div class="empty sm">${DOODLE}<p>لا يوجد مزاج مسجّل — احكِ لي عن يومك وسأرسمه لك هنا.</p></div>`;
     return;
   }
   const W = 560, H = 180, padX = 26, padTop = 18, padBot = 30;
@@ -773,7 +773,7 @@ function renderBodyMap() {
   const listEl = $("healthList");
   const shown = pageFilter ? items.filter((h) => (h.body_region || "عام") === pageFilter) : items;
   if (!items.length) {
-    listEl.innerHTML = `<div class="empty sm">${DOODLE}<p>مفيش حاجات صحية في اليوم ده. قول لدوّنلي «جريت ١٠ دقايق» أو «أخدت العلاج».</p></div>`;
+    listEl.innerHTML = `<div class="empty sm">${DOODLE}<p>لا توجد تدوينات صحية في هذا اليوم. قل لدوّنلي «جريت ١٠ دقائق» أو «أخذت الدواء».</p></div>`;
     return;
   }
   listEl.innerHTML =
@@ -903,7 +903,7 @@ function renderHabitsPage() {
           </div>`).join("")}
       </div>`;
   } else {
-    $("streakPanel").innerHTML = emptyState("لسه مفيش عادات", "ضيف عادة جنب، أو قول لدوّنلي «بلعب رياضة كل يوم».");
+    $("streakPanel").innerHTML = emptyState("لا توجد عادات بعد", "أضف عادة بجانبه، أو قل لدوّنلي «ألعب رياضة كل يوم».");
   }
 
   // هيت ماب ٨ أسابيع: كل الأيام اللي اتعملت فيها أي عادة
@@ -948,7 +948,7 @@ function renderHabitsPage() {
           <div class="hr-dots">${dots}</div>
           <div class="hr-foot">
             <button class="btn ${h.doneToday ? "secondary" : "habits"} sm" onclick="toggleHabit(${h.id}, ${h.doneToday})">
-              ${h.doneToday ? "✓ اتعملت النهاردة" : "علّمها للنهاردة"}
+              ${h.doneToday ? "✓ تمّت اليوم" : "علّمها لليوم"}
             </button>
             <button class="icon-btn" onclick="del('habits', ${h.id})" title="حذف">🗑️</button>
           </div>
@@ -995,7 +995,7 @@ function renderGoalsPage() {
   const el = $("ringGrid");
   const data = state.goals;
   if (!data.length) {
-    el.innerHTML = emptyState("لسه مفيش أهداف", "ضيف هدف فوق، أو قول لدوّنلي «هدفي أوصل ٥٠٠ ألف».");
+    el.innerHTML = emptyState("لا توجد أهداف بعد", "أضف هدفًا بالأعلى، أو قل لدوّنلي «هدفي الوصول إلى ٥٠٠ ألف».");
     return;
   }
   el.innerHTML = data.map((g) => {
@@ -1041,7 +1041,7 @@ async function openGoalDetail(id) {
           <span class="gl-after">الإجمالي ${arNum(e.current_after)}</span>
         </div>`;
       }).join("")
-    : `<div class="muted" style="text-align:center;padding:24px">لسه مفيش تحديثات على الهدف ده — أول ما تزوّد فيه هتلاقي السجل هنا.</div>`;
+    : `<div class="muted" style="text-align:center;padding:24px">لا توجد تحديثات على هذا الهدف بعد — بمجرد أن تزيد فيه ستجد السجل هنا.</div>`;
   const ov = document.createElement("div");
   ov.className = "modal-overlay"; ov.id = "goalDetailOv";
   ov.innerHTML = `<div class="modal" style="max-width:460px;text-align:right">
@@ -1122,14 +1122,14 @@ function renderFinancesPage() {
           <div class="cb-track"><div class="cb-fill" style="width:${pct}%"></div></div>
         </div>`;
       }).join("")
-    : `<span class="muted" style="font-size:var(--text-sm)">قول لدوّنلي «صرفت ٢٠٠ على أكل» وهيتصنّف هنا لوحده.</span>`;
+    : `<span class="muted" style="font-size:var(--text-sm)">قل لدوّنلي «صرفت ٢٠٠ على الطعام» وسيُصنّف هنا تلقائيًا.</span>`;
 
   // آخر حركات
   $("finTx").innerHTML = data.slice(0, 5).map((f) => `
     <div class="tl-row">
       <span class="tl-text" style="flex:1">${escapeHtml(f.note || f.category || "عملية")}</span>
       <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}" style="font:var(--type-label)">${f.direction === "income" ? "+" : "-"}${arNum(f.amount)} ${curLabel(f)}</span>
-    </div>`).join("") || `<span class="muted" style="font-size:var(--text-sm)">لسه مفيش حركات.</span>`;
+    </div>`).join("") || `<span class="muted" style="font-size:var(--text-sm)">لا توجد حركات بعد.</span>`;
 
   // كل العمليات
   const el = $("finList");
@@ -1145,7 +1145,7 @@ function renderFinancesPage() {
           <button class="icon-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
         </div>
       </div>`).join("")
-    : emptyState("مفيش عمليات لسه", "قول لدوّنلي «صرفت ٢٠٠ على أكل» أو ضيف عملية فوق.");
+    : emptyState("لا توجد عمليات بعد", "قل لدوّنلي «صرفت ٢٠٠ على الطعام» أو أضف عملية بالأعلى.");
 }
 $("finForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -1250,7 +1250,7 @@ function renderJournal() {
   const el = $("entries");
   const data = state.journal;
   if (!data.length) {
-    el.innerHTML = emptyState("لسه ما دوّنتش حاجة", "سجّل صوتك أو اكتب عن يومك وأنا أرتّبه.");
+    el.innerHTML = emptyState("لا يوجد تدوين بعد", "سجّل صوتك أو اكتب عن يومك وأنا أرتّبه.");
     return;
   }
   el.innerHTML = data.map((e) => {
@@ -1334,7 +1334,7 @@ function renderCalendar() {
   );
 
   const isToday = state.selDate === TODAY();
-  $("dayTasksTitle").textContent = isToday ? "مهام النهاردة" : `مهام ${fmtDate(state.selDate)}`;
+  $("dayTasksTitle").textContent = isToday ? "مهام اليوم" : `مهام ${fmtDate(state.selDate)}`;
   const sel = (byDate[state.selDate] || []).slice().sort((a, b) => ((a.due_time || "99") < (b.due_time || "99") ? -1 : 1));
   renderTaskRows($("dayTasks"), sel);
 }
@@ -1397,7 +1397,7 @@ const KIND_LABEL = { voice: "🎙️ صوت", text: "⌨️ كتابة", command
 function renderChats() {
   const el = $("chats");
   const data = state.conversations;
-  if (!data.length) { el.innerHTML = emptyState("لسه مفيش محادثات", "أول ما تحكي لدوّنلي هتلاقي كل حاجة هنا."); return; }
+  if (!data.length) { el.innerHTML = emptyState("لا توجد محادثات بعد", "بمجرد أن تحكي لدوّنلي ستجد كل شيء هنا."); return; }
   el.innerHTML = data.slice(0, 60).map((c) => `
     <div class="chat-card">
       <div class="chat-head">
@@ -1475,7 +1475,7 @@ const notif = { items: [], unread: 0, swReady: null };
 
 function fmtNotifTime(iso) {
   const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 60) return "دلوقتي";
+  if (diff < 60) return "الآن";
   if (diff < 3600) return `من ${arNum(Math.floor(diff / 60))} دقيقة`;
   if (diff < 86400) return `من ${arNum(Math.floor(diff / 3600))} ساعة`;
   if (diff < 604800) return `من ${arNum(Math.floor(diff / 86400))} يوم`;
@@ -1495,7 +1495,7 @@ function renderNotifList() {
   const list = $("notifList");
   if (!list) return;
   if (!notif.items.length) {
-    list.innerHTML = `<div class="notif-empty">لسه مفيش إشعارات.<br>هتوصلك هنا تذكيرات المهام والـ check-in اليومي.</div>`;
+    list.innerHTML = `<div class="notif-empty">لا توجد إشعارات بعد.<br>ستصلك هنا تذكيرات المهام والمتابعة اليومية.</div>`;
     return;
   }
   list.innerHTML = notif.items.map((n) => `

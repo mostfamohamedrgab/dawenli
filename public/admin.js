@@ -75,21 +75,8 @@ function renderUsage(usage, pricing) {
       </tr>`).join("")
     : `<tr><td colspan="7" class="muted" style="font-size:var(--text-sm)">لسه مفيش استهلاك متسجّل.</td></tr>`;
 
-  // بطاقة الأسعار — عشان يبان إزاي اتحسبت التكلفة بالظبط
-  const rateCard = Object.entries(pricing || {})
-    .map(([model, p]) => {
-      const parts = [];
-      if (p.in != null) parts.push(`$${p.in}/مليون توكن إدخال`);
-      if (p.out != null) parts.push(`$${p.out}/مليون توكن إخراج`);
-      if (p.perMin != null) parts.push(`$${p.perMin}/دقيقة صوت`);
-      return `<b>${escapeHtml(model)}</b>: ${parts.join(" · ")}`;
-    })
-    .join("<br>");
-
-  const since = t.since ? `بنتتبّع من ${fmtDate(t.since)}. ` : "";
-  $("usageNote").innerHTML =
-    `${since}عدد التوكنز والدقايق دي <b>حقيقية</b> جايّة من الـ response بتاع OpenAI API. ` +
-    `التكلفة محسوبة = التوكنز × سعر الموديل من القايمة دي:<br>${rateCard}`;
+  const noteEl = $("usageNote");
+  if (noteEl) noteEl.innerHTML = "";
 }
 
 function renderStats(s, usage) {
