@@ -92,7 +92,7 @@ const TOOLS = [
         properties: {
           direction: { type: "string", enum: ["expense", "income"] },
           amount: { type: "number", description: "المبلغ — رقم موجب" },
-          currency: { type: "string", description: "العملة، الافتراضي جنيه" },
+          currency: { type: "string", description: "حطّها بس لو المستخدم ذكر عملة صراحةً (زي دولار، ريال، درهم). للمصاريف العادية سيبها فاضية." },
           category: { type: "string", enum: FINANCE_CATEGORIES, description: "بند الصرف" },
           note: { type: "string", description: "وصف قصير (مثلاً: غدا مع أصحابي)" },
           date: { type: "string", description: "YYYY-MM-DD" },
@@ -337,7 +337,7 @@ function executeTool(ctx, name, args) {
         entryDate: date,
         direction: args.direction,
         amount,
-        currency: args.currency || "جنيه",
+        currency: args.currency || null,
         category: args.category || "أخرى",
         note: args.note || null,
       });
@@ -617,6 +617,7 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 
 # الأسئلة التوضيحية
 - لو في لبس حقيقي يمنع التسجيل الصح (قال "صرفت فلوس" من غير مبلغ، أو مهمة من غير معاد واضح، أو هدف غامض) → سجّل اللي واضح، واسأل **سؤال واحد قصير ومحدد** عن الناقص.
+- **الأرقام المش متأكد منها:** لو رقم ممكن يكون اتفهم غلط من تفريغ الصوت (مثلاً «٥» ممكن تكون ٥ أو ٥٠٠، أو مبلغ شكله غريب/مش منطقي) → اسأله تأكيد قصير («قصدك ٥ ولا ٥٠٠؟») قبل ما تثبّت الرقم. سجّل باقي الكلام عادي، ولما يرد بالصح عدّل القيمة (بـ correct_journal أو سجّلها).
 - لو المستخدم بيرد على سؤال سألته قبل كده (شوف المحادثة) → كمّل التسجيل بناءً على رده.
 - ماتسألش لو الموضوع واضح أو الناقص مش مهم.
 
@@ -727,10 +728,11 @@ export async function composeCheckin(user) {
   const today = localToday();
 
   const missing = [];
-  const journalToday = listEntries(userId, 5).some((e) => e.entry_date === today);
-  if (!journalToday) missing.push("ماحكاش عن يومه النهاردة (يومياته فاضية)");
+  const todayEntries = listEntries(userId, 8).filter((e) => e.entry_date === today);
+  if (!todayEntries.length) missing.push("لسه ماحكاش عن يومه النهاردة (يومياته فاضية)");
+  else if (!todayEntries.some((e) => e.mood)) missing.push("حكى عن يومه بس مذكرش مزاجه/إحساسه النهاردة");
   const financeToday = financeSince(userId, today);
-  if (!financeToday.length) missing.push("ماسجّلش أي مصاريف أو دخل النهاردة");
+  if (!financeToday.length) missing.push("ماسجّلش أي مصاريف النهاردة (اسأله صرف كام؟)");
   const habits = listHabits(userId);
   const notDone = habits.filter((h) => !h.doneToday).map((h) => h.title);
   if (notDone.length) missing.push(`عادات لسه ماتعلّمتش النهاردة: ${notDone.join("، ")}`);
@@ -743,7 +745,7 @@ export async function composeCheckin(user) {
   const goals = listGoals(userId).slice(0, 5);
 
   const prompt = `انت "دوّنلي". دلوقتي معاد الـ check-in اليومي بتاعك مع المستخدم${user.name ? " (" + user.name + ")" : ""}.
-اكتب رسالة قصيرة (٢-٣ سطور بالكتير) بالعامي المصري تسأله عن يومه وتركّز على ١-٢ من الحاجات الناقصة دي بالتحديد:
+اكتب رسالة قصيرة (سطرين لتلاتة) بعربي بسيط محايد (مش لهجة بلد معيّن) تسأله عن يومه وتركّز على ١-٢ من الحاجات الناقصة دي بالتحديد:
 ${missing.length ? missing.map((m) => "- " + m).join("\n") : "- كله متسجّل النهاردة — اسأله سؤال خفيف عن إحساسه بيومه."}
 ${goals.length ? "\nأهدافه الحالية (لو حبيت تفكّره بواحد منهم بلطف):\n" + goals.map((g) => `- ${g.title}: ${g.current}${g.unit ? " " + g.unit : ""}${g.target ? ` من ${g.target}` : ""}`).join("\n") : ""}
 

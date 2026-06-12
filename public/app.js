@@ -47,6 +47,8 @@ const HEALTH_ICON = { "تمرين": "🏃", "دواء": "💊", "أكل": "🍽�
 
 // حرف اليوم زي التصميم: س ح ن ث ر خ ج
 const DAY_LETTER = ["ح", "ن", "ث", "ر", "خ", "ج", "س"]; // jsDay 0=الأحد
+const MONEY = "🪙"; // رمز فلوس محايد — مابنحدّدش عملة معيّنة (العملات بتختلف بين الناس)
+const curLabel = (f) => (f.currency && f.currency !== "جنيه" ? escapeHtml(f.currency) : MONEY);
 
 function fmtDate(d) {
   try { return new Date(d).toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" }); }
@@ -255,6 +257,47 @@ function endTour() {
 }
 window.startTour = startTour; // عشان نقدر نشغّلها يدويًا
 
+/* ===================== سحب لتحت للتحديث (زي السوشيال) ===================== */
+(function pullToRefresh() {
+  const THRESH = 72;
+  let startY = 0, pulling = false, dist = 0, busy = false;
+  const ind = document.createElement("div");
+  ind.className = "ptr-ind";
+  ind.innerHTML = `<span class="ptr-spin"></span>`;
+  document.body.appendChild(ind);
+  const atTop = () => (window.scrollY || document.documentElement.scrollTop || 0) <= 0;
+  const blocked = () => busy || $("chatSheet")?.classList.contains("open") || !!$("tourOv") || $("sidebar")?.classList.contains("open");
+  window.addEventListener("touchstart", (e) => {
+    if (!atTop() || blocked()) { pulling = false; return; }
+    startY = e.touches[0].clientY; pulling = true; dist = 0;
+  }, { passive: true });
+  window.addEventListener("touchmove", (e) => {
+    if (!pulling) return;
+    dist = e.touches[0].clientY - startY;
+    if (dist > 0) {
+      if (e.cancelable) e.preventDefault();
+      const pull = Math.min(dist, 130);
+      ind.style.transform = `translateX(-50%) translateY(${Math.min(pull * 0.7, 70)}px) rotate(${pull * 2.6}deg)`;
+      ind.style.opacity = String(Math.min(1, pull / THRESH));
+      ind.classList.toggle("ready", pull >= THRESH);
+    } else { pulling = false; ind.style.opacity = ""; ind.style.transform = ""; }
+  }, { passive: false });
+  window.addEventListener("touchend", async () => {
+    if (!pulling) return;
+    pulling = false;
+    if (dist >= THRESH) {
+      busy = true;
+      ind.classList.add("spinning"); ind.classList.remove("ready");
+      ind.style.transform = `translateX(-50%) translateY(54px)`;
+      ind.style.opacity = "1";
+      try { await loadAll(true); } catch {}
+      ind.classList.remove("spinning");
+      busy = false;
+    }
+    ind.style.transform = ""; ind.style.opacity = ""; dist = 0;
+  });
+})();
+
 /* ===================== الكومبوزر: رتّبهالي ===================== */
 // سطر الإيصال من الـ agent → عالمه (للون الـ chip)
 function receiptWorld(line) {
@@ -310,7 +353,7 @@ let recChunks = [];
 let recTimer = null;
 let recStartedAt = 0;
 let recCancelled = false;
-let audioCtx = null, waveAnalyser = null, waveRaf = null, wakeLock = null;
+let audioCtx = null, waveAnalyser = null, waveRaf = null, wakeLock = null, micStream = null;
 
 function recElems() {
   return { bar: $("recBar"), time: $("recTime"), mic: $("micBtn"), comp: $("composerBtn") };
@@ -377,6 +420,14 @@ async function releaseWakeLock() {
   try { if (wakeLock) await wakeLock.release(); } catch {}
   wakeLock = null;
 }
+// المايك بنطلبه مرة واحدة بس ونعيد استخدام نفس الـ stream — مفيش طلب صلاحية كل مرة
+async function getMic() {
+  if (micStream && micStream.getTracks().some((t) => t.readyState === "live")) return micStream;
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  return micStream;
+}
+window.addEventListener("pagehide", () => { micStream?.getTracks().forEach((t) => t.stop()); micStream = null; });
+
 async function startRecording() {
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
     $("composerResult").innerHTML = `<div class="comp-reply">متصفحك مش بيدعم التسجيل الصوتي — اكتب عن يومك في الخانة فوق وأنا أرتّبه 🙏</div>`;
@@ -384,7 +435,8 @@ async function startRecording() {
   }
   let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream = await getMic();
+    stream.getTracks().forEach((t) => (t.enabled = true));
   } catch {
     $("composerResult").innerHTML = `<div class="comp-reply">لازم تسمح للمايك عشان أسجّل صوتك 🎙️</div>`;
     return;
@@ -396,7 +448,8 @@ async function startRecording() {
   recCancelled = false;
   mediaRecorder.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
   mediaRecorder.onstop = async () => {
-    stream.getTracks().forEach((t) => t.stop());
+    // مانوقّفش الـ tracks — نسكّتها بس عشان نحافظ على الصلاحية ومنطلبهاش تاني
+    stream.getTracks().forEach((t) => (t.enabled = false));
     clearInterval(recTimer);
     stopWave();
     releaseWakeLock();
@@ -579,7 +632,7 @@ function renderFeed() {
   const items = [];
   for (const e of state.journal.slice(0, 5)) items.push({ t: e.created_at || e.entry_date, txt: e.summary || "تدوينة", chips: [{ c: "", t: `📝 يوميات${e.mood ? " · " + e.mood : ""}` }] });
   for (const h of state.health.slice(0, 5)) items.push({ t: h.created_at, txt: h.detail, chips: [{ c: "health", t: `${HEALTH_ICON[h.category] || "🩺"} ${h.category}` }] });
-  for (const f of state.finance.slice(0, 5)) items.push({ t: f.created_at, txt: f.note || f.category || "عملية", chips: [{ c: "finances", t: `${f.direction === "income" ? "➕" : "➖"} ${arNum(f.amount)} ${f.currency || "جنيه"}` }] });
+  for (const f of state.finance.slice(0, 5)) items.push({ t: f.created_at, txt: f.note || f.category || "عملية", chips: [{ c: "finances", t: `${f.direction === "income" ? "➕" : "➖"} ${arNum(f.amount)} ${curLabel(f)}` }] });
   for (const t of state.tasks.slice(-4)) items.push({ t: t.created_at, txt: t.title, chips: [{ c: "goals", t: `📅 ${fmtShort(t.due_date)}${t.due_time ? " · " + t.due_time : ""}` }] });
   items.sort((a, b) => new Date(b.t) - new Date(a.t));
   const top = items.slice(0, 8);
@@ -993,9 +1046,9 @@ function renderFinancesPage() {
 
   // الفلوس مركّزة على المصاريف بس (الدخل في الأهداف، مش هنا — عشان نبسّط)
   $("finStats").innerHTML = [
-    { label: "مصاريف الأسبوع", value: arNum(weekExpense), unit: "جنيه", ico: "💸", delta: "آخر ٧ أيام", trend: "" },
-    { label: "مصاريف الشهر", value: arNum(mExpense), unit: "جنيه", ico: "🧾", delta: "من أول الشهر", trend: "" },
-    { label: "متوسط اليوم", value: arNum(avgDay), unit: "جنيه", ico: "📊", delta: "في المتوسط", trend: "" },
+    { label: "مصاريف الأسبوع", value: arNum(weekExpense), unit: MONEY, ico: "💸", delta: "آخر ٧ أيام", trend: "" },
+    { label: "مصاريف الشهر", value: arNum(mExpense), unit: MONEY, ico: "🧾", delta: "من أول الشهر", trend: "" },
+    { label: "متوسط اليوم", value: arNum(avgDay), unit: MONEY, ico: "📊", delta: "في المتوسط", trend: "" },
   ].map((s) => `
     <div class="stat-card finances">
       <div class="sc-top"><span class="sc-ico">${s.ico}</span><span class="sc-label">${s.label}</span></div>
@@ -1026,7 +1079,7 @@ function renderFinancesPage() {
         return `<div class="cat-bar ${accents[i] || ""}">
           <div class="cb-top">
             <span>${CAT_ICONS[c] || "📦"} ${escapeHtml(c)}</span>
-            <span class="cb-amount">${arNum(v)} جنيه · ${arNum(pct)}٪</span>
+            <span class="cb-amount">${arNum(v)} ${MONEY} · ${arNum(pct)}٪</span>
           </div>
           <div class="cb-track"><div class="cb-fill" style="width:${pct}%"></div></div>
         </div>`;
@@ -1037,7 +1090,7 @@ function renderFinancesPage() {
   $("finTx").innerHTML = data.slice(0, 5).map((f) => `
     <div class="tl-row">
       <span class="tl-text" style="flex:1">${escapeHtml(f.note || f.category || "عملية")}</span>
-      <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}" style="font:var(--type-label)">${f.direction === "income" ? "+" : "-"}${arNum(f.amount)} ج</span>
+      <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}" style="font:var(--type-label)">${f.direction === "income" ? "+" : "-"}${arNum(f.amount)} ${curLabel(f)}</span>
     </div>`).join("") || `<span class="muted" style="font-size:var(--text-sm)">لسه مفيش حركات.</span>`;
 
   // كل العمليات
@@ -1050,7 +1103,7 @@ function renderFinancesPage() {
           <span class="l2">${escapeHtml(f.note || "—")}</span>
         </div>
         <div class="row-actions">
-          <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}">${arNum(f.amount)} ${escapeHtml(f.currency || "جنيه")}</span>
+          <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}">${arNum(f.amount)} ${curLabel(f)}</span>
           <button class="icon-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
         </div>
       </div>`).join("")

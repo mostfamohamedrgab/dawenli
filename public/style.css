@@ -1421,6 +1421,26 @@ select.field { cursor: pointer; }
 .tour-dots { display: flex; gap: 6px; }
 .tour-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hairline); transition: background var(--dur-fast); }
 .tour-dot.on { background: var(--brand); }
+
+/* ===== سحب لتحت للتحديث ===== */
+.ptr-ind {
+  position: fixed; top: 6px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 75; opacity: 0; pointer-events: none;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-md);
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity .2s var(--ease-soft);
+}
+.ptr-ind .ptr-spin {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2.5px solid var(--brand-tint); border-top-color: var(--brand);
+}
+.ptr-ind.ready .ptr-spin { border-top-color: var(--brand-deep); }
+.ptr-ind.spinning .ptr-spin { animation: ptrSpin .7s linear infinite; }
+@keyframes ptrSpin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .rec-dot, .rec-wave i { animation: none; } }
 
 /* ===========================================================================
