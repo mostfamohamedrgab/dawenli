@@ -187,6 +187,26 @@ export function startServer() {
     next();
   });
 
+  // CORS للـ API — عشان تطبيق الموبايل (Capacitor/أصول native) يقدر ينادي الـ APIs بالكوكيز.
+  // أصول معروفة بس (allowlist) — آمن. الويب نفسه same-origin فمش محتاج ده.
+  const APP_ORIGINS = new Set([
+    "capacitor://localhost", "ionic://localhost",
+    "http://localhost", "https://localhost",
+    "https://dawenli.com", "https://www.dawenli.com",
+  ]);
+  app.use("/api", (req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && APP_ORIGINS.has(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+      if (req.method === "OPTIONS") return res.sendStatus(204);
+    }
+    next();
+  });
+
   // JSON صغيرة للـ API العادي؛ الصوت ليه parser منفصل (raw) في endpoint بتاعه
   app.use(express.json({ limit: "64kb" }));
 
