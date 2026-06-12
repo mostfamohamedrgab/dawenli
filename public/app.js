@@ -149,6 +149,39 @@ function closeSidebar() { $("sidebar").classList.remove("open"); $("sideScrim").
 $("menuBtn")?.addEventListener("click", openSidebar);
 $("sideScrim")?.addEventListener("click", closeSidebar);
 
+/* ===================== تحديث مباشر ===================== */
+document.querySelectorAll("[data-refresh]").forEach((b) =>
+  b.addEventListener("click", async () => {
+    if (b.classList.contains("spinning")) return;
+    b.classList.add("spinning");
+    await loadAll(true);
+    setTimeout(() => b.classList.remove("spinning"), 750);
+  })
+);
+
+/* ===================== زرار الصوت العائم + شيت الشات ===================== */
+const composerEl = document.querySelector(".composer");
+const composerParent = composerEl?.parentNode || null;
+const composerNext = composerEl?.nextSibling || null;
+function openChat() {
+  if (composerEl) $("chatSheetBody").appendChild(composerEl);
+  $("chatSheet")?.classList.add("open");
+  $("chatScrim")?.classList.add("show");
+  $("voiceFab")?.classList.add("hidden");
+  setTimeout(() => $("composerText")?.focus(), 280);
+}
+function closeChat() {
+  $("chatSheet")?.classList.remove("open");
+  $("chatScrim")?.classList.remove("show");
+  $("voiceFab")?.classList.remove("hidden");
+  // رجّع الكومبوزر لمكانه الأصلي بعد الأنيميشن
+  setTimeout(() => { if (composerEl && composerParent) composerParent.insertBefore(composerEl, composerNext); }, 320);
+}
+$("voiceFab")?.addEventListener("click", openChat);
+$("chatClose")?.addEventListener("click", closeChat);
+$("chatScrim")?.addEventListener("click", closeChat);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("chatSheet")?.classList.contains("open")) closeChat(); });
+
 /* ===================== الكومبوزر: رتّبهالي ===================== */
 // سطر الإيصال من الـ agent → عالمه (للون الـ chip)
 function receiptWorld(line) {
@@ -430,11 +463,7 @@ function renderOverview() {
   const monthStart = TODAY().slice(0, 8) + "01";
   const monthFin = state.finance.filter((f) => f.entry_date >= monthStart);
   const isEGP = (f) => !f.currency || f.currency === "جنيه";
-  const mIncome = monthFin.filter((f) => f.direction === "income" && isEGP(f)).reduce((a, f) => a + f.amount, 0);
   const mExpense = monthFin.filter((f) => f.direction === "expense" && isEGP(f)).reduce((a, f) => a + f.amount, 0);
-  const fxInc = {};
-  for (const f of monthFin.filter((f) => f.direction === "income" && !isEGP(f))) fxInc[f.currency] = (fxInc[f.currency] || 0) + f.amount;
-  const fxIncStr = Object.entries(fxInc).map(([c, v]) => `+${arNum(v)} ${c}`).join(" · ");
 
   const worlds = [
     {
@@ -454,8 +483,8 @@ function renderOverview() {
     },
     {
       w: "finances", title: "الفلوس",
-      metric: monthFin.length ? `${mIncome - mExpense >= 0 ? "صافي +" : "صافي -"}${arNum(Math.abs(mIncome - mExpense))}` : "سجّل أول عملية",
-      caption: monthFin.length ? `دخل ${arNum(mIncome)} · صرف ${arNum(mExpense)}${fxIncStr ? ` · ${fxIncStr}` : ""}` : "قول لدوّنلي «صرفت ٢٠٠ على أكل»",
+      metric: monthFin.length ? `صرفت ${arNum(mExpense)}` : "سجّل أول عملية",
+      caption: monthFin.length ? "اضغط تشوف تفاصيل مصاريفك الشهر ده" : "قول لدوّنلي «صرفت ٢٠٠ على أكل»",
     },
   ];
   $("worldGrid").innerHTML = worlds.map((x) => `
@@ -885,18 +914,15 @@ function renderFinancesPage() {
   const week = lastNDays(7);
   const monthStart = TODAY().slice(0, 8) + "01";
   const weekExpense = data.filter((f) => f.direction === "expense" && week.includes(f.entry_date) && isEGP(f)).reduce((a, f) => a + f.amount, 0);
-  const mIncome = data.filter((f) => f.direction === "income" && f.entry_date >= monthStart && isEGP(f)).reduce((a, f) => a + f.amount, 0);
   const mExpense = data.filter((f) => f.direction === "expense" && f.entry_date >= monthStart && isEGP(f)).reduce((a, f) => a + f.amount, 0);
-  const net = mIncome - mExpense;
-  // دخل بعملات تانية (دولار…) الشهر ده — نعرضه لوحده مش مخلوط بالجنيه
-  const fx = {};
-  for (const f of data.filter((f) => f.direction === "income" && f.entry_date >= monthStart && !isEGP(f))) fx[f.currency] = (fx[f.currency] || 0) + f.amount;
-  const fxStr = Object.entries(fx).map(([c, v]) => `+${arNum(v)} ${c}`).join(" · ");
+  const dayOfMonth = Math.max(1, Number(TODAY().slice(8, 10)));
+  const avgDay = Math.round(mExpense / dayOfMonth);
 
+  // الفلوس مركّزة على المصاريف بس (الدخل في الأهداف، مش هنا — عشان نبسّط)
   $("finStats").innerHTML = [
     { label: "مصاريف الأسبوع", value: arNum(weekExpense), unit: "جنيه", ico: "💸", delta: "آخر ٧ أيام", trend: "" },
-    { label: "دخل الشهر", value: arNum(mIncome), unit: "جنيه", ico: "💰", delta: fxStr ? `من أول الشهر · ${fxStr}` : "من أول الشهر", trend: "up" },
-    { label: "الصافي", value: arNum(net), unit: "جنيه", ico: "🌱", delta: net >= 0 ? "نبتتك بخير" : "اصرف بالراحة", trend: net >= 0 ? "up" : "down" },
+    { label: "مصاريف الشهر", value: arNum(mExpense), unit: "جنيه", ico: "🧾", delta: "من أول الشهر", trend: "" },
+    { label: "متوسط اليوم", value: arNum(avgDay), unit: "جنيه", ico: "📊", delta: "في المتوسط", trend: "" },
   ].map((s) => `
     <div class="stat-card finances">
       <div class="sc-top"><span class="sc-ico">${s.ico}</span><span class="sc-label">${s.label}</span></div>

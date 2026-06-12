@@ -1327,6 +1327,69 @@ select.field { cursor: pointer; }
   .rec-actions { flex: 1 1 100%; }
   .rec-actions .btn { flex: 1; }
 }
+
+/* ===========================================================================
+   زرار التحديث + زرار الصوت العائم + شيت الشات
+   =========================================================================== */
+[data-refresh].spinning svg { animation: spin360 0.7s var(--ease-soft); }
+@keyframes spin360 { to { transform: rotate(-360deg); } }
+
+.voice-fab {
+  position: fixed; z-index: 70;
+  inset-inline-start: 20px; bottom: 24px;
+  width: 60px; height: 60px;
+  border: none; border-radius: 50%;
+  background: var(--brand); color: var(--on-accent);
+  box-shadow: 0 10px 26px rgba(92,138,107,.45), var(--shadow-md);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-base) var(--ease-bounce), opacity var(--dur-fast);
+  animation: fabIn var(--dur-base) var(--ease-bounce) both;
+}
+.voice-fab::after {
+  content: ""; position: absolute; inset: -5px; border-radius: 50%;
+  border: 2px solid var(--brand); pointer-events: none;
+  animation: fabPulse 2.6s ease-out infinite;
+}
+.voice-fab:hover { transform: translateY(-3px) scale(1.05); }
+.voice-fab:active { transform: scale(0.93); }
+.voice-fab.hidden { opacity: 0; pointer-events: none; transform: scale(0.55); }
+@keyframes fabIn { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes fabPulse { 0% { transform: scale(1); opacity: .4; } 100% { transform: scale(1.55); opacity: 0; } }
+
+.chat-scrim {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(52,48,42,.4);
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-soft);
+}
+.chat-scrim.show { opacity: 1; pointer-events: auto; }
+
+.chat-sheet {
+  position: fixed; z-index: 85;
+  inset-inline: 0; bottom: 0; margin: 0 auto;
+  width: 100%; max-width: 560px; max-height: 88vh;
+  display: flex; flex-direction: column;
+  background: var(--paper);
+  border: var(--stroke) solid var(--ink); border-bottom: none;
+  border-radius: 26px 26px 0 0;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(106%);
+  transition: transform var(--dur-base) var(--ease-bounce);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.chat-sheet.open { transform: translateY(0); }
+.chat-sheet-head { padding: 10px 18px 14px; border-bottom: 1px solid var(--hairline); }
+.chat-grip { display: block; width: 42px; height: 5px; border-radius: 99px; background: var(--hairline); margin: 2px auto 12px; }
+.chat-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.chat-head-row b { font: var(--type-h3); font-size: var(--text-h4); margin: 0; }
+.chat-sub { display: block; font-size: var(--text-sm); color: var(--ink-muted); margin-top: 4px; }
+.chat-sheet-body { padding: 16px 18px 20px; overflow-y: auto; }
+.chat-sheet-body .composer { margin: 0 !important; }
+
+@media (max-width: 760px) {
+  .voice-fab { bottom: calc(82px + env(safe-area-inset-bottom)); inset-inline-start: 16px; width: 56px; height: 56px; }
+}
 @media (prefers-reduced-motion: reduce) { .rec-dot, .rec-wave i { animation: none; } }
 
 /* ===========================================================================

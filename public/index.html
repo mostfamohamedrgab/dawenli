@@ -70,6 +70,9 @@
             <div class="su-name" id="userName">—</div>
             <div class="su-sub">دفترك الشخصي</div>
           </div>
+          <button class="bell-btn side-bell" data-refresh aria-label="تحديث" title="تحديث">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+          </button>
           <button class="bell-btn side-bell" data-bell aria-label="الإشعارات" title="الإشعارات">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             <span class="bell-badge hidden" data-bell-badge>0</span>
@@ -83,6 +86,9 @@
         <div class="dw-topbar">
           <img src="/assets/logo/dawwenli-logo.svg" alt="دوّنلي" />
           <div class="topbar-actions">
+            <button class="bell-btn" data-refresh aria-label="تحديث" title="تحديث">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+            </button>
             <button class="bell-btn" data-bell aria-label="الإشعارات">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span class="bell-badge hidden" data-bell-badge>0</span>
@@ -461,6 +467,23 @@
           <span class="tb-label">الفلوس</span>
         </button>
       </nav>
+    </div>
+
+    <!-- ===================== زرار الصوت العائم + شيت الشات ===================== -->
+    <button class="voice-fab" id="voiceFab" aria-label="احكيلي بصوتك">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
+    </button>
+    <div id="chatScrim" class="chat-scrim"></div>
+    <div id="chatSheet" class="chat-sheet" role="dialog" aria-modal="true" aria-label="دوّنلي">
+      <div class="chat-sheet-head">
+        <span class="chat-grip"></span>
+        <div class="chat-head-row">
+          <b>احكيلي يومك ✍️</b>
+          <button id="chatClose" class="icon-btn" aria-label="إغلاق">✕</button>
+        </div>
+        <span class="chat-sub">اكتب أو سجّل صوتك وأنا أرتّبهولك — واسألني أي وقت 🙂</span>
+      </div>
+      <div id="chatSheetBody" class="chat-sheet-body"><!-- الكومبوزر بيتنقل هنا --></div>
     </div>
 
     <!-- ===================== لوحة الإشعارات (الجرس) ===================== -->
