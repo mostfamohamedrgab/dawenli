@@ -429,8 +429,12 @@ function renderOverview() {
   const topGoal = [...state.goals].filter((g) => g.target).sort((a, b) => (b.current / b.target) - (a.current / a.target))[0] || state.goals[0];
   const monthStart = TODAY().slice(0, 8) + "01";
   const monthFin = state.finance.filter((f) => f.entry_date >= monthStart);
-  const mIncome = monthFin.filter((f) => f.direction === "income").reduce((a, f) => a + f.amount, 0);
-  const mExpense = monthFin.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
+  const isEGP = (f) => !f.currency || f.currency === "جنيه";
+  const mIncome = monthFin.filter((f) => f.direction === "income" && isEGP(f)).reduce((a, f) => a + f.amount, 0);
+  const mExpense = monthFin.filter((f) => f.direction === "expense" && isEGP(f)).reduce((a, f) => a + f.amount, 0);
+  const fxInc = {};
+  for (const f of monthFin.filter((f) => f.direction === "income" && !isEGP(f))) fxInc[f.currency] = (fxInc[f.currency] || 0) + f.amount;
+  const fxIncStr = Object.entries(fxInc).map(([c, v]) => `+${arNum(v)} ${c}`).join(" · ");
 
   const worlds = [
     {
@@ -451,7 +455,7 @@ function renderOverview() {
     {
       w: "finances", title: "الفلوس",
       metric: monthFin.length ? `${mIncome - mExpense >= 0 ? "صافي +" : "صافي -"}${arNum(Math.abs(mIncome - mExpense))}` : "سجّل أول عملية",
-      caption: monthFin.length ? `دخل ${arNum(mIncome)} · صرف ${arNum(mExpense)} الشهر ده` : "قول لدوّنلي «صرفت ٢٠٠ على أكل»",
+      caption: monthFin.length ? `دخل ${arNum(mIncome)} · صرف ${arNum(mExpense)}${fxIncStr ? ` · ${fxIncStr}` : ""}` : "قول لدوّنلي «صرفت ٢٠٠ على أكل»",
     },
   ];
   $("worldGrid").innerHTML = worlds.map((x) => `
@@ -877,16 +881,21 @@ $("goalForm").addEventListener("submit", async (e) => {
 /* ===================== الفلوس ===================== */
 function renderFinancesPage() {
   const data = state.finance;
+  const isEGP = (f) => !f.currency || f.currency === "جنيه";
   const week = lastNDays(7);
   const monthStart = TODAY().slice(0, 8) + "01";
-  const weekExpense = data.filter((f) => f.direction === "expense" && week.includes(f.entry_date)).reduce((a, f) => a + f.amount, 0);
-  const mIncome = data.filter((f) => f.direction === "income" && f.entry_date >= monthStart).reduce((a, f) => a + f.amount, 0);
-  const mExpense = data.filter((f) => f.direction === "expense" && f.entry_date >= monthStart).reduce((a, f) => a + f.amount, 0);
+  const weekExpense = data.filter((f) => f.direction === "expense" && week.includes(f.entry_date) && isEGP(f)).reduce((a, f) => a + f.amount, 0);
+  const mIncome = data.filter((f) => f.direction === "income" && f.entry_date >= monthStart && isEGP(f)).reduce((a, f) => a + f.amount, 0);
+  const mExpense = data.filter((f) => f.direction === "expense" && f.entry_date >= monthStart && isEGP(f)).reduce((a, f) => a + f.amount, 0);
   const net = mIncome - mExpense;
+  // دخل بعملات تانية (دولار…) الشهر ده — نعرضه لوحده مش مخلوط بالجنيه
+  const fx = {};
+  for (const f of data.filter((f) => f.direction === "income" && f.entry_date >= monthStart && !isEGP(f))) fx[f.currency] = (fx[f.currency] || 0) + f.amount;
+  const fxStr = Object.entries(fx).map(([c, v]) => `+${arNum(v)} ${c}`).join(" · ");
 
   $("finStats").innerHTML = [
     { label: "مصاريف الأسبوع", value: arNum(weekExpense), unit: "جنيه", ico: "💸", delta: "آخر ٧ أيام", trend: "" },
-    { label: "دخل الشهر", value: arNum(mIncome), unit: "جنيه", ico: "💰", delta: "من أول الشهر", trend: "up" },
+    { label: "دخل الشهر", value: arNum(mIncome), unit: "جنيه", ico: "💰", delta: fxStr ? `من أول الشهر · ${fxStr}` : "من أول الشهر", trend: "up" },
     { label: "الصافي", value: arNum(net), unit: "جنيه", ico: "🌱", delta: net >= 0 ? "نبتتك بخير" : "اصرف بالراحة", trend: net >= 0 ? "up" : "down" },
   ].map((s) => `
     <div class="stat-card finances">
@@ -898,14 +907,14 @@ function renderFinancesPage() {
   // أعمدة الأسبوع — مرسومة باليد على canvas
   const weekData = week.map((d) => ({
     label: DAY_LETTER[new Date(d + "T00:00:00").getDay()],
-    value: data.filter((f) => f.entry_date === d && f.direction === "expense").reduce((a, f) => a + f.amount, 0),
+    value: data.filter((f) => f.entry_date === d && f.direction === "expense" && isEGP(f)).reduce((a, f) => a + f.amount, 0),
   }));
   drawSketchBars($("finBars"), weekData, "finances", 200);
 
   // على إيه بتصرف — آخر ٣٠ يوم
   const month = lastNDays(30);
   const byCat = {};
-  for (const f of data.filter((f) => f.direction === "expense" && month.includes(f.entry_date))) {
+  for (const f of data.filter((f) => f.direction === "expense" && month.includes(f.entry_date) && isEGP(f))) {
     const c = f.category || "أخرى";
     byCat[c] = (byCat[c] || 0) + f.amount;
   }
