@@ -22,6 +22,7 @@ import {
   applyGoal,
   deleteGoal,
   setGoalCurrent,
+  goalLog,
   listConversations,
   deleteConversation,
   listConditions,
@@ -712,6 +713,13 @@ export function startServer() {
     if (!user) return;
     const { current } = req.body || {};
     res.json({ ok: setGoalCurrent(user.id, Number(req.params.id), Number(current) || 0) });
+  });
+
+  // سجل تقدّم الهدف (إمتى زوّدت كام)
+  app.get("/api/goals/:id/log", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(goalLog(user.id, Number(req.params.id)));
   });
 
   app.listen(config.port, () =>

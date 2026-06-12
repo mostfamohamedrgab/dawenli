@@ -1002,9 +1002,12 @@ function renderGoalsPage() {
     const pct = g.target ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
     const unit = g.unit ? " " + escapeHtml(g.unit) : "";
     return `<div class="ring-card lift">
-      ${g.target ? ringSVG(pct) : `<div style="font-size:44px">🎯</div>`}
-      <div class="rc-caption">${escapeHtml(g.title)}</div>
-      <div class="rc-meta">${arNum(g.current)}${g.target ? ` / ${arNum(g.target)}` : ""}${unit}${g.target ? ` · باقي ${arNum(Math.max(0, g.target - g.current))}` : ""}</div>
+      <div class="rc-tap" onclick="openGoalDetail(${g.id})">
+        ${g.target ? ringSVG(pct) : `<div style="font-size:44px">🎯</div>`}
+        <div class="rc-caption">${escapeHtml(g.title)}</div>
+        <div class="rc-meta">${arNum(g.current)}${g.target ? ` / ${arNum(g.target)}` : ""}${unit}${g.target ? ` · باقي ${arNum(Math.max(0, g.target - g.current))}` : ""}</div>
+        <div class="rc-hint">اضغط تشوف السجل ›</div>
+      </div>
       <div class="rc-update">
         <input type="number" placeholder="حدّث الرقم" id="gc-${g.id}" class="field" style="flex:1" />
         <button class="btn goals sm" onclick="updateGoal(${g.id})">تحديث</button>
@@ -1021,6 +1024,41 @@ async function updateGoal(id) {
   renderGoalsPage();
 }
 window.updateGoal = updateGoal;
+
+async function openGoalDetail(id) {
+  const goal = state.goals.find((g) => g.id === id);
+  if (!goal) return;
+  let log = [];
+  try { log = await api(`/api/goals/${id}/log`).then((r) => r.json()); } catch {}
+  const unit = goal.unit ? " " + escapeHtml(goal.unit) : "";
+  const pct = goal.target ? Math.min(100, Math.round((goal.current / goal.target) * 100)) : 0;
+  const rows = log.length
+    ? log.map((e) => {
+        const delta = e.delta == null ? "" : (e.delta >= 0 ? `+${arNum(e.delta)}` : `−${arNum(Math.abs(e.delta))}`);
+        return `<div class="gl-row">
+          <span class="gl-delta ${e.delta >= 0 ? "pos" : "neg"}">${delta}${delta ? unit : ""}</span>
+          <div class="gl-mid"><div class="gl-note">${escapeHtml(e.note || "تحديث")}</div><div class="gl-date">${fmtShort(e.created_at.slice(0, 10))}</div></div>
+          <span class="gl-after">الإجمالي ${arNum(e.current_after)}</span>
+        </div>`;
+      }).join("")
+    : `<div class="muted" style="text-align:center;padding:24px">لسه مفيش تحديثات على الهدف ده — أول ما تزوّد فيه هتلاقي السجل هنا.</div>`;
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay"; ov.id = "goalDetailOv";
+  ov.innerHTML = `<div class="modal" style="max-width:460px;text-align:right">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px">
+      <h3 class="modal-title" style="margin:0">🎯 ${escapeHtml(goal.title)}</h3>
+      <button class="icon-btn" onclick="closeGoalDetail()" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="muted" style="font-size:var(--text-sm);margin-bottom:14px">${arNum(goal.current)}${goal.target ? ` / ${arNum(goal.target)}` : ""}${unit}${goal.target ? ` · ${arNum(pct)}٪` : ""}</div>
+    <div class="gl-list">${rows}</div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeGoalDetail(); });
+}
+function closeGoalDetail() { $("goalDetailOv")?.remove(); }
+window.openGoalDetail = openGoalDetail;
+window.closeGoalDetail = closeGoalDetail;
+
 $("goalForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const title = $("goalTitle").value.trim();

@@ -1441,6 +1441,23 @@ select.field { cursor: pointer; }
 .ptr-ind.ready .ptr-spin { border-top-color: var(--brand-deep); }
 .ptr-ind.spinning .ptr-spin { animation: ptrSpin .7s linear infinite; }
 @keyframes ptrSpin { to { transform: rotate(360deg); } }
+
+/* ===== سجل تفاصيل الهدف ===== */
+.rc-tap { cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.rc-hint { font-size: var(--text-xs); color: var(--goals-deep); font-weight: 700; margin-top: 2px; opacity: .85; }
+.gl-list { display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow-y: auto; }
+.gl-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 12px;
+  background: var(--goals-wash);
+}
+.gl-delta { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); flex: none; min-width: 64px; }
+.gl-delta.pos { color: var(--goals-deep); }
+.gl-delta.neg { color: var(--health-deep); }
+.gl-mid { flex: 1; min-width: 0; }
+.gl-note { font-size: var(--text-sm); color: var(--ink); }
+.gl-date { font-size: var(--text-xs); color: var(--ink-faint); margin-top: 2px; }
+.gl-after { font-size: var(--text-xs); color: var(--ink-muted); flex: none; }
 @media (prefers-reduced-motion: reduce) { .rec-dot, .rec-wave i { animation: none; } }
 
 /* ===========================================================================

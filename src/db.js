@@ -81,6 +81,16 @@ db.exec(`
     note        TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS goal_log (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at    TEXT NOT NULL,
+    user_id       INTEGER NOT NULL,
+    goal_id       INTEGER NOT NULL,
+    delta         REAL,
+    current_after REAL,
+    note          TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS conditions (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at  TEXT NOT NULL,
@@ -595,6 +605,7 @@ export function applyGoal({ userId, title, target, addAmount, setCurrent, unit, 
       note || existing.note,
       existing.id
     );
+    logGoalChange(userId, existing.id, current - existing.current, current, note || null);
     return {
       id: existing.id,
       created: false,
@@ -617,6 +628,7 @@ export function applyGoal({ userId, title, target, addAmount, setCurrent, unit, 
     unit || null,
     note || null
   );
+  logGoalChange(userId, Number(info.lastInsertRowid), current, current, note || "هدف جديد");
   return {
     id: Number(info.lastInsertRowid),
     created: true,
@@ -634,11 +646,29 @@ export function deleteGoal(userId, id) {
   return db.prepare(`DELETE FROM goals WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
 }
 export function setGoalCurrent(userId, id, current) {
-  return (
+  const g = db.prepare(`SELECT current FROM goals WHERE user_id = ? AND id = ?`).get(userId, id);
+  if (!g) return false;
+  const ok =
     db
       .prepare(`UPDATE goals SET current = ?, updated_at = ? WHERE user_id = ? AND id = ?`)
-      .run(Number(current), now(), userId, id).changes > 0
-  );
+      .run(Number(current), now(), userId, id).changes > 0;
+  if (ok) logGoalChange(userId, id, Number(current) - g.current, Number(current), "تحديث يدوي");
+  return ok;
+}
+
+const insertGoalLogStmt = db.prepare(
+  `INSERT INTO goal_log (created_at, user_id, goal_id, delta, current_after, note) VALUES (?, ?, ?, ?, ?, ?)`
+);
+export function logGoalChange(userId, goalId, delta, currentAfter, note) {
+  insertGoalLogStmt.run(now(), userId, goalId, delta == null ? null : Number(delta), Number(currentAfter), note || null);
+}
+export function goalLog(userId, goalId, limit = 60) {
+  return db
+    .prepare(
+      `SELECT id, created_at, delta, current_after, note FROM goal_log
+       WHERE user_id = ? AND goal_id = ? ORDER BY id DESC LIMIT ?`
+    )
+    .all(userId, goalId, limit);
 }
 
 /* ===================== Tasks (مهام + تقويم) ===================== */
