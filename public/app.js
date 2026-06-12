@@ -204,6 +204,7 @@ let recChunks = [];
 let recTimer = null;
 let recStartedAt = 0;
 let recCancelled = false;
+let audioCtx = null, waveAnalyser = null, waveRaf = null, wakeLock = null;
 
 function recElems() {
   return { bar: $("recBar"), time: $("recTime"), mic: $("micBtn"), comp: $("composerBtn") };
@@ -211,6 +212,64 @@ function recElems() {
 function fmtRecTime(ms) {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/* موجة حيّة بتتحرّك مع مستوى صوت المستخدم فعليًا */
+function startWave(stream) {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx = new Ctx();
+    const src = audioCtx.createMediaStreamSource(stream);
+    waveAnalyser = audioCtx.createAnalyser();
+    waveAnalyser.fftSize = 64;
+    waveAnalyser.smoothingTimeConstant = 0.75;
+    src.connect(waveAnalyser);
+    const wave = $("recBar").querySelector(".rec-wave");
+    const bars = wave.querySelectorAll("i");
+    wave.classList.add("live");
+    const data = new Uint8Array(waveAnalyser.frequencyBinCount);
+    const step = Math.max(1, Math.floor(data.length / bars.length));
+    const draw = () => {
+      waveAnalyser.getByteFrequencyData(data);
+      bars.forEach((bar, i) => {
+        let sum = 0;
+        for (let j = 0; j < step; j++) sum += data[i * step + j] || 0;
+        const level = sum / step / 255; // 0..1
+        const scale = Math.max(0.12, Math.min(1, level * 1.7));
+        bar.style.transform = `scaleY(${scale.toFixed(3)})`;
+      });
+      waveRaf = requestAnimationFrame(draw);
+    };
+    draw();
+  } catch { /* لو Web Audio مش متاح، الأنيميشن CSS بيفضل شغّال */ }
+}
+function stopWave() {
+  if (waveRaf) { cancelAnimationFrame(waveRaf); waveRaf = null; }
+  if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
+  waveAnalyser = null;
+  const wave = $("recBar")?.querySelector(".rec-wave");
+  if (wave) {
+    wave.classList.remove("live");
+    wave.querySelectorAll("i").forEach((b) => (b.style.transform = ""));
+  }
+}
+
+/* الشاشة تفضل صاحية وانت بتسجّل */
+function isRecording() { return mediaRecorder && mediaRecorder.state === "recording"; }
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+  } catch { /* بعض المتصفحات بتمنعها — نتجاهل */ }
+}
+function onRecVisibility() {
+  // iOS بيفكّ القفل لما الصفحة تختفي — نرجّعه لما ترجع وإحنا لسه بنسجّل
+  if (document.visibilityState === "visible" && isRecording()) requestWakeLock();
+}
+async function releaseWakeLock() {
+  document.removeEventListener("visibilitychange", onRecVisibility);
+  try { if (wakeLock) await wakeLock.release(); } catch {}
+  wakeLock = null;
 }
 async function startRecording() {
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
@@ -233,6 +292,8 @@ async function startRecording() {
   mediaRecorder.onstop = async () => {
     stream.getTracks().forEach((t) => t.stop());
     clearInterval(recTimer);
+    stopWave();
+    releaseWakeLock();
     const { bar, mic } = recElems();
     bar.classList.add("hidden");
     mic.classList.remove("hidden");
@@ -245,6 +306,9 @@ async function startRecording() {
   mic.classList.add("hidden");
   bar.classList.remove("hidden");
   time.textContent = "0:00";
+  startWave(stream);
+  requestWakeLock();
+  document.addEventListener("visibilitychange", onRecVisibility);
   recTimer = setInterval(() => {
     time.textContent = fmtRecTime(Date.now() - recStartedAt);
     if (Date.now() - recStartedAt > 120000) stopRecording(); // سقف دقيقتين
