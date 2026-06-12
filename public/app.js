@@ -182,6 +182,79 @@ $("chatClose")?.addEventListener("click", closeChat);
 $("chatScrim")?.addEventListener("click", closeChat);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("chatSheet")?.classList.contains("open")) closeChat(); });
 
+/* ===================== جولة تعريفية لأول مرة ===================== */
+const TOUR_STEPS = [
+  { sel: null, ico: "👋", title: "أهلاً بك في دوّنلي", body: "دفترك الشخصي الذكي. خلّينا نأخذ جولة سريعة — أقل من دقيقة." },
+  { sel: "#voiceFab", ico: "🎙️", title: "احكِ يومك", body: "من هذا الزر تسجّل صوتك أو تكتب، ودوّنلي يرتّب كلامك تلقائيًا. واسأله أي وقت: «كم صرفت؟»، «ماذا سجّلت أمس؟»." },
+  { sel: ".dw-tabbar, #sideNav", ico: "🌱", title: "عوالمك الأربعة", body: "صحتك، عاداتك، أهدافك، وأموالك — كلها مرتّبة ومتابَعة في مكان واحد." },
+  { sel: "[data-refresh]", ico: "🔔", title: "نتابع معك كل يوم", body: "نذكّرك ونسألك عمّا فاتك. وتقدر تحدّث بياناتك من زر التحديث وقت ما تشاء." },
+  { sel: null, ico: "✨", title: "جاهز؟", body: "ابدأ بأول تدوينة الآن — اضغط زر المايك واحكِ يومك." },
+];
+let tourIdx = 0;
+function tourFirstVisible(selList) {
+  for (const s of selList.split(",").map((x) => x.trim())) {
+    const e = document.querySelector(s);
+    if (e) { const r = e.getBoundingClientRect(); if (r.width && r.height) return e; }
+  }
+  return null;
+}
+function startTour() {
+  if ($("tourOv")) return;
+  tourIdx = 0;
+  const ov = document.createElement("div");
+  ov.className = "tour-ov"; ov.id = "tourOv";
+  ov.innerHTML = `
+    <div class="tour-ring" id="tourRing"></div>
+    <div class="tour-card" id="tourCard">
+      <div class="tour-ico" id="tourIco"></div>
+      <h3 id="tourTitle"></h3>
+      <p id="tourBody"></p>
+      <div class="tour-foot">
+        <button class="tour-skip" id="tourSkip">تخطّي</button>
+        <div class="tour-dots" id="tourDots">${TOUR_STEPS.map(() => `<span class="tour-dot"></span>`).join("")}</div>
+        <button class="btn sm" id="tourNext">التالي</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  $("tourSkip").onclick = endTour;
+  $("tourNext").onclick = () => { if (tourIdx >= TOUR_STEPS.length - 1) endTour(); else { tourIdx++; renderTourStep(); } };
+  window.addEventListener("resize", renderTourStep);
+  renderTourStep();
+}
+function renderTourStep() {
+  const step = TOUR_STEPS[tourIdx]; if (!step || !$("tourOv")) return;
+  $("tourIco").textContent = step.ico;
+  $("tourTitle").textContent = step.title;
+  $("tourBody").textContent = step.body;
+  $("tourNext").textContent = tourIdx >= TOUR_STEPS.length - 1 ? "يلا نبدأ ✨" : "التالي";
+  [...$("tourDots").children].forEach((d, i) => d.classList.toggle("on", i === tourIdx));
+  const ring = $("tourRing"), card = $("tourCard"), ov = $("tourOv");
+  const el = step.sel ? tourFirstVisible(step.sel) : null;
+  card.style.top = ""; card.style.bottom = "";
+  if (el) {
+    const r = el.getBoundingClientRect(), pad = 8;
+    ov.style.background = "transparent";
+    ring.style.display = "block";
+    ring.style.top = (r.top - pad) + "px";
+    ring.style.left = (r.left - pad) + "px";
+    ring.style.width = (r.width + pad * 2) + "px";
+    ring.style.height = (r.height + pad * 2) + "px";
+    if (window.innerHeight - r.bottom > 240) { card.classList.remove("centered"); card.style.top = (r.bottom + 14) + "px"; }
+    else if (r.top > 240) { card.classList.remove("centered"); card.style.bottom = (window.innerHeight - r.top + 14) + "px"; }
+    else { card.classList.add("centered"); }
+  } else {
+    ring.style.display = "none";
+    ov.style.background = "rgba(40,36,32,.62)";
+    card.classList.add("centered");
+  }
+}
+function endTour() {
+  window.removeEventListener("resize", renderTourStep);
+  $("tourOv")?.remove();
+  try { localStorage.setItem("dawenli_tour_v1", "1"); } catch {}
+}
+window.startTour = startTour; // عشان نقدر نشغّلها يدويًا
+
 /* ===================== الكومبوزر: رتّبهالي ===================== */
 // سطر الإيصال من الـ agent → عالمه (للون الـ chip)
 function receiptWorld(line) {
@@ -1296,6 +1369,7 @@ async function loadAll(rerender = true) {
 
 loadAll().then(() => {
   renderJournal();
+  if (state.me && !localStorage.getItem("dawenli_tour_v1")) setTimeout(startTour, 800);
 });
 
 /* ===================== الإشعارات (الجرس) + PWA ===================== */

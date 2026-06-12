@@ -10,6 +10,7 @@ import { config } from "./config.js";
 import {
   localToday,
   upsertJournalForDay,
+  correctJournal,
   listEntries,
   entriesSince,
   addFinance,
@@ -61,6 +62,23 @@ const TOOLS = [
           date: { type: "string", description: "اليوم اللي بيتكلم عنه YYYY-MM-DD" },
         },
         required: ["summary"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "correct_journal",
+      description:
+        "عدّل/صحّح كلمة أو جملة في يوميات يوم معيّن لما المستخدم يطلب التعديل صراحةً (مثلاً «عدّل في يوم الخميس كلمة كذا لكذا» أو «المبلغ غلط خليه كذا»). لو مش متأكد من النص الحالي بالظبط استخدم get_data الأول عشان تشوف نص اليوم.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "تاريخ اليوم المطلوب تعديله YYYY-MM-DD (من past_days)" },
+          find: { type: "string", description: "النص/الكلمة الحالية بالظبط اللي هتتغير" },
+          replace: { type: "string", description: "النص البديل" },
+        },
+        required: ["date", "find", "replace"],
       },
     },
   },
@@ -299,6 +317,16 @@ function executeTool(ctx, name, args) {
       return {
         result: { ok: true, merged: r.merged },
         receipt: `📝 يوميات (${date})${args.mood ? " — " + args.mood : ""}`,
+      };
+    }
+    case "correct_journal": {
+      if (!isDate(args.date)) return { result: { ok: false, error: "date لازم YYYY-MM-DD" } };
+      const r = correctJournal(userId, args.date, String(args.find || ""), String(args.replace ?? ""));
+      return {
+        result: { ok: r.changed, ...r },
+        receipt: r.changed
+          ? `✏️ تعديل يوميات (${args.date}): «${args.find}» → «${args.replace}»`
+          : `⚠️ ملقيتش «${args.find}» في يوميات ${args.date}`,
       };
     }
     case "log_finance": {
@@ -572,6 +600,7 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 - استخرج **كل** اللي في الكلام: مصاريف ودخل (بالبند)، صحة ونفسية، أكل، عادات، أهداف، مهام بمواعيدها، وتدوينة اليوميات.
 - **اليوم الصح لكل حاجة (مهم):** المستخدم ساعات بيحكي عن يوم فات — "امبارح عملت كذا"، "أول امبارح"، "يوم التلات اللي فات"، "من ٣ أيام"، أو حتى وسط الكلام. لو الحدث حصل في يوم فات → سجّله **بتاريخ اليوم ده مش النهاردة**: حِط \`date\` على أداة التسجيل (save_journal / log_finance / log_health / log_meal / log_habit) بالتاريخ المحسوب من **past_days** اللي في السياق (مثلاً لو النهاردة الجمعة و"امبارح" يبقى الخميس بتاريخه). لو ماذكرش يوم → النهاردة. الرسالة الواحدة ممكن تبقى فيها حاجات لأيام مختلفة — **كل واحدة بتاريخها هي**.
 - لما المستخدم يحكي عن يومه أو مشاعره → لازم تسجّل save_journal. لو بيسأل سؤال بس من غير حكي → ماتسجّلش يوميات.
+- **التعديل والتصحيح:** لو المستخدم طلب يعدّل/يصحّح حاجة في يوم فات («عدّل في يوم كذا الكلمة الفلانية»، «دي غلط خليها كذا») → استخدم correct_journal بتاريخ اليوم (من past_days) مع find = النص الحالي بالظبط و replace = البديل. لو مش متأكد من صيغة النص الحالي، اقرا اليوم بـ get_data الأول وبعدين عدّل.
 - الأهداف: لو بيتكلم عن تقدّم في هدف موجود في السياق، استخدم **نفس عنوان الهدف بالظبط**.
 - **اربط الدخل بالهدف:** لو المستخدم كسب أو وفّر فلوس وعنده في السياق هدف نشط بنفس العملة/الفكرة (مثلاً هدف ادخار «أوصل ١٠ آلاف دولار» وهو كسب دولار) → بالإضافة لـ log_finance، زوّد تقدّم الهدف بـ upsert_goal action=add_amount بنفس عنوان الهدف وبالمبلغ بعملته. خلّي بالك من العملة: ماتخلطش دخل بالدولار في هدف بالجنيه.
 - العادات: عنوان قصير ثابت ("رياضة" مش "لعبت رياضة في الجيم"). لو عملها من غير ما تكون معرّفة → action="both".

@@ -415,6 +415,18 @@ export function upsertJournalForDay({ userId, entryDate, mood, summary, tags, tr
   return { id: Number(info.lastInsertRowid), merged: false };
 }
 
+// تصحيح/تعديل نص يوميات يوم معيّن (استبدال كلمة/جملة) — للتعديل بالصوت
+export function correctJournal(userId, date, find, replace) {
+  if (!find) return { changed: false };
+  const info = db
+    .prepare(
+      `UPDATE entries SET summary = REPLACE(summary, ?, ?)
+       WHERE user_id = ? AND entry_date = ? AND summary LIKE '%' || ? || '%'`
+    )
+    .run(find, replace ?? "", userId, date, find);
+  return { changed: info.changes > 0 };
+}
+
 const listEntriesStmt = db.prepare(
   `SELECT id, created_at, entry_date, mood, summary, tags, transcript
    FROM entries WHERE user_id = ? ORDER BY entry_date DESC, id DESC LIMIT ?`

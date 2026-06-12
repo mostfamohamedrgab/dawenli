@@ -1390,6 +1390,37 @@ select.field { cursor: pointer; }
 @media (max-width: 760px) {
   .voice-fab { bottom: calc(82px + env(safe-area-inset-bottom)); inset-inline-start: 16px; width: 56px; height: 56px; }
 }
+
+/* ===========================================================================
+   الجولة التعريفية (أول مرة)
+   =========================================================================== */
+.tour-ov { position: fixed; inset: 0; z-index: 9997; animation: tourFade .25s var(--ease-soft); }
+@keyframes tourFade { from { opacity: 0; } to { opacity: 1; } }
+.tour-ring {
+  position: fixed; z-index: 9998; pointer-events: none;
+  border-radius: 16px;
+  border: 2px solid var(--on-accent);
+  box-shadow: 0 0 0 9999px rgba(40,36,32,.62);
+  transition: top .3s var(--ease-soft), left .3s var(--ease-soft), width .3s var(--ease-soft), height .3s var(--ease-soft);
+}
+.tour-card {
+  position: fixed; z-index: 9999;
+  left: 50%; transform: translateX(-50%);
+  width: min(340px, calc(100vw - 32px));
+  background: var(--paper);
+  border: var(--stroke) solid var(--ink);
+  border-radius: 20px; box-shadow: var(--shadow-lg);
+  padding: 20px; text-align: center;
+}
+.tour-card.centered { top: 50%; transform: translate(-50%, -50%); }
+.tour-ico { font-size: 34px; margin-bottom: 6px; }
+.tour-card h3 { font: var(--type-h3); font-size: var(--text-h4); margin: 0 0 6px; }
+.tour-card p { font-size: var(--text-sm); color: var(--ink-muted); line-height: 1.7; margin: 0 0 16px; }
+.tour-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tour-skip { background: none; border: none; color: var(--ink-faint); font: var(--type-label); cursor: pointer; padding: 4px; }
+.tour-dots { display: flex; gap: 6px; }
+.tour-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hairline); transition: background var(--dur-fast); }
+.tour-dot.on { background: var(--brand); }
 @media (prefers-reduced-motion: reduce) { .rec-dot, .rec-wave i { animation: none; } }
 
 /* ===========================================================================
