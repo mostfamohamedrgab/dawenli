@@ -1284,7 +1284,26 @@ select.field { cursor: pointer; }
   background: var(--health-wash);
   border: 1.5px solid var(--health-tint);
   border-radius: var(--radius-md);
+  position: relative;
+  overflow: hidden;
 }
+/* شريط تقدّم مدة التسجيل (٧ دقايق) */
+.rec-progress {
+  position: absolute;
+  inset-inline: 0; bottom: 0;
+  height: 3px;
+  background: color-mix(in srgb, var(--health-tint) 60%, transparent);
+}
+.rec-progress i {
+  display: block; height: 100%; width: 0%;
+  background: var(--health);
+  transition: width 0.25s linear, background var(--dur-fast);
+}
+/* آخر ٤٥ ثانية — تحذير */
+.rec-bar.warn { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, var(--health-wash)); }
+.rec-bar.warn .rec-progress i { background: var(--danger); }
+.rec-bar.warn .rec-time { color: var(--danger-deep); }
+.rec-bar.warn .rec-dot { background: var(--danger); }
 .rec-dot {
   width: 11px; height: 11px;
   border-radius: 50%;

@@ -354,6 +354,7 @@ let recTimer = null;
 let recStartedAt = 0;
 let recCancelled = false;
 let audioCtx = null, waveAnalyser = null, waveRaf = null, wakeLock = null, micStream = null;
+const MAX_REC_MS = 7 * 60 * 1000; // أقصى مدة تسجيل في المرة = ٧ دقايق
 
 function recElems() {
   return { bar: $("recBar"), time: $("recTime"), mic: $("micBtn"), comp: $("composerBtn") };
@@ -465,12 +466,20 @@ async function startRecording() {
   mic.classList.add("hidden");
   bar.classList.remove("hidden");
   time.textContent = "0:00";
+  bar.classList.remove("warn");
+  const prog = $("recProgress");
+  if (prog) prog.style.width = "0%";
   startWave(stream);
   requestWakeLock();
   document.addEventListener("visibilitychange", onRecVisibility);
   recTimer = setInterval(() => {
-    time.textContent = fmtRecTime(Date.now() - recStartedAt);
-    if (Date.now() - recStartedAt > 120000) stopRecording(); // سقف دقيقتين
+    const elapsed = Date.now() - recStartedAt;
+    const remaining = MAX_REC_MS - elapsed;
+    const warn = remaining <= 45000; // آخر ٤٥ ثانية = تحذير
+    bar.classList.toggle("warn", warn);
+    time.textContent = warn ? `⚠️ باقي ${fmtRecTime(Math.max(0, remaining))}` : fmtRecTime(elapsed);
+    if (prog) prog.style.width = `${Math.min(100, (elapsed / MAX_REC_MS) * 100)}%`;
+    if (remaining <= 0) stopRecording(); // سقف ٧ دقايق
   }, 250);
 }
 function stopRecording() {
