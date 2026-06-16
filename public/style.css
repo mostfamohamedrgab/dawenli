@@ -1135,6 +1135,19 @@ select.field { cursor: pointer; }
 }
 .auth-form .remember input { accent-color: var(--brand); width: 16px; height: 16px; }
 .auth-form button[type="submit"] { width: 100%; justify-content: center; }
+
+/* حقل كلمة السر مع زرار إظهار/إخفاء (الزرار على الشمال — نهاية الحقل في RTL) */
+.pw-wrap { position: relative; display: block; }
+.auth-form .pw-wrap .field { padding-left: 46px; }
+.pw-toggle {
+  position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; cursor: pointer;
+  font-size: 18px; line-height: 1; padding: 6px;
+  border-radius: 8px; color: var(--ink-muted);
+}
+.pw-toggle:hover { background: var(--brand-wash); }
+.pw-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .auth-error {
   margin-top: 14px;
   color: var(--danger-deep);

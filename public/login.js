@@ -22,6 +22,18 @@ tabLogin.addEventListener("click", () => { signup = false; refresh(); });
 tabSignup.addEventListener("click", () => { signup = true; refresh(); });
 refresh();
 
+// إظهار/إخفاء كلمة السر
+const togglePw = document.getElementById("togglePw");
+const pwInput = document.getElementById("emailPassword");
+togglePw?.addEventListener("click", () => {
+  const show = pwInput.type === "password";
+  pwInput.type = show ? "text" : "password";
+  togglePw.textContent = show ? "🙈" : "👁️";
+  togglePw.setAttribute("aria-pressed", String(show));
+  togglePw.setAttribute("aria-label", show ? "إخفاء كلمة السر" : "إظهار كلمة السر");
+  pwInput.focus();
+});
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   errorEl.hidden = true;
