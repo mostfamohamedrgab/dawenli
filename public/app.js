@@ -10,6 +10,8 @@ const state = {
   habits: [],
   finance: [],
   tasks: [],
+  ideas: [],
+  problems: [],
   profile: [],
   categories: [],
   pageDate: null,
@@ -133,7 +135,8 @@ function gotoTab(tab) {
   if (tab === "habits") renderHabitsPage();
   if (tab === "goals") renderGoalsPage();
   if (tab === "finances") renderFinancesPage();
-  if (tab === "tasks") renderCalendar();
+  if (tab === "ideas") renderIdeasPage();
+  if (tab === "problems") renderProblemsPage();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 $("sideNav").addEventListener("click", (e) => {
@@ -146,8 +149,17 @@ $("tabBar")?.addEventListener("click", (e) => {
 });
 document.querySelectorAll("[data-go]").forEach((c) => c.addEventListener("click", () => gotoTab(c.dataset.go)));
 
-function openSidebar() { $("sidebar").classList.add("open"); $("sideScrim").classList.add("show"); }
-function closeSidebar() { $("sidebar").classList.remove("open"); $("sideScrim").classList.remove("show"); }
+// زرار المايك العائم يختفي وقت ما يفتح أي شيت/قائمة عشان ميركبش فوق المحتوى
+function syncFab() {
+  const hide =
+    $("sidebar")?.classList.contains("open") ||
+    $("notifPanel")?.classList.contains("open") ||
+    $("chatSheet")?.classList.contains("open") ||
+    $("moreSheet")?.classList.contains("open");
+  $("voiceFab")?.classList.toggle("hidden", !!hide);
+}
+function openSidebar() { $("sidebar").classList.add("open"); $("sideScrim").classList.add("show"); syncFab(); }
+function closeSidebar() { $("sidebar").classList.remove("open"); $("sideScrim").classList.remove("show"); syncFab(); }
 $("menuBtn")?.addEventListener("click", openSidebar);
 $("sideScrim")?.addEventListener("click", closeSidebar);
 
@@ -169,13 +181,13 @@ function openChat() {
   if (composerEl) $("chatSheetBody").appendChild(composerEl);
   $("chatSheet")?.classList.add("open");
   $("chatScrim")?.classList.add("show");
-  $("voiceFab")?.classList.add("hidden");
+  syncFab();
   setTimeout(() => $("composerText")?.focus(), 280);
 }
 function closeChat() {
   $("chatSheet")?.classList.remove("open");
   $("chatScrim")?.classList.remove("show");
-  $("voiceFab")?.classList.remove("hidden");
+  syncFab();
   // رجّع الكومبوزر لمكانه الأصلي بعد الأنيميشن
   setTimeout(() => { if (composerEl && composerParent) composerParent.insertBefore(composerEl, composerNext); }, 320);
 }
@@ -302,6 +314,8 @@ window.startTour = startTour; // عشان نقدر نشغّلها يدويًا
 // سطر الإيصال من الـ agent → عالمه (للون الـ chip)
 function receiptWorld(line) {
   if (line.startsWith("💰")) return "finances";
+  if (line.startsWith("💡")) return "ideas";
+  if (line.startsWith("🧩")) return "problems";
   if (line.startsWith("🩺") || line.startsWith("🧠") || line.startsWith("🍽️") || line.startsWith("🩹")) return "health";
   if (line.startsWith("🎯")) return "goals";
   if (line.startsWith("📅") || line.startsWith("☑️")) return "goals";
@@ -1401,6 +1415,141 @@ $("calToday").addEventListener("click", () => {
   renderCalendar();
 });
 
+/* ===================== الأفكار (دماغك) — هَب موحّد مع المهام/التقويم ===================== */
+const IDEA_STATUS = {
+  inbox: { label: "فكرة", emoji: "💡" },
+  planned: { label: "مخطّط لها", emoji: "📌" },
+  done: { label: "اتعملت", emoji: "✅" },
+};
+function renderIdeasPage() {
+  renderIdeas();
+  renderCalendar();
+}
+function renderIdeas() {
+  const el = $("ideasList");
+  if (!el) return;
+  const data = state.ideas;
+  if (!data.length) {
+    el.innerHTML = emptyState("لا توجد أفكار بعد", "اكتب فكرة بالأعلى، أو قل لدوّنلي «عندي فكرة…».");
+    return;
+  }
+  el.innerHTML = data.map((i) => {
+    const meta = IDEA_STATUS[i.status] || IDEA_STATUS.inbox;
+    const done = i.status === "done";
+    return `<div class="idea-card ${done ? "done" : ""}">
+      <div class="ic-top">
+        <span class="ic-title">${meta.emoji} ${escapeHtml(i.title)}</span>
+        <button class="icon-btn" onclick="del('ideas', ${i.id})" title="حذف">🗑️</button>
+      </div>
+      ${i.detail ? `<p class="ic-detail">${escapeHtml(i.detail)}</p>` : ""}
+      <div class="ic-foot">
+        <span class="badge ideas"><span class="dot"></span>${meta.label}</span>
+        <div class="ic-actions">
+          ${!done ? `<button class="btn ideas sm" onclick="ideaToTask(${i.id})">حوّلها لمهمة</button>` : ""}
+          <button class="btn ghost sm" onclick="changeIdeaStatus(${i.id}, '${done ? "inbox" : "done"}')">${done ? "رجّعها" : "تمّت ✓"}</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+async function changeIdeaStatus(id, status) {
+  await api(`/api/ideas/${id}/status`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+  await loadAll(false);
+  renderIdeas();
+}
+window.changeIdeaStatus = changeIdeaStatus;
+async function ideaToTask(id) {
+  const idea = state.ideas.find((x) => x.id === id);
+  if (!idea) return;
+  await api("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: idea.title, dueDate: TODAY() }) });
+  await api(`/api/ideas/${id}/status`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "planned" }) });
+  await loadAll(false);
+  renderIdeasPage();
+}
+window.ideaToTask = ideaToTask;
+$("ideaForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("ideaTitle").value.trim();
+  if (!title) return;
+  await api("/api/ideas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) });
+  e.target.reset();
+  await loadAll(false);
+  renderIdeas();
+});
+
+/* ===================== المشاكل (قلبك) ===================== */
+const PROBLEM_AREAS = ["شغل", "صحة", "علاقات", "نفسي", "فلوس", "أخرى"];
+const PROB_STATUS = {
+  active: { label: "نشطة", cls: "danger" },
+  working: { label: "بنشتغل عليها", cls: "warning" },
+  resolved: { label: "اتحلّت", cls: "success" },
+};
+function fillProblemAreas() {
+  const sel = $("problemArea");
+  if (sel && !sel.children.length) sel.innerHTML = PROBLEM_AREAS.map((a) => `<option value="${a}">${a}</option>`).join("");
+}
+function renderProblemsPage() {
+  fillProblemAreas();
+  const el = $("problemsList");
+  if (!el) return;
+  const data = state.problems;
+  if (!data.length) {
+    el.innerHTML = emptyState("مفيش مشاكل مسجّلة", "احكِ لدوّنلي اللي مضايقك وهيطلّعه هنا، أو ضيفه بالأعلى.");
+    return;
+  }
+  el.innerHTML = data.map((p) => {
+    const st = PROB_STATUS[p.status] || PROB_STATUS.active;
+    const resolved = p.status === "resolved";
+    return `<div class="problem-card ${p.status}">
+      <div class="pc-top">
+        <span class="pc-title">🧩 ${escapeHtml(p.title)}</span>
+        <span class="badge ${st.cls}"><span class="dot"></span>${st.label}</span>
+      </div>
+      ${p.detail ? `<p class="pc-detail">${escapeHtml(p.detail)}</p>` : ""}
+      <div class="pc-foot">
+        ${p.area ? `<span class="chip problems">${escapeHtml(p.area)}</span>` : ""}
+        <div class="pc-actions">
+          ${resolved
+            ? `<button class="btn ghost sm" onclick="changeProblemStatus(${p.id}, 'active')">رجّعها</button>`
+            : `${p.status === "active" ? `<button class="btn ghost sm" onclick="changeProblemStatus(${p.id}, 'working')">بنشتغل عليها</button>` : ""}
+               <button class="btn problems sm" onclick="changeProblemStatus(${p.id}, 'resolved')">اتحلّت ✓</button>`}
+          <button class="icon-btn" onclick="del('problems', ${p.id})" title="حذف">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+async function changeProblemStatus(id, status) {
+  await api(`/api/problems/${id}/status`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+  await loadAll(false);
+  renderProblemsPage();
+}
+window.changeProblemStatus = changeProblemStatus;
+$("problemForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("problemTitle").value.trim();
+  const area = $("problemArea").value;
+  if (!title) return;
+  await api("/api/problems", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, area }) });
+  e.target.reset();
+  fillProblemAreas();
+  await loadAll(false);
+  renderProblemsPage();
+});
+
+/* ===================== شيت «أقسام أكتر» (موبايل) ===================== */
+function openMore() { $("moreSheet")?.classList.add("open"); $("moreScrim")?.classList.add("show"); syncFab(); }
+function closeMore() { $("moreSheet")?.classList.remove("open"); $("moreScrim")?.classList.remove("show"); syncFab(); }
+$("moreTabBtn")?.addEventListener("click", openMore);
+$("moreClose")?.addEventListener("click", closeMore);
+$("moreScrim")?.addEventListener("click", closeMore);
+$("moreSheet")?.addEventListener("click", (e) => {
+  const btn = e.target.closest(".more-item");
+  if (!btn) return;
+  closeMore();
+  gotoTab(btn.dataset.tab);
+});
+
 /* ===================== المحادثات ===================== */
 const KIND_LABEL = { voice: "🎙️ صوت", text: "⌨️ كتابة", command: "⚙️ أمر", checkin: "⏰ سؤال اليوم", dashboard: "✎ من الداشبورد" };
 function renderChats() {
@@ -1430,7 +1579,7 @@ $("logoutBtn").addEventListener("click", logout);
 
 async function loadAll(rerender = true) {
   try {
-    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof] = await Promise.all([
+    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob] = await Promise.all([
       api("/api/me").then((r) => r.json()),
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
@@ -1443,11 +1592,14 @@ async function loadAll(rerender = true) {
       api("/api/tasks").then((r) => r.json()),
       api("/api/finance-categories").then((r) => r.json()),
       api("/api/profile").then((r) => r.json()),
+      api("/api/ideas").then((r) => r.json()),
+      api("/api/problems").then((r) => r.json()),
     ]);
     state.me = me;
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
     state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin;
     state.tasks = tasks; state.categories = cats; state.profile = prof;
+    state.ideas = idea; state.problems = prob;
   } catch { return; }
 
   const first = (state.me?.name || "د").trim()[0] || "د";
@@ -1464,7 +1616,8 @@ async function loadAll(rerender = true) {
   if (active === "habits") renderHabitsPage();
   if (active === "goals") renderGoalsPage();
   if (active === "finances") renderFinancesPage();
-  if (active === "tasks") renderCalendar();
+  if (active === "ideas") renderIdeasPage();
+  if (active === "problems") renderProblemsPage();
 }
 
 loadAll().then(() => {
@@ -1533,12 +1686,14 @@ function openNotif() {
   $("notifPanel").classList.add("open");
   $("notifScrim").classList.add("show");
   $("notifPanel").setAttribute("aria-hidden", "false");
+  syncFab();
   loadNotifications();
 }
 function closeNotif() {
   $("notifPanel").classList.remove("open");
   $("notifScrim").classList.remove("show");
   $("notifPanel").setAttribute("aria-hidden", "true");
+  syncFab();
 }
 
 document.querySelectorAll("[data-bell]").forEach((b) =>

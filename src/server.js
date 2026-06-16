@@ -58,6 +58,14 @@ import {
   listNotifications,
   unreadNotificationCount,
   markNotificationsRead,
+  addIdea,
+  listIdeas,
+  setIdeaStatus,
+  deleteIdea,
+  addProblem,
+  listProblems,
+  setProblemStatus,
+  deleteProblem,
 } from "./db.js";
 import { pushEnabled, vapidPublicKey, sendPushToUser, notifyUser } from "./push.js";
 import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING } from "./openai.js";
@@ -545,6 +553,44 @@ export function startServer() {
     res.json({ ok: deleteTask(user.id, Number(req.params.id)) });
   });
 
+  /* ===== الأفكار (دماغك) ===== */
+  app.get("/api/ideas", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listIdeas(user.id));
+  });
+  app.post("/api/ideas", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const { title, detail } = req.body || {};
+    if (!title) return res.status(400).json({ error: "اكتب الفكرة" });
+    res.json({ ok: true, idea: addIdea({ userId: user.id, title, detail }) });
+  });
+  app.put("/api/ideas/:id/status", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: setIdeaStatus(user.id, Number(req.params.id), String(req.body?.status || "")) });
+  });
+
+  /* ===== المشاكل (قلبك) ===== */
+  app.get("/api/problems", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listProblems(user.id));
+  });
+  app.post("/api/problems", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const { title, detail, area } = req.body || {};
+    if (!title) return res.status(400).json({ error: "اكتب المشكلة" });
+    res.json({ ok: true, problem: addProblem({ userId: user.id, title, detail, area }) });
+  });
+  app.put("/api/problems/:id/status", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: setProblemStatus(user.id, Number(req.params.id), String(req.body?.status || ""), req.body?.note) });
+  });
+
   // الكومبوزر في الداشبورد: "رتّبهالي" — بيشغّل الـ agent على النص
   app.post("/api/log", async (req, res) => {
     const user = gate(req, res);
@@ -642,6 +688,8 @@ export function startServer() {
     conditions: deleteCondition,
     meals: deleteMeal,
     habits: deleteHabit,
+    ideas: deleteIdea,
+    problems: deleteProblem,
   };
   for (const [kind, fn] of Object.entries(deleters)) {
     app.delete(`/api/${kind}/:id`, (req, res) => {

@@ -204,6 +204,35 @@ db.exec(`
     read_at     TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, id);
+
+  -- الأفكار: اللي في دماغ المستخدم — أفكار، حاجات ناوي يعملها، خطط. الـ agent بيطلّعها
+  -- من كلامه، وممكن الفكرة تتحوّل لمهمة بمعاد (task_id).
+  CREATE TABLE IF NOT EXISTS ideas (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    title       TEXT NOT NULL,
+    detail      TEXT,
+    status      TEXT NOT NULL DEFAULT 'inbox', -- inbox | planned | done
+    task_id     INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_ideas_user ON ideas(user_id, id);
+
+  -- المشاكل والهموم: حاجة مضايقة المستخدم وعايز يتخلص منها. الـ agent بيطلّعها من
+  -- كلامه ويتابع حلّها (نشطة → بنشتغل عليها → اتحلّت).
+  CREATE TABLE IF NOT EXISTS problems (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    title       TEXT NOT NULL,
+    detail      TEXT,
+    area        TEXT,            -- شغل | صحة | علاقات | نفسي | فلوس | أخرى
+    status      TEXT NOT NULL DEFAULT 'active', -- active | working | resolved
+    resolved_at TEXT,
+    note        TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_problems_user ON problems(user_id, status, id);
 `);
 
 /* ===================== Migrations ===================== */
@@ -1150,6 +1179,92 @@ export function profileForAgent(userId) {
     (out[r.category] = out[r.category] || []).push(`${r.fact_key}: ${r.value}`);
   }
   return out;
+}
+
+/* ===================== Ideas (الأفكار — دماغك) ===================== */
+
+const insertIdeaStmt = db.prepare(
+  `INSERT INTO ideas (created_at, user_id, title, detail, status) VALUES (?, ?, ?, ?, ?)`
+);
+export function addIdea({ userId, title, detail, status }) {
+  if (!title) return null;
+  const st = ["inbox", "planned", "done"].includes(status) ? status : "inbox";
+  const info = insertIdeaStmt.run(now(), userId, String(title).trim(), detail || null, st);
+  return db.prepare(`SELECT * FROM ideas WHERE id = ?`).get(Number(info.lastInsertRowid));
+}
+export function listIdeas(userId, limit = 200) {
+  return db
+    .prepare(`SELECT * FROM ideas WHERE user_id = ? ORDER BY status = 'done', id DESC LIMIT ?`)
+    .all(userId, limit);
+}
+export function setIdeaStatus(userId, id, status) {
+  if (!["inbox", "planned", "done"].includes(status)) return false;
+  return db.prepare(`UPDATE ideas SET status = ? WHERE user_id = ? AND id = ?`).run(status, userId, id).changes > 0;
+}
+export function deleteIdea(userId, id) {
+  return db.prepare(`DELETE FROM ideas WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+}
+// لقطة مختصرة للـ agent عشان مايكرّرش نفس الفكرة
+export function recentIdeas(userId, limit = 12) {
+  return db
+    .prepare(`SELECT title, status FROM ideas WHERE user_id = ? ORDER BY id DESC LIMIT ?`)
+    .all(userId, limit);
+}
+
+/* ===================== Problems (المشاكل والهموم — قلبك) ===================== */
+
+export const PROBLEM_AREAS = ["شغل", "صحة", "علاقات", "نفسي", "فلوس", "أخرى"];
+
+const findActiveProblemStmt = db.prepare(
+  `SELECT * FROM problems WHERE user_id = ? AND status != 'resolved' AND title LIKE ? ORDER BY id DESC LIMIT 1`
+);
+const insertProblemStmt = db.prepare(
+  `INSERT INTO problems (created_at, updated_at, user_id, title, detail, area, status) VALUES (?, ?, ?, ?, ?, ?, 'active')`
+);
+// لو مشكلة شبه موجودة ونشطة، نرجّعها بدل ما نكرّرها
+export function addProblem({ userId, title, detail, area }) {
+  if (!title) return null;
+  const t = String(title).trim();
+  const existing = findActiveProblemStmt.get(userId, `%${t}%`);
+  if (existing) return { ...existing, created: false };
+  const ar = PROBLEM_AREAS.includes(area) ? area : "أخرى";
+  const info = insertProblemStmt.run(now(), now(), userId, t, detail || null, ar);
+  return { ...db.prepare(`SELECT * FROM problems WHERE id = ?`).get(Number(info.lastInsertRowid)), created: true };
+}
+export function listProblems(userId, limit = 200) {
+  return db
+    .prepare(
+      `SELECT * FROM problems WHERE user_id = ?
+       ORDER BY status = 'resolved', CASE status WHEN 'working' THEN 0 WHEN 'active' THEN 1 ELSE 2 END, id DESC
+       LIMIT ?`
+    )
+    .all(userId, limit);
+}
+export function activeProblems(userId) {
+  return db
+    .prepare(`SELECT * FROM problems WHERE user_id = ? AND status != 'resolved' ORDER BY id DESC`)
+    .all(userId);
+}
+export function setProblemStatus(userId, id, status, note) {
+  if (!["active", "working", "resolved"].includes(status)) return false;
+  const resolvedAt = status === "resolved" ? now() : null;
+  return (
+    db
+      .prepare(`UPDATE problems SET status = ?, resolved_at = ?, note = COALESCE(?, note), updated_at = ? WHERE user_id = ? AND id = ?`)
+      .run(status, resolvedAt, note ?? null, now(), userId, id).changes > 0
+  );
+}
+// الـ agent بيقفل/يحدّث مشكلة بالاسم أو الـ id
+export function resolveProblem(userId, { id, title }) {
+  let prob = null;
+  if (id) prob = db.prepare(`SELECT * FROM problems WHERE user_id = ? AND id = ?`).get(userId, Number(id));
+  if (!prob && title) prob = findActiveProblemStmt.get(userId, `%${String(title).trim()}%`);
+  if (!prob) return null;
+  setProblemStatus(userId, prob.id, "resolved");
+  return db.prepare(`SELECT * FROM problems WHERE id = ?`).get(prob.id);
+}
+export function deleteProblem(userId, id) {
+  return db.prepare(`DELETE FROM problems WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
 }
 
 /* ===================== helpers ===================== */

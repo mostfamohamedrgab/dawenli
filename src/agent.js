@@ -39,6 +39,12 @@ import {
   recentConversations,
   upsertProfileFact,
   profileForAgent,
+  addIdea,
+  recentIdeas,
+  addProblem,
+  resolveProblem,
+  activeProblems,
+  PROBLEM_AREAS,
 } from "./db.js";
 
 /* ===================== الأدوات ===================== */
@@ -98,6 +104,54 @@ const TOOLS = [
           date: { type: "string", description: "YYYY-MM-DD" },
         },
         required: ["direction", "amount"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "log_idea",
+      description:
+        "سجّل فكرة أو حاجة المستخدم ناوي يعملها أو خاطر جه في باله — مش مهمة بمعاد محدد (دي للمهام). مثلاً «عندي فكرة مشروع»، «نفسي أعمل قناة»، «المفروض أجرّب كذا».",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "الفكرة في جملة قصيرة" },
+          detail: { type: "string", description: "تفاصيل إضافية لو موجودة" },
+        },
+        required: ["title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "log_problem",
+      description:
+        "سجّل مشكلة أو همّ أو حاجة مضايقة المستخدم وعايز يتخلص منها — مش عرض صحي لحظي (ده log_health). مثلاً «متضايق من شغلي»، «فيه مشكلة بيني وبين حد»، «حاسس إني مش مرتاح من كذا». استخرجها حتى لو ماطلبش صراحةً.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "المشكلة في جملة قصيرة" },
+          detail: { type: "string", description: "تفاصيل إضافية لو موجودة" },
+          area: { type: "string", enum: PROBLEM_AREAS, description: "مجال المشكلة" },
+        },
+        required: ["title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "resolve_problem",
+      description:
+        "علّم مشكلة سابقة إنها اتحلّت لما المستخدم يقول إنها خلصت أو اتحسّنت خالص. استخدم نفس عنوان المشكلة من السياق (active_problems).",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "عنوان المشكلة اللي اتحلّت (زي ما هي في السياق)" },
+        },
+        required: ["title"],
       },
     },
   },
@@ -347,6 +401,23 @@ function executeTool(ctx, name, args) {
         receipt: `💰 ${sign}: ${fmtNum(amount)} ${args.currency || "جنيه"}${args.category ? " · " + args.category : ""}${args.note ? " · " + args.note : ""}`,
       };
     }
+    case "log_idea": {
+      if (!args.title) return { result: { ok: false, error: "محتاج عنوان للفكرة" } };
+      const idea = addIdea({ userId, title: args.title, detail: args.detail || null });
+      return { result: { ok: !!idea }, receipt: `💡 فكرة: ${args.title}` };
+    }
+    case "log_problem": {
+      if (!args.title) return { result: { ok: false, error: "محتاج عنوان للمشكلة" } };
+      const p = addProblem({ userId, title: args.title, detail: args.detail || null, area: args.area });
+      return {
+        result: { ok: !!p, created: p?.created },
+        receipt: `🧩 مشكلة: ${args.title}${args.area ? " · " + args.area : ""}`,
+      };
+    }
+    case "resolve_problem": {
+      const r = resolveProblem(userId, { title: args.title });
+      return { result: { ok: !!r }, receipt: r ? `🧩 اتحلّت: ${r.title}` : `⚠️ ملقيتش المشكلة دي` };
+    }
     case "upsert_goal": {
       const applied = applyGoal({
         userId,
@@ -562,6 +633,8 @@ function buildSnapshot(userId) {
   const habits = listHabits(userId);
   const tasks = pendingTasks(userId, 12).filter((t) => t.due_date <= daysAhead(7));
   const conditions = activeConditions(userId);
+  const ideas = recentIdeas(userId, 12);
+  const problems = activeProblems(userId);
   const recentJournal = listEntries(userId, 3);
   const profile = profileForAgent(userId); // الذاكرة الدائمة عن الشخص
 
@@ -593,6 +666,10 @@ function buildSnapshot(userId) {
     habits: habits.map((h) => `${h.title} (${h.kind === "quit" ? "بيبطّلها" : "بيعملها"})${h.doneToday ? " ✓ اتعملت النهاردة" : ""} — ستريك ${h.streak}`),
     pending_tasks: tasks.map((t) => `#${t.id} ${t.title} — ${t.due_date}${t.due_time ? " " + t.due_time : ""}`),
     active_conditions: conditions.map((c) => `${c.title} (متابعة لحد ${c.end_date})`),
+    recent_ideas: ideas.map((i) => `${i.title}${i.status === "done" ? " ✓" : ""}`),
+    active_problems: problems.map(
+      (p) => `${p.title}${p.area ? " (" + p.area + ")" : ""}${p.status === "working" ? " — بنشتغل عليها" : ""}`
+    ),
     recent_journal: recentJournal.map((e) => `${e.entry_date} (${e.mood || "?"}): ${e.summary || ""}`),
   };
 }
@@ -609,6 +686,8 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 - **اربط الدخل بالهدف:** لو المستخدم كسب أو وفّر فلوس وعنده في السياق هدف نشط بنفس العملة/الفكرة (مثلاً هدف ادخار «أوصل ١٠ آلاف دولار» وهو كسب دولار) → بالإضافة لـ log_finance، زوّد تقدّم الهدف بـ upsert_goal action=add_amount بنفس عنوان الهدف وبالمبلغ بعملته. خلّي بالك من العملة: ماتخلطش دخل بالدولار في هدف بالجنيه.
 - العادات: عنوان قصير ثابت ("رياضة" مش "لعبت رياضة في الجيم"). لو عملها من غير ما تكون معرّفة → action="both".
 - المهام: أي حاجة ليها معاد ("عندي ميتنج بكرة الساعة ٥") → add_task بتاريخ محسوب صح من جدول الأيام اللي في السياق.
+- **الأفكار (log_idea):** لو قال فكرة أو حاجة ناوي/نفسه يعملها من غير معاد محدد ("عندي فكرة…"، "نفسي أعمل قناة"، "المفروض أجرّب كذا") → سجّلها بـ log_idea. لو ليها معاد واضح فهي مهمة (add_task) مش فكرة. شوف \`recent_ideas\` في السياق ومتكرّرش فكرة موجودة.
+- **المشاكل والهموم (log_problem):** لو حسّيت إن في حاجة مضايقة المستخدم أو بتقلقه أو عايز يتخلص منها ("متضايق من شغلي"، "تعبان نفسيًا بسبب…"، "في مشكلة بيني وبين حد") → سجّلها بـ log_problem بالمجال المناسب، **حتى لو ماطلبش صراحةً**. ده غير العرض الصحي اللحظي (log_health). شوف \`active_problems\` في السياق: لو نفس الهمّ متسجّل بلاش تكرار؛ ولو قال إنه اتحسّن/خلص → resolve_problem.
 - الصحة النفسية: قلق، توتر، حزن، ضغط نفسي → log_health بـ category="نفسية" و body_region="راس".
 - صحة حد تاني غير المستخدم ماتسجّلهاش خالص.
 - **متسجّلش نفس الحاجة مرتين (مهم جدًا في الفلوس):** في سياقك \`finance_today\` فيها كل المصاريف/الدخل المسجّلة النهاردة. **قبل** أي نداء \`log_finance\`، بُص عليها كويس: لو نفس المبلغ (أو قريب منه) ووصف مشابه أو نفس البند اتسجّل خلاص — حتى لو المستخدم قاله بصيغة تانية أو في تسجيل صوتي منفصل (مثلاً «موزع واي فاي للبي سي ٤٠٠» و«موزع واي فاي ٤٠٠»، أو «أبو طارق ٩٥» و«أبو طارق كشري ٩٥») → **ماتسجّلوش تاني**. المستخدم بيدردش وبيكرّر نفس الحاجة بكلام مختلف، والتكرار ده بيبوّظ مجموع مصاريفه. لو عندك شك حقيقي إنهم عمليتين مختلفتين بنفس المبلغ، اسأله سؤال قصير («ده غير الـ ٤٠٠ اللي سجّلتهم قبل كده؟») بدل ما تسجّل تكرار. نفس المبدأ لباقي المحاور (أكل، صحة، مهام): لو واضح إنه متسجّل، بلاش تكرار.
