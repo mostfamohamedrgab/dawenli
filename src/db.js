@@ -233,6 +233,21 @@ db.exec(`
     note        TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_problems_user ON problems(user_id, status, id);
+
+  -- مركز الملفات: المستخدم بيرفع صورة (دوا/روشتة/تحليل/فاتورة...) والـ ai بيصنّفها
+  -- ويحفظ وصف قصير، والملف نفسه على الديسك في path.
+  CREATE TABLE IF NOT EXISTS files (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    filename    TEXT NOT NULL,
+    mime        TEXT,
+    size        INTEGER,
+    category    TEXT,            -- دواء | روشتة | تحليل | أشعة | فاتورة | مستند | أخرى
+    description TEXT,
+    path        TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id, id);
 `);
 
 /* ===================== Migrations ===================== */
@@ -1298,6 +1313,85 @@ export function resolveProblem(userId, { id, title }) {
 }
 export function deleteProblem(userId, id) {
   return db.prepare(`DELETE FROM problems WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+}
+
+/* ===================== Files (مركز الملفات) ===================== */
+
+export const FILE_CATEGORIES = ["دواء", "روشتة", "تحليل", "أشعة", "فاتورة", "مستند", "أخرى"];
+
+const insertFileStmt = db.prepare(
+  `INSERT INTO files (created_at, user_id, filename, mime, size, category, description, path)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+);
+export function addFile({ userId, filename, mime, size, category, description, path }) {
+  const cat = FILE_CATEGORIES.includes(category) ? category : "أخرى";
+  const info = insertFileStmt.run(now(), userId, filename, mime || null, Number(size) || 0, cat, description || null, path);
+  return db.prepare(`SELECT * FROM files WHERE id = ?`).get(Number(info.lastInsertRowid));
+}
+export function listFiles(userId, limit = 300) {
+  return db.prepare(`SELECT * FROM files WHERE user_id = ? ORDER BY id DESC LIMIT ?`).all(userId, limit);
+}
+export function getFile(userId, id) {
+  return db.prepare(`SELECT * FROM files WHERE user_id = ? AND id = ?`).get(userId, id) || null;
+}
+export function deleteFile(userId, id) {
+  return db.prepare(`DELETE FROM files WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+}
+
+/* ===================== تعديل عام لأي صف (مرونة التعديل) ===================== */
+// بنحدّث الأعمدة المسموح بيها بس (allowlist ثابت — مفيش حقن SQL) لصف يخص المستخدم.
+function updateOwned(table, allowedCols, userId, id, patch) {
+  const sets = [];
+  const vals = [];
+  for (const col of allowedCols) {
+    if (patch[col] !== undefined) {
+      sets.push(`${col} = ?`);
+      vals.push(patch[col]);
+    }
+  }
+  if (!sets.length) return false;
+  vals.push(Number(userId), Number(id));
+  return db.prepare(`UPDATE ${table} SET ${sets.join(", ")} WHERE user_id = ? AND id = ?`).run(...vals).changes > 0;
+}
+
+export function updateFinance(userId, id, patch) {
+  const p = { ...patch };
+  if (p.amount !== undefined) p.amount = Number(p.amount) || 0;
+  if (p.direction !== undefined) p.direction = p.direction === "income" ? "income" : "expense";
+  if (p.category !== undefined && !FINANCE_CATEGORIES.includes(p.category)) p.category = p.category || "أخرى";
+  return updateOwned("finance", ["entry_date", "direction", "amount", "category", "note"], userId, id, p);
+}
+export function updateHealth(userId, id, patch) {
+  return updateOwned("health", ["entry_date", "category", "detail", "body_region"], userId, id, patch);
+}
+export function updateEntry(userId, id, patch) {
+  return updateOwned("entries", ["entry_date", "mood", "summary"], userId, id, patch);
+}
+export function updateTaskFields(userId, id, patch) {
+  const p = { ...patch };
+  if (p.due_time === "") p.due_time = null;
+  return updateOwned("tasks", ["title", "due_date", "due_time", "note"], userId, id, p);
+}
+export function updateMeal(userId, id, patch) {
+  return updateOwned("meals", ["entry_date", "at_time", "items", "note"], userId, id, patch);
+}
+export function updateGoalMeta(userId, id, patch) {
+  const p = { ...patch, updated_at: now() };
+  if (p.target !== undefined) p.target = p.target === "" || p.target == null ? null : Number(p.target);
+  return updateOwned("goals", ["title", "target", "unit", "updated_at"], userId, id, p);
+}
+export function updateIdeaFields(userId, id, patch) {
+  return updateOwned("ideas", ["title", "detail"], userId, id, patch);
+}
+export function updateProblemFields(userId, id, patch) {
+  const p = { ...patch, updated_at: now() };
+  if (p.area !== undefined && !PROBLEM_AREAS.includes(p.area)) p.area = "أخرى";
+  return updateOwned("problems", ["title", "detail", "area", "updated_at"], userId, id, p);
+}
+export function updateHabitFields(userId, id, patch) {
+  const p = { ...patch };
+  if (p.kind !== undefined) p.kind = p.kind === "quit" ? "quit" : "do";
+  return updateOwned("habits", ["title", "kind", "emoji"], userId, id, p);
 }
 
 /* ===================== helpers ===================== */

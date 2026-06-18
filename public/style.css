@@ -469,10 +469,13 @@ a { color: inherit; }
   margin-top: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   padding: 14px 8px 4px;
   border-top: 1px solid var(--hairline);
 }
+.side-user > div { flex: 1; min-width: 0; } /* كتلة الاسم تتقلّص وتتقصّ بدل ما تزقّ الأيقونات */
+.side-user .side-bell, .side-user .su-logout { flex: none; }
+.side-user .side-bell { width: 32px; height: 32px; padding: 0; }
 .side-user .avatar {
   width: 38px; height: 38px;
   flex: none;
@@ -483,8 +486,8 @@ a { color: inherit; }
   font-family: var(--font-display);
   font-weight: 700;
 }
-.side-user .su-name { font: var(--type-label); color: var(--ink); line-height: 1.3; }
-.side-user .su-sub { font-size: var(--text-xs); color: var(--ink-faint); }
+.side-user .su-name { font: var(--type-label); color: var(--ink); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-user .su-sub { font-size: var(--text-xs); color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-user .su-logout {
   margin-inline-start: auto;
   border: none; background: transparent;
@@ -504,7 +507,10 @@ a { color: inherit; }
   padding: clamp(20px, 4vw, 44px);
   width: 100%;
   max-width: 1060px;
-  margin: 0 auto;
+  /* نلزّق المحتوى ناحية السايدبار (inline-start) فالفراغ الزيادة على الشاشة العريضة
+     يروح للطرف البعيد بدل ما يبقى فجوة بين المحتوى والسايدبار. */
+  margin-inline-start: 0;
+  margin-inline-end: auto;
 }
 
 /* توب بار + شريط تابات الموبايل — متخفيين على الديسكتوب */
@@ -622,6 +628,59 @@ a { color: inherit; }
 .more-item .mi-ico { font-size: 26px; }
 .more-item.ideas    { border-color: var(--ideas-tint); }
 .more-item.problems { border-color: var(--problems-tint); }
+
+/* ===================== اسأل دوّنلي (شات سياقي) ===================== */
+.ask-scope { display: flex; gap: 8px; align-items: center; }
+.ask-thread {
+  min-height: 180px; max-height: 54vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 6px 2px; margin-bottom: 12px;
+}
+.ask-empty { color: var(--ink-muted); font-size: var(--text-sm); text-align: center; padding: 28px 16px; line-height: 1.8; }
+.ask-bubble {
+  max-width: 86%; padding: 10px 14px; border-radius: 16px;
+  line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;
+}
+.ask-bubble.user { align-self: flex-start; background: var(--brand); color: var(--on-accent); border-bottom-right-radius: 5px; }
+.ask-bubble.assistant { align-self: flex-end; background: var(--surface-card); border: 1.5px solid var(--hairline); border-bottom-left-radius: 5px; }
+.ask-input { display: flex; gap: 8px; align-items: center; }
+.ask-input .field { flex: 1; }
+
+/* ===================== مركز الملفات ===================== */
+.file-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 26px; border: 2px dashed var(--hairline-strong); border-radius: var(--radius-md);
+  cursor: pointer; color: var(--ink-muted); text-align: center; font-size: var(--text-sm);
+  transition: border-color var(--dur-fast) var(--ease-soft), background var(--dur-fast) var(--ease-soft);
+}
+.file-drop:hover { border-color: var(--brand); background: var(--brand-wash); color: var(--brand-deep); }
+.file-drop .fd-ico { font-size: 30px; }
+.files-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.file-card {
+  background: var(--surface-card); border: 1.5px solid var(--hairline);
+  border-radius: var(--radius-md); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.fc-thumb {
+  display: flex; align-items: center; justify-content: center;
+  height: 128px; background: var(--paper-deep); overflow: hidden;
+}
+.fc-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.fc-thumb .fc-ico { font-size: 44px; }
+.fc-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.fc-name { font-size: var(--text-sm); font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; }
+.fc-foot { display: flex; align-items: center; justify-content: space-between; }
+.fc-date { font-size: var(--text-xs); color: var(--ink-faint); }
+
+/* ===================== مودال التعديل الموحّد ===================== */
+.edit-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.edit-form { display: flex; flex-direction: column; gap: 12px; }
+.ef-row { display: flex; flex-direction: column; gap: 6px; }
+.ef-row > span { font: var(--type-label); color: var(--ink-muted); }
+.ef-row .field { width: 100%; }
+.ef-row textarea.field { resize: vertical; min-height: 72px; line-height: 1.6; }
+.ef-actions { display: flex; gap: 10px; justify-content: flex-start; margin-top: 6px; }
+.ef-actions .btn { flex: 1; justify-content: center; }
 
 .date-chip, .streak-chip {
   display: inline-flex;

@@ -166,3 +166,48 @@ export async function doctorReport(condition, healthItems = [], userId) {
   logChatUsage("doctor", config.analysisModel, res, userId);
   return res.choices[0].message.content.trim();
 }
+
+/* ===================== اسأل دوّنلي (شات سياقي عن اليوميات) ===================== */
+
+const ASK_PROMPT = `انت "دوّنلي" — رفيق بيعرف يوميات المستخدم. هتلاقي في السياق "تدوينات المستخدم" في النطاق اللي اختاره (كل التدوينات أو يوم معيّن). جاوب على أسئلته أو اتأمّل معاه بالعامي المصري البسيط **بناءً على التدوينات دي بس**. متخترعش حاجة مش موجودة — لو السؤال عن حاجة مش في التدوينات قول بصراحة إنها مش مذكورة. خليك ودود ومختصر، وافتكر كلام المحادثة اللي فات (السياق مستمر).`;
+
+export async function chatAboutJournal({ messages, contextText, userId }) {
+  const res = await client.chat.completions.create({
+    model: config.analysisModel,
+    messages: [
+      { role: "system", content: ASK_PROMPT },
+      { role: "system", content: `# تدوينات المستخدم (السياق المتاح)\n${contextText || "(مفيش تدوينات في النطاق المختار)"}` },
+      ...messages,
+    ],
+  });
+  logChatUsage("ask", config.analysisModel, res, userId);
+  return (res.choices?.[0]?.message?.content || "معرفتش أرد على ده، جرّب تاني.").trim();
+}
+
+/* ===================== تصنيف ملف مرفوع (رؤية) ===================== */
+
+const FILE_CLASSIFY_PROMPT = `انت بتصنّف صورة مستند رفعها المستخدم في تطبيق شخصي/صحي. صنّفها في فئة واحدة بالظبط من: دواء، روشتة، تحليل، أشعة، فاتورة، مستند، أخرى. وادّي وصف قصير جدًا (٣–٦ كلمات) بالعربي لمحتواها (مثلاً "علبة بنادول" أو "تحليل صورة دم"). رجّع JSON بس بالشكل ده: {"category":"...","description":"..."}.`;
+
+export async function classifyImage({ base64, mime, userId }) {
+  const res = await client.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: FILE_CLASSIFY_PROMPT },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "صنّف الصورة دي." },
+          { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } },
+        ],
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+  logChatUsage("classify", "gpt-4o", res, userId);
+  try {
+    const j = JSON.parse(res.choices[0].message.content || "{}");
+    return { category: j.category || "أخرى", description: j.description || "" };
+  } catch {
+    return { category: "أخرى", description: "" };
+  }
+}

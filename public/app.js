@@ -12,6 +12,7 @@ const state = {
   tasks: [],
   ideas: [],
   problems: [],
+  files: [],
   profile: [],
   categories: [],
   pageDate: null,
@@ -123,6 +124,107 @@ async function del(kind, id) {
 }
 window.del = del;
 
+/* ===================== تعديل أي عنصر (مودال موحّد) ===================== */
+const escAttr = (s) => escapeHtml(s).replace(/"/g, "&quot;");
+const EDIT_CONFIGS = {
+  finance: { title: "تعديل عملية", source: () => state.finance, fields: [
+    { key: "direction", label: "النوع", type: "select", options: [["expense", "صرف ➖"], ["income", "دخل ➕"]] },
+    { key: "amount", label: "المبلغ", type: "number" },
+    { key: "category", label: "البند", type: "select", options: () => (state.categories || []).map((c) => [c, c]) },
+    { key: "note", label: "ملاحظة", type: "text" },
+    { key: "entry_date", label: "التاريخ", type: "date" },
+  ] },
+  health: { title: "تعديل تسجيل صحي", source: () => state.health, fields: [
+    { key: "category", label: "النوع", type: "select", options: [["تمرين", "تمرين"], ["دواء", "دواء"], ["أكل", "أكل"], ["عرض", "عرض"], ["نوم", "نوم"], ["نفسية", "نفسية"], ["ملاحظة", "ملاحظة"]] },
+    { key: "detail", label: "التفاصيل", type: "text" },
+    { key: "body_region", label: "المنطقة", type: "select", options: [["عام", "عام"], ["راس", "راس"], ["صدر", "صدر"], ["معدة", "معدة"], ["بطن", "بطن"], ["ذراعين", "ذراعين"], ["ساقين", "ساقين"]] },
+    { key: "entry_date", label: "التاريخ", type: "date" },
+  ] },
+  entries: { title: "تعديل يوميات", source: () => state.journal, fields: [
+    { key: "mood", label: "المزاج", type: "text" },
+    { key: "summary", label: "التدوينة", type: "textarea" },
+    { key: "entry_date", label: "التاريخ", type: "date" },
+  ] },
+  tasks: { title: "تعديل مهمة", source: () => state.tasks, fields: [
+    { key: "title", label: "المهمة", type: "text" },
+    { key: "due_date", label: "التاريخ", type: "date" },
+    { key: "due_time", label: "الوقت", type: "time" },
+    { key: "note", label: "ملاحظة", type: "text" },
+  ] },
+  meals: { title: "تعديل وجبة", source: () => state.meals, fields: [
+    { key: "items", label: "الأكل", type: "text" },
+    { key: "at_time", label: "الوقت", type: "text" },
+    { key: "note", label: "ملاحظة", type: "text" },
+    { key: "entry_date", label: "التاريخ", type: "date" },
+  ] },
+  goals: { title: "تعديل هدف", source: () => state.goals, fields: [
+    { key: "title", label: "الهدف", type: "text" },
+    { key: "target", label: "المستهدف", type: "number" },
+    { key: "unit", label: "الوحدة", type: "text" },
+  ] },
+  ideas: { title: "تعديل فكرة", source: () => state.ideas, fields: [
+    { key: "title", label: "الفكرة", type: "text" },
+    { key: "detail", label: "التفاصيل", type: "text" },
+  ] },
+  problems: { title: "تعديل مشكلة", source: () => state.problems, fields: [
+    { key: "title", label: "المشكلة", type: "text" },
+    { key: "area", label: "المجال", type: "select", options: () => PROBLEM_AREAS.map((a) => [a, a]) },
+    { key: "detail", label: "التفاصيل", type: "text" },
+  ] },
+  habits: { title: "تعديل عادة", source: () => state.habits, fields: [
+    { key: "title", label: "العادة", type: "text" },
+    { key: "kind", label: "النوع", type: "select", options: [["do", "أعملها 🔁"], ["quit", "أبطّلها 🚭"]] },
+    { key: "emoji", label: "إيموجي", type: "text" },
+  ] },
+};
+let editState = null;
+function openEdit(type, id) {
+  const cfg = EDIT_CONFIGS[type];
+  if (!cfg) return;
+  const item = (cfg.source() || []).find((x) => x.id === id);
+  if (!item) return;
+  editState = { type, id };
+  $("editTitle").textContent = cfg.title;
+  const body = cfg.fields
+    .map((f) => {
+      const val = item[f.key] ?? "";
+      if (f.type === "select") {
+        const opts = typeof f.options === "function" ? f.options() : f.options;
+        return `<label class="ef-row"><span>${f.label}</span><select name="${f.key}" class="field">${opts
+          .map(([v, l]) => `<option value="${escAttr(v)}"${String(v) === String(val) ? " selected" : ""}>${escapeHtml(l)}</option>`)
+          .join("")}</select></label>`;
+      }
+      if (f.type === "textarea") {
+        return `<label class="ef-row"><span>${f.label}</span><textarea name="${f.key}" class="field" rows="4">${escapeHtml(val)}</textarea></label>`;
+      }
+      return `<label class="ef-row"><span>${f.label}</span><input name="${f.key}" type="${f.type}" class="field" value="${escAttr(val)}" /></label>`;
+    })
+    .join("");
+  $("editForm").innerHTML = body + `<div class="ef-actions"><button type="button" class="btn secondary sm" id="editCancel">إلغاء</button><button type="submit" class="btn sm">💾 حفظ</button></div>`;
+  $("editOverlay").classList.remove("hidden");
+}
+window.openEdit = openEdit;
+function closeEdit() { $("editOverlay")?.classList.add("hidden"); editState = null; }
+$("editClose")?.addEventListener("click", closeEdit);
+$("editOverlay")?.addEventListener("click", (e) => { if (e.target === $("editOverlay")) closeEdit(); });
+$("editForm")?.addEventListener("click", (e) => { if (e.target.id === "editCancel") closeEdit(); });
+$("editForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!editState) return;
+  const cfg = EDIT_CONFIGS[editState.type];
+  const patch = {};
+  for (const f of cfg.fields) {
+    const el = e.target.elements[f.key];
+    if (el) patch[f.key] = el.value;
+  }
+  try {
+    await api(`/api/${editState.type}/${editState.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+  } catch {}
+  closeEdit();
+  await loadAll();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("editOverlay")?.classList.contains("hidden")) closeEdit(); });
+
 /* ===================== Navigation ===================== */
 function gotoTab(tab) {
   document.querySelectorAll(".nav-btn[data-tab], .tabbar-btn[data-tab]").forEach((b) => b.dataset.active = String(b.dataset.tab === tab));
@@ -137,6 +239,8 @@ function gotoTab(tab) {
   if (tab === "finances") renderFinancesPage();
   if (tab === "ideas") renderIdeasPage();
   if (tab === "problems") renderProblemsPage();
+  if (tab === "ask") renderAskPage();
+  if (tab === "files") renderFilesPage();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 $("sideNav").addEventListener("click", (e) => {
@@ -807,7 +911,7 @@ function renderBodyMap() {
           <span class="l1">${HEALTH_ICON[h.category] || "🩺"} ${escapeHtml(h.category || "ملاحظة")}${h.body_region && h.body_region !== "عام" ? " · " + escapeHtml(h.body_region) : ""}</span>
           <span class="l2">${escapeHtml(h.detail)}</span>
         </div>
-        <div class="row-actions"><button class="icon-btn" onclick="del('health', ${h.id})" title="حذف">🗑️</button></div>
+        <div class="row-actions"><button class="icon-btn" onclick="openEdit('health', ${h.id})" title="تعديل">✏️</button><button class="icon-btn" onclick="del('health', ${h.id})" title="حذف">🗑️</button></div>
       </div>`).join("");
 }
 function clearPageFilter() { pageFilter = null; renderBodyMap(); }
@@ -895,7 +999,7 @@ function renderMeals() {
         <span class="l1">🍽️ ${m.at_time ? escapeHtml(m.at_time) : "أكل"}</span>
         <span class="l2">${escapeHtml(m.items)}${m.note ? " · " + escapeHtml(m.note) : ""}</span>
       </div>
-      <div class="row-actions"><button class="icon-btn" onclick="del('meals', ${m.id})" title="حذف">🗑️</button></div>
+      <div class="row-actions"><button class="icon-btn" onclick="openEdit('meals', ${m.id})" title="تعديل">✏️</button><button class="icon-btn" onclick="del('meals', ${m.id})" title="حذف">🗑️</button></div>
     </div>`).join("");
 }
 $("mealPrev")?.addEventListener("click", () => shiftMealDate(-1));
@@ -973,6 +1077,7 @@ function renderHabitsPage() {
             <button class="btn ${h.doneToday ? "secondary" : "habits"} sm" onclick="toggleHabit(${h.id}, ${h.doneToday})">
               ${h.doneToday ? "✓ تمّت اليوم" : "علّمها لليوم"}
             </button>
+            <button class="icon-btn" onclick="openEdit('habits', ${h.id})" title="تعديل">✏️</button>
             <button class="icon-btn" onclick="del('habits', ${h.id})" title="حذف">🗑️</button>
           </div>
         </div>`;
@@ -1034,6 +1139,7 @@ function renderGoalsPage() {
       <div class="rc-update">
         <input type="number" placeholder="حدّث الرقم" id="gc-${g.id}" class="field" style="flex:1" />
         <button class="btn goals sm" onclick="updateGoal(${g.id})">تحديث</button>
+        <button class="icon-btn" onclick="openEdit('goals', ${g.id})" title="تعديل">✏️</button>
         <button class="icon-btn" onclick="del('goals', ${g.id})" title="حذف">🗑️</button>
       </div>
     </div>`;
@@ -1165,6 +1271,7 @@ function renderFinancesPage() {
         </div>
         <div class="row-actions">
           <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}">${arNum(f.amount)} ${curLabel(f)}</span>
+          <button class="icon-btn" onclick="openEdit('finance', ${f.id})" title="تعديل">✏️</button>
           <button class="icon-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
         </div>
       </div>`).join("")
@@ -1283,6 +1390,7 @@ function renderJournal() {
         <span class="e-date">${fmtDate(e.entry_date)}</span>
         <div class="row-actions">
           <span class="badge health"><span class="dot"></span>${moodInfo(e.mood).emoji} ${escapeHtml(e.mood || "")}</span>
+          <button class="icon-btn" onclick="openEdit('entries', ${e.id})" title="تعديل">✏️</button>
           <button class="icon-btn" onclick="del('entries', ${e.id})" title="حذف">🗑️</button>
         </div>
       </div>
@@ -1376,6 +1484,7 @@ function renderTaskRows(el, tasks) {
       </div>
       <div class="row-actions">
         ${t.due_time ? `<span class="time-chip">⏰ ${t.due_time}</span>` : ""}
+        <button class="icon-btn" onclick="openEdit('tasks', ${t.id})" title="تعديل">✏️</button>
         <button class="icon-btn" onclick="delTask(${t.id})" title="حذف">🗑️</button>
       </div>
     </div>`).join("");
@@ -1439,7 +1548,10 @@ function renderIdeas() {
     return `<div class="idea-card ${done ? "done" : ""}">
       <div class="ic-top">
         <span class="ic-title">${meta.emoji} ${escapeHtml(i.title)}</span>
-        <button class="icon-btn" onclick="del('ideas', ${i.id})" title="حذف">🗑️</button>
+        <span style="display:flex;gap:4px">
+          <button class="icon-btn" onclick="openEdit('ideas', ${i.id})" title="تعديل">✏️</button>
+          <button class="icon-btn" onclick="del('ideas', ${i.id})" title="حذف">🗑️</button>
+        </span>
       </div>
       ${i.detail ? `<p class="ic-detail">${escapeHtml(i.detail)}</p>` : ""}
       <div class="ic-foot">
@@ -1513,6 +1625,7 @@ function renderProblemsPage() {
             ? `<button class="btn ghost sm" onclick="changeProblemStatus(${p.id}, 'active')">رجّعها</button>`
             : `${p.status === "active" ? `<button class="btn ghost sm" onclick="changeProblemStatus(${p.id}, 'working')">بنشتغل عليها</button>` : ""}
                <button class="btn problems sm" onclick="changeProblemStatus(${p.id}, 'resolved')">اتحلّت ✓</button>`}
+          <button class="icon-btn" onclick="openEdit('problems', ${p.id})" title="تعديل">✏️</button>
           <button class="icon-btn" onclick="del('problems', ${p.id})" title="حذف">🗑️</button>
         </div>
       </div>
@@ -1550,6 +1663,150 @@ $("moreSheet")?.addEventListener("click", (e) => {
   gotoTab(btn.dataset.tab);
 });
 
+/* ===================== تصدير التدوينات في ملف ===================== */
+function exportJournal() {
+  const data = [...state.journal].sort((a, b) => (a.entry_date < b.entry_date ? 1 : -1)); // الأحدث الأول
+  if (!data.length) {
+    $("exportBtn") && ($("exportBtn").textContent = "مفيش تدوينات");
+    setTimeout(() => $("exportBtn") && ($("exportBtn").textContent = "⬇️ صدّر"), 1500);
+    return;
+  }
+  const lines = [];
+  lines.push(`تدوينات ${state.me?.name || "دوّنلي"}`);
+  lines.push(`صُدّرت في ${fmtDate(TODAY())}`);
+  lines.push("");
+  for (const e of data) {
+    lines.push("════════════════════════════════");
+    lines.push(`تدوينات يوم ${fmtDate(e.entry_date)}`);
+    if (e.mood) lines.push(`المزاج: ${e.mood}`);
+    lines.push("");
+    lines.push((e.summary || e.transcript || "").trim());
+    lines.push("");
+  }
+  const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `دوّنلي-تدويناتي-${TODAY()}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+$("exportBtn")?.addEventListener("click", exportJournal);
+
+/* ===================== اسأل دوّنلي (شات سياقي) ===================== */
+const askMessages = []; // ذاكرة المحادثة (بتتبعت كاملة للسيرفر عشان الـ context يفضل)
+function renderAskThread() {
+  const el = $("askThread");
+  if (!el) return;
+  if (!askMessages.length) {
+    el.innerHTML = `<div class="ask-empty">اسألني عن أي يوم، أو «اعمللي ملخص للأسبوع»، أو «إيه اللي بيأثر على مزاجي؟» — وأنا أرد من تدويناتك.</div>`;
+    return;
+  }
+  el.innerHTML = askMessages
+    .map((m) => `<div class="ask-bubble ${m.role}">${m.pending ? `<span class="loading"><span class="spinner"></span> بفكّر…</span>` : escapeHtml(m.content)}</div>`)
+    .join("");
+  el.scrollTop = el.scrollHeight;
+}
+function renderAskPage() {
+  $("askDate") && $("askDate").classList.toggle("hidden", $("askScope")?.value !== "day");
+  renderAskThread();
+}
+$("askScope")?.addEventListener("change", () => {
+  $("askDate")?.classList.toggle("hidden", $("askScope").value !== "day");
+});
+let askBusy = false;
+$("askForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (askBusy) return; // يمنع إرسال تاني (بالـ Enter) والطلب لسه شغّال
+  const input = $("askInput");
+  const text = input.value.trim();
+  if (!text) return;
+  const scope = $("askScope")?.value || "all";
+  const date = $("askDate")?.value || null;
+  if (scope === "day" && !date) { input.placeholder = "اختار اليوم الأول ☝️"; return; }
+  askBusy = true;
+  askMessages.push({ role: "user", content: text });
+  askMessages.push({ role: "assistant", content: "", pending: true });
+  input.value = "";
+  input.disabled = true;
+  if ($("askSend")) $("askSend").disabled = true;
+  renderAskThread();
+  try {
+    const payload = { messages: askMessages.filter((m) => !m.pending).map((m) => ({ role: m.role, content: m.content })), scope, date };
+    const res = await api("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (askMessages[askMessages.length - 1]?.pending) askMessages.pop(); // شيل الـ pending بأمان
+    askMessages.push({ role: "assistant", content: data.reply || data.error || "مقدرتش أرد، جرّب تاني" });
+  } catch {
+    if (askMessages[askMessages.length - 1]?.pending) askMessages.pop();
+    askMessages.push({ role: "assistant", content: "حصل خطأ، جرّب تاني." });
+  } finally {
+    askBusy = false;
+    input.disabled = false;
+    if ($("askSend")) $("askSend").disabled = false;
+    renderAskThread();
+  }
+});
+
+/* ===================== مركز الملفات (رفع + تصنيف) ===================== */
+const FILE_CAT_ICON = { "دواء": "💊", "روشتة": "📝", "تحليل": "🧪", "أشعة": "🩻", "فاتورة": "🧾", "مستند": "📄", "أخرى": "📎" };
+function renderFilesPage() { renderFiles(); }
+function renderFiles() {
+  const el = $("filesGrid");
+  if (!el) return;
+  const data = state.files || [];
+  if (!data.length) {
+    el.innerHTML = emptyState("مفيش ملفات بعد", "ارفع صورة دوا أو روشتة أو فاتورة وهتظهر هنا متصنّفة.");
+    return;
+  }
+  el.innerHTML = data
+    .map((f) => {
+      const isImg = (f.mime || "").startsWith("image/");
+      const ico = FILE_CAT_ICON[f.category] || "📄";
+      return `<div class="file-card">
+        <a class="fc-thumb" href="/api/files/${f.id}/raw" target="_blank" rel="noopener">
+          ${isImg ? `<img src="/api/files/${f.id}/raw" alt="${escapeHtml(f.filename)}" loading="lazy" />` : `<span class="fc-ico">${ico}</span>`}
+        </a>
+        <div class="fc-body">
+          <span class="badge health"><span class="dot"></span>${ico} ${escapeHtml(f.category || "مستند")}</span>
+          <div class="fc-name">${escapeHtml(f.description || f.filename)}</div>
+          <div class="fc-foot">
+            <span class="fc-date">${fmtShort((f.created_at || "").slice(0, 10))}</span>
+            <button class="icon-btn" onclick="del('files', ${f.id})" title="حذف">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+    })
+    .join("");
+}
+$("fileInput")?.addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const status = $("fileUploadStatus");
+  if (status) status.innerHTML = `<div class="loading"><span class="spinner"></span> بيرفع ويصنّف… ممكن ياخد ثواني</div>`;
+  try {
+    const res = await api(`/api/files?name=${encodeURIComponent(file.name)}`, {
+      method: "POST",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    const data = await res.json();
+    if (data.error) {
+      if (status) status.innerHTML = `<p class="muted">${escapeHtml(data.error)}</p>`;
+    } else {
+      if (status) status.innerHTML = `<p class="muted">✅ اترفع واتصنّف: ${escapeHtml(data.file?.category || "مستند")}</p>`;
+      await loadAll(false);
+      renderFiles();
+      setTimeout(() => { if (status) status.innerHTML = ""; }, 2500);
+    }
+  } catch {
+    if (status) status.innerHTML = `<p class="muted">حصل خطأ في الرفع، جرّب تاني.</p>`;
+  }
+  e.target.value = "";
+});
+
 /* ===================== المحادثات ===================== */
 const KIND_LABEL = { voice: "🎙️ صوت", text: "⌨️ كتابة", command: "⚙️ أمر", checkin: "⏰ سؤال اليوم", dashboard: "✎ من الداشبورد" };
 function renderChats() {
@@ -1579,7 +1836,7 @@ $("logoutBtn").addEventListener("click", logout);
 
 async function loadAll(rerender = true) {
   try {
-    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob] = await Promise.all([
+    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files] = await Promise.all([
       api("/api/me").then((r) => r.json()),
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
@@ -1594,12 +1851,13 @@ async function loadAll(rerender = true) {
       api("/api/profile").then((r) => r.json()),
       api("/api/ideas").then((r) => r.json()),
       api("/api/problems").then((r) => r.json()),
+      api("/api/files").then((r) => r.json()),
     ]);
     state.me = me;
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
     state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin;
     state.tasks = tasks; state.categories = cats; state.profile = prof;
-    state.ideas = idea; state.problems = prob;
+    state.ideas = idea; state.problems = prob; state.files = files;
   } catch { return; }
 
   const first = (state.me?.name || "د").trim()[0] || "د";
@@ -1618,6 +1876,7 @@ async function loadAll(rerender = true) {
   if (active === "finances") renderFinancesPage();
   if (active === "ideas") renderIdeasPage();
   if (active === "problems") renderProblemsPage();
+  if (active === "files") renderFilesPage();
 }
 
 loadAll().then(() => {

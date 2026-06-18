@@ -2,6 +2,7 @@ import express from "express";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { writeFileSync, mkdirSync, unlinkSync } from "node:fs";
 import { config } from "./config.js";
 import {
   getUserById,
@@ -66,14 +67,29 @@ import {
   listProblems,
   setProblemStatus,
   deleteProblem,
+  entriesBetween,
+  addFile,
+  listFiles,
+  getFile,
+  deleteFile,
+  updateFinance,
+  updateHealth,
+  updateEntry,
+  updateTaskFields,
+  updateMeal,
+  updateGoalMeta,
+  updateIdeaFields,
+  updateProblemFields,
+  updateHabitFields,
 } from "./db.js";
 import { pushEnabled, vapidPublicKey, sendPushToUser, notifyUser } from "./push.js";
-import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING } from "./openai.js";
+import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage } from "./openai.js";
 import { buildReportData } from "./report.js";
 import { runAgent } from "./agent.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
+const uploadsDir = join(__dirname, "..", "data", "uploads"); // ملفات المستخدمين المرفوعة
 
 /* ===================== الجلسات ===================== */
 
@@ -181,6 +197,11 @@ setInterval(() => {
 
 const loginLimiter = rateLimit({ bucket: "login", max: 8, windowMs: 10 * 60 * 1000 }); // 8 / 10د
 const voiceLimiter = rateLimit({ bucket: "voice", max: 40, windowMs: 10 * 60 * 1000 });
+const uploadLimiter = rateLimit({ bucket: "upload", max: 30, windowMs: 10 * 60 * 1000 });
+// أنواع مسموح برفعها — صور نقطية + PDF بس. **مرفوض SVG** (ممكن يحمل سكربت = XSS).
+const ALLOWED_UPLOAD = new Set([
+  "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/heic", "image/heif", "application/pdf",
+]);
 
 export function startServer() {
   const app = express();
@@ -591,6 +612,125 @@ export function startServer() {
     res.json({ ok: setProblemStatus(user.id, Number(req.params.id), String(req.body?.status || ""), req.body?.note) });
   });
 
+  /* ===== اسأل دوّنلي (شات سياقي عن اليوميات — بيحافظ على الـ context) ===== */
+  app.post("/api/ask", async (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const { messages, scope, date, from, to } = req.body || {};
+    if (!Array.isArray(messages)) return res.status(400).json({ error: "اكتب رسالة" });
+    // ناخد آخر ٢٠ رسالة بس (user/assistant) للحفاظ على التوكنز — الـ context مستمر
+    const clean = messages
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .slice(-20)
+      .map((m) => ({ role: m.role, content: String(m.content).slice(0, 4000) }));
+    if (!clean.length) return res.status(400).json({ error: "اكتب رسالة" });
+    const dateOk = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ""));
+    if ((scope === "day" && !dateOk(date)) || (scope === "range" && !(dateOk(from) && dateOk(to))))
+      return res.status(400).json({ error: "اختار تاريخ صحيح الأول" });
+    let entries;
+    if (scope === "day") entries = entriesBetween(user.id, date, date);
+    else if (scope === "range") entries = entriesBetween(user.id, from, to);
+    else entries = listEntries(user.id, 500);
+    const contextText = entries
+      .map((e) => `📅 ${e.entry_date}${e.mood ? ` (${e.mood})` : ""}: ${e.summary || e.transcript || ""}`)
+      .join("\n\n");
+    try {
+      const reply = await chatAboutJournal({ messages: clean, contextText, userId: user.id });
+      res.json({ reply });
+    } catch (err) {
+      console.error("ask error:", err);
+      res.status(500).json({ error: "حصل خطأ، جرّب تاني" });
+    }
+  });
+
+  /* ===== مركز الملفات: رفع (raw) + تصنيف بالرؤية + عرض ===== */
+  app.post(
+    "/api/files",
+    uploadLimiter,
+    express.raw({ type: ["image/*", "application/pdf"], limit: "12mb" }),
+    async (req, res) => {
+      const user = gate(req, res);
+      if (!user) return;
+      const mime = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+      if (!ALLOWED_UPLOAD.has(mime))
+        return res.status(415).json({ error: "النوع ده مش مدعوم — ارفع صورة (PNG/JPG/WEBP) أو PDF" });
+      const buf = req.body;
+      if (!Buffer.isBuffer(buf) || !buf.length) return res.status(400).json({ error: "مفيش ملف" });
+      let rawName;
+      try { rawName = decodeURIComponent(String(req.query.name || "ملف")); }
+      catch { rawName = "ملف"; }
+      const safeName = rawName.replace(/[^\w.\-؀-ۿ ]/g, "_").slice(0, 120) || "ملف";
+      const userDir = join(uploadsDir, String(user.id));
+      let fullPath = null;
+      try {
+        mkdirSync(userDir, { recursive: true });
+        fullPath = join(userDir, `${Date.now()}-${safeName}`);
+        writeFileSync(fullPath, buf);
+        let category = mime === "application/pdf" ? "مستند" : "أخرى";
+        let description = "";
+        if (mime.startsWith("image/")) {
+          try {
+            const c = await classifyImage({ base64: buf.toString("base64"), mime, userId: user.id });
+            category = c.category;
+            description = c.description;
+          } catch (e) {
+            console.error("classify error:", e);
+          }
+        }
+        const file = addFile({ userId: user.id, filename: safeName, mime, size: buf.length, category, description, path: fullPath });
+        res.json({ ok: true, file });
+      } catch (err) {
+        if (fullPath) { try { unlinkSync(fullPath); } catch {} } // منسيبش ملف يتيم من غير صف
+        console.error("file upload error:", err);
+        res.status(500).json({ error: "حصل خطأ في رفع الملف" });
+      }
+    }
+  );
+  app.get("/api/files", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listFiles(user.id));
+  });
+  app.get("/api/files/:id/raw", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const f = getFile(user.id, Number(req.params.id));
+    if (!f || !f.path || !f.path.startsWith(uploadsDir)) return res.status(404).end();
+    res.setHeader("Content-Type", f.mime || "application/octet-stream");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // sandbox + default-src none: حتى لو اترفع ملف خبيث، مايشتغلش أي سكربت في الأصل.
+    res.setHeader("Content-Security-Policy", "default-src 'none'; img-src 'self'; sandbox");
+    res.setHeader("Cache-Control", "private, max-age=86400");
+    res.sendFile(f.path);
+  });
+  app.delete("/api/files/:id", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const f = getFile(user.id, Number(req.params.id));
+    if (f?.path) { try { unlinkSync(f.path); } catch {} }
+    res.json({ ok: deleteFile(user.id, Number(req.params.id)) });
+  });
+
+  /* ===== تعديل أي عنصر (مرونة التعديل) — PUT /api/<نوع>/:id ===== */
+  const updaters = {
+    finance: updateFinance,
+    health: updateHealth,
+    entries: updateEntry,
+    tasks: updateTaskFields,
+    meals: updateMeal,
+    goals: updateGoalMeta,
+    ideas: updateIdeaFields,
+    problems: updateProblemFields,
+    habits: updateHabitFields,
+  };
+  for (const [kind, fn] of Object.entries(updaters)) {
+    app.put(`/api/${kind}/:id`, (req, res) => {
+      const user = gate(req, res);
+      if (!user) return;
+      res.json({ ok: fn(user.id, Number(req.params.id), req.body || {}) });
+    });
+  }
+
   // الكومبوزر في الداشبورد: "رتّبهالي" — بيشغّل الـ agent على النص
   app.post("/api/log", async (req, res) => {
     const user = gate(req, res);
@@ -788,6 +928,15 @@ export function startServer() {
     const user = gate(req, res);
     if (!user) return;
     res.json(goalLog(user.id, Number(req.params.id)));
+  });
+
+  // معالج أخطاء عام — يرجّع JSON نضيف بدل صفحة HTML أو سوكت معلّق (أخطاء body-parser
+  // زي الملف الأكبر من الحد، أو أي throw في middleware).
+  app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    const status = err?.status || err?.statusCode || 500;
+    if (status >= 500) console.error("unhandled route error:", err?.message || err);
+    res.status(status).json({ error: status === 413 ? "الملف كبير جدًا (الحد ١٢ ميجا)" : "حصل خطأ في الخادم" });
   });
 
   app.listen(config.port, () =>
