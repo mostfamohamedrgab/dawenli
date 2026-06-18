@@ -248,6 +248,17 @@ db.exec(`
     path        TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id, id);
+
+  -- ميزانية وهدف الشهر للفلوس: لكل (مستخدم، شهر) حد صرف وهدف مادي اختياريين.
+  CREATE TABLE IF NOT EXISTS finance_budget (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    month       TEXT NOT NULL,   -- YYYY-MM
+    budget      REAL,            -- حد الصرف الشهري
+    goal        REAL,            -- الهدف المادي للشهر (دخل)
+    updated_at  TEXT NOT NULL,
+    UNIQUE(user_id, month)
+  );
 `);
 
 /* ===================== Migrations ===================== */
@@ -1336,6 +1347,24 @@ export function getFile(userId, id) {
 }
 export function deleteFile(userId, id) {
   return db.prepare(`DELETE FROM files WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+}
+
+/* ===================== ميزانية وهدف الشهر (الفلوس) ===================== */
+
+export function getFinanceBudget(userId, month) {
+  const row = db.prepare(`SELECT month, budget, goal FROM finance_budget WHERE user_id = ? AND month = ?`).get(userId, month);
+  return row || { month, budget: null, goal: null };
+}
+const upsertBudgetStmt = db.prepare(`
+  INSERT INTO finance_budget (user_id, month, budget, goal, updated_at)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(user_id, month) DO UPDATE SET budget = excluded.budget, goal = excluded.goal, updated_at = excluded.updated_at
+`);
+export function setFinanceBudget(userId, month, { budget, goal }) {
+  const b = budget === "" || budget == null ? null : Number(budget);
+  const g = goal === "" || goal == null ? null : Number(goal);
+  upsertBudgetStmt.run(userId, month, b, g, now());
+  return getFinanceBudget(userId, month);
 }
 
 /* ===================== تعديل عام لأي صف (مرونة التعديل) ===================== */

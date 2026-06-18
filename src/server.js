@@ -81,6 +81,8 @@ import {
   updateIdeaFields,
   updateProblemFields,
   updateHabitFields,
+  getFinanceBudget,
+  setFinanceBudget,
 } from "./db.js";
 import { pushEnabled, vapidPublicKey, sendPushToUser, notifyUser } from "./push.js";
 import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage } from "./openai.js";
@@ -899,6 +901,21 @@ export function startServer() {
   app.get("/api/finance-categories", (req, res) => {
     if (!gate(req, res)) return;
     res.json(FINANCE_CATEGORIES);
+  });
+
+  /* ===== ميزانية وهدف الشهر ===== */
+  app.get("/api/finance-budget", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const month = /^\d{4}-\d{2}$/.test(String(req.query.month || "")) ? req.query.month : localToday().slice(0, 7);
+    res.json(getFinanceBudget(user.id, month));
+  });
+  app.put("/api/finance-budget", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const { month, budget, goal } = req.body || {};
+    const m = /^\d{4}-\d{2}$/.test(String(month || "")) ? month : localToday().slice(0, 7);
+    res.json({ ok: true, budget: setFinanceBudget(user.id, m, { budget, goal }) });
   });
   app.post("/api/finance", (req, res) => {
     const user = gate(req, res);

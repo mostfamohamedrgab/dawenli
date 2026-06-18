@@ -321,6 +321,16 @@
 
             <div class="stat-grid" id="finStats" style="margin-bottom:20px"></div>
 
+            <div class="card budget-card" style="margin-bottom:20px">
+              <div class="card-head"><h3>🎯 ميزانية وهدف الشهر</h3><span class="muted" id="budgetMonth" style="font-size:var(--text-sm)"></span></div>
+              <div id="budgetView"></div>
+              <form id="budgetForm" class="inline-form" style="margin-top:14px">
+                <input id="budgetInput" type="number" class="field" placeholder="حد الصرف الشهري 💸" />
+                <input id="goalInput" type="number" class="field" placeholder="هدف الدخل للشهر 🎯" />
+                <button type="submit" class="btn finances sm">💾 حفظ</button>
+              </form>
+            </div>
+
             <div class="grid-2-side">
               <div class="stack">
                 <div class="card">
@@ -346,7 +356,18 @@
                 </div>
                 <div class="card">
                   <div class="card-head"><h3>كل العمليات</h3></div>
+                  <div class="filter-bar">
+                    <select id="finFilterDir" class="field">
+                      <option value="all">صرف ودخل</option>
+                      <option value="expense">صرف ➖</option>
+                      <option value="income">دخل ➕</option>
+                    </select>
+                    <select id="finFilterCat" class="field"><option value="all">كل البنود</option></select>
+                    <input id="finFilterQ" class="field grow" placeholder="بحث في الملاحظات…" />
+                  </div>
+                  <div id="finFilterMeta" class="filter-meta"></div>
                   <div id="finList" class="list"></div>
+                  <div id="finLoadMore" class="load-more"></div>
                 </div>
               </div>
               <div class="stack">
@@ -514,6 +535,7 @@
               </label>
               <div id="fileUploadStatus" style="margin-top:10px"></div>
             </div>
+            <div id="filesFilter" class="files-filter"></div>
             <div id="filesGrid" class="files-grid"></div>
           </section>
 

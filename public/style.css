@@ -680,6 +680,34 @@ a { color: inherit; }
 .ef-actions { display: flex; gap: 10px; justify-content: flex-start; margin-top: 6px; }
 .ef-actions .btn { flex: 1; justify-content: center; }
 
+/* ===================== فلاتر + تحميل المزيد + ميزانية الشهر ===================== */
+.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.filter-bar .field { padding: 8px 12px; font-size: var(--text-sm); }
+.filter-meta { font-size: var(--text-sm); color: var(--ink-muted); margin: 0 2px 10px; }
+.load-more { display: flex; justify-content: center; margin-top: 12px; }
+
+.files-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.filter-chip {
+  border: 1.5px solid var(--hairline); background: var(--surface-card);
+  border-radius: var(--radius-pill); padding: 6px 14px;
+  font: 700 var(--text-sm)/1 var(--font-body); color: var(--ink-muted); cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-soft), background var(--dur-fast) var(--ease-soft), color var(--dur-fast) var(--ease-soft);
+}
+.filter-chip:hover { border-color: var(--brand-tint); }
+.filter-chip.on { background: var(--brand-wash); border-color: var(--brand); color: var(--brand-deep); }
+
+.budget-card .budget-row { margin-bottom: 16px; }
+.budget-card .budget-row:last-child { margin-bottom: 0; }
+.br-label { display: block; font: var(--type-label); color: var(--ink-muted); margin-bottom: 8px; }
+.bb-track { height: 12px; background: var(--paper-deep); border-radius: var(--radius-pill); overflow: hidden; }
+.bb-fill { height: 100%; border-radius: var(--radius-pill); background: var(--finances); transition: width var(--dur-draw) var(--ease-pen); }
+.budget-bar.warn .bb-fill { background: var(--warning); }
+.budget-bar.danger .bb-fill { background: var(--danger); }
+.bb-meta { display: flex; justify-content: space-between; margin-top: 6px; font-size: var(--text-sm); color: var(--ink-muted); }
+.bb-alert { margin-top: 8px; padding: 8px 12px; border-radius: var(--radius-sm); font-size: var(--text-sm); font-weight: 700; }
+.bb-alert.danger { color: var(--danger-deep); background: var(--health-wash); }
+.bb-alert.warn { color: var(--habits-deep); background: var(--habits-wash); }
+
 .date-chip, .streak-chip {
   display: inline-flex;
   align-items: center;

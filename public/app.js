@@ -15,6 +15,9 @@ const state = {
   files: [],
   profile: [],
   categories: [],
+  finFilter: { dir: "all", cat: "all", q: "", limit: 40 },
+  finBudget: { month: "", budget: null, goal: null },
+  fileFilter: "all",
   pageDate: null,
   mealDate: null,
   calY: new Date().getFullYear(),
@@ -1260,23 +1263,103 @@ function renderFinancesPage() {
       <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}" style="font:var(--type-label)">${f.direction === "income" ? "+" : "-"}${arNum(f.amount)} ${curLabel(f)}</span>
     </div>`).join("") || `<span class="muted" style="font-size:var(--text-sm)">لا توجد حركات بعد.</span>`;
 
-  // كل العمليات
-  const el = $("finList");
-  el.innerHTML = data.length
-    ? data.slice(0, 60).map((f) => `
-      <div class="list-row">
-        <div class="lm">
-          <span class="l1">${f.direction === "income" ? "➕ دخل" : "➖ صرف"} · ${fmtShort(f.entry_date)}${f.category ? ` · ${CAT_ICONS[f.category] || ""} ${escapeHtml(f.category)}` : ""}</span>
-          <span class="l2">${escapeHtml(f.note || "—")}</span>
-        </div>
-        <div class="row-actions">
-          <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}">${arNum(f.amount)} ${curLabel(f)}</span>
-          <button class="icon-btn" onclick="openEdit('finance', ${f.id})" title="تعديل">✏️</button>
-          <button class="icon-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
-        </div>
-      </div>`).join("")
-    : emptyState("لا توجد عمليات بعد", "قل لدوّنلي «صرفت ٢٠٠ على الطعام» أو أضف عملية بالأعلى.");
+  // ميزانية/هدف الشهر + قائمة العمليات بفلاتر وتحميل المزيد
+  renderBudget();
+  fillFinFilterCat();
+  renderFinList();
 }
+
+/* ---- قائمة العمليات: فلاتر + تحميل المزيد ---- */
+function finRowHtml(f) {
+  return `<div class="list-row">
+    <div class="lm">
+      <span class="l1">${f.direction === "income" ? "➕ دخل" : "➖ صرف"} · ${fmtShort(f.entry_date)}${f.category ? ` · ${CAT_ICONS[f.category] || ""} ${escapeHtml(f.category)}` : ""}</span>
+      <span class="l2">${escapeHtml(f.note || "—")}</span>
+    </div>
+    <div class="row-actions">
+      <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}">${arNum(f.amount)} ${curLabel(f)}</span>
+      <button class="icon-btn" onclick="openEdit('finance', ${f.id})" title="تعديل">✏️</button>
+      <button class="icon-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
+    </div>
+  </div>`;
+}
+function fillFinFilterCat() {
+  const sel = $("finFilterCat");
+  if (!sel) return;
+  const cur = state.finFilter.cat;
+  const cats = [...new Set(state.finance.map((f) => f.category || "أخرى"))];
+  sel.innerHTML = `<option value="all">كل البنود</option>` + cats.map((c) => `<option value="${escapeHtml(c)}">${CAT_ICONS[c] || ""} ${escapeHtml(c)}</option>`).join("");
+  sel.value = cur === "all" || cats.includes(cur) ? cur : "all";
+}
+function applyFinFilter() {
+  const f = state.finFilter;
+  let rows = state.finance;
+  if (f.dir !== "all") rows = rows.filter((r) => r.direction === f.dir);
+  if (f.cat !== "all") rows = rows.filter((r) => (r.category || "أخرى") === f.cat);
+  const q = (f.q || "").trim();
+  if (q) rows = rows.filter((r) => (r.note || "").includes(q) || (r.category || "").includes(q));
+  return rows;
+}
+function renderFinList() {
+  const el = $("finList");
+  if (!el) return;
+  const all = applyFinFilter();
+  const shown = all.slice(0, state.finFilter.limit);
+  const exp = all.filter((r) => r.direction === "expense").reduce((a, r) => a + r.amount, 0);
+  const inc = all.filter((r) => r.direction === "income").reduce((a, r) => a + r.amount, 0);
+  const meta = $("finFilterMeta");
+  if (meta) meta.innerHTML = all.length ? `${arNum(all.length)} عملية · صرف ${arNum(exp)} ${MONEY}${inc ? ` · دخل ${arNum(inc)} ${MONEY}` : ""}` : "";
+  el.innerHTML = shown.length ? shown.map(finRowHtml).join("") : `<div class="empty sm">${DOODLE}<p>مفيش عمليات بالفلاتر دي.</p></div>`;
+  const lm = $("finLoadMore");
+  if (lm) lm.innerHTML = all.length > shown.length ? `<button class="btn secondary sm" id="finMoreBtn">تحميل المزيد (${arNum(all.length - shown.length)} فاضلين)</button>` : "";
+}
+$("finFilterDir")?.addEventListener("change", (e) => { state.finFilter.dir = e.target.value; state.finFilter.limit = 40; renderFinList(); });
+$("finFilterCat")?.addEventListener("change", (e) => { state.finFilter.cat = e.target.value; state.finFilter.limit = 40; renderFinList(); });
+$("finFilterQ")?.addEventListener("input", (e) => { state.finFilter.q = e.target.value; state.finFilter.limit = 40; renderFinList(); });
+$("finLoadMore")?.addEventListener("click", (e) => { if (e.target.id === "finMoreBtn") { state.finFilter.limit += 40; renderFinList(); } });
+
+/* ---- ميزانية وهدف الشهر ---- */
+function monthLabel(m) {
+  try { return new Date(m + "-01T00:00:00").toLocaleDateString("ar-EG", { month: "long", year: "numeric" }); }
+  catch { return m; }
+}
+function renderBudget() {
+  const b = state.finBudget || {};
+  const monthStr = TODAY().slice(0, 7);
+  const monthStart = monthStr + "-01";
+  const isEGP = (f) => !f.currency || f.currency === "جنيه";
+  const monthFin = state.finance.filter((f) => f.entry_date >= monthStart && isEGP(f));
+  const spent = monthFin.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
+  const income = monthFin.filter((f) => f.direction === "income").reduce((a, f) => a + f.amount, 0);
+  if ($("budgetMonth")) $("budgetMonth").textContent = monthLabel(monthStr);
+  const bar = (cur, target, kind) => {
+    const pct = target > 0 ? Math.round((cur / target) * 100) : 0;
+    const lvl = kind === "spend" ? (pct >= 100 ? "danger" : pct >= 80 ? "warn" : "ok") : "ok";
+    return `<div class="budget-bar ${lvl}">
+      <div class="bb-track"><div class="bb-fill" style="width:${Math.min(100, pct)}%"></div></div>
+      <div class="bb-meta"><span>${arNum(cur)} / ${arNum(target)} ${MONEY}</span><span>${arNum(pct)}٪</span></div>
+      ${kind === "spend" && pct >= 100 ? `<div class="bb-alert danger">🚨 تخطّيت ميزانية الشهر بـ ${arNum(cur - target)} ${MONEY}!</div>` : ""}
+      ${kind === "spend" && pct >= 80 && pct < 100 ? `<div class="bb-alert warn">⚠️ قرّبت من حد الميزانية — فاضل ${arNum(target - cur)} ${MONEY}</div>` : ""}
+    </div>`;
+  };
+  let html = "";
+  if (b.budget) html += `<div class="budget-row"><span class="br-label">💸 الصرف مقابل الميزانية</span>${bar(spent, b.budget, "spend")}</div>`;
+  if (b.goal) html += `<div class="budget-row"><span class="br-label">🎯 الدخل مقابل هدف الشهر</span>${bar(income, b.goal, "goal")}</div>`;
+  if (!b.budget && !b.goal) html = `<p class="muted" style="font-size:var(--text-sm);margin:0">حدّد حد صرف شهري وهدف للشهر تحت — ودوّنلي يتابعهم وينبّهك لو قرّبت من الميزانية.</p>`;
+  if ($("budgetView")) $("budgetView").innerHTML = html;
+  if ($("budgetInput")) $("budgetInput").value = b.budget ?? "";
+  if ($("goalInput")) $("goalInput").value = b.goal ?? "";
+}
+$("budgetForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const month = TODAY().slice(0, 7);
+  try {
+    const res = await api("/api/finance-budget", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ month, budget: $("budgetInput").value, goal: $("goalInput").value }) });
+    const data = await res.json();
+    state.finBudget = data.budget || state.finBudget;
+  } catch {}
+  renderBudget();
+});
 $("finForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const direction = $("finDir").value;
@@ -1757,9 +1840,24 @@ function renderFilesPage() { renderFiles(); }
 function renderFiles() {
   const el = $("filesGrid");
   if (!el) return;
-  const data = state.files || [];
-  if (!data.length) {
+  const all = state.files || [];
+  // فلتر الفئات (chips)
+  const filterEl = $("filesFilter");
+  if (filterEl) {
+    if (all.length) {
+      const cats = [...new Set(all.map((f) => f.category || "مستند"))];
+      filterEl.innerHTML = [["all", "الكل"]].concat(cats.map((c) => [c, c]))
+        .map(([v, l]) => `<button class="filter-chip ${state.fileFilter === v ? "on" : ""}" data-cat="${escapeHtml(v)}">${v !== "all" ? (FILE_CAT_ICON[v] || "📄") + " " : ""}${escapeHtml(l)}</button>`)
+        .join("");
+    } else filterEl.innerHTML = "";
+  }
+  if (!all.length) {
     el.innerHTML = emptyState("مفيش ملفات بعد", "ارفع صورة دوا أو روشتة أو فاتورة وهتظهر هنا متصنّفة.");
+    return;
+  }
+  const data = state.fileFilter === "all" ? all : all.filter((f) => (f.category || "مستند") === state.fileFilter);
+  if (!data.length) {
+    el.innerHTML = `<div class="empty sm">${DOODLE}<p>مفيش ملفات في الفئة دي.</p></div>`;
     return;
   }
   el.innerHTML = data
@@ -1782,6 +1880,12 @@ function renderFiles() {
     })
     .join("");
 }
+$("filesFilter")?.addEventListener("click", (e) => {
+  const b = e.target.closest(".filter-chip");
+  if (!b) return;
+  state.fileFilter = b.dataset.cat;
+  renderFiles();
+});
 $("fileInput")?.addEventListener("change", async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
@@ -1837,7 +1941,7 @@ $("logoutBtn").addEventListener("click", logout);
 
 async function loadAll(rerender = true) {
   try {
-    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files] = await Promise.all([
+    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files, budget] = await Promise.all([
       api("/api/me").then((r) => r.json()),
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
@@ -1853,12 +1957,13 @@ async function loadAll(rerender = true) {
       api("/api/ideas").then((r) => r.json()),
       api("/api/problems").then((r) => r.json()),
       api("/api/files").then((r) => r.json()),
+      api("/api/finance-budget").then((r) => r.json()),
     ]);
     state.me = me;
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
     state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin;
     state.tasks = tasks; state.categories = cats; state.profile = prof;
-    state.ideas = idea; state.problems = prob; state.files = files;
+    state.ideas = idea; state.problems = prob; state.files = files; state.finBudget = budget;
   } catch { return; }
 
   const first = (state.me?.name || "د").trim()[0] || "د";
