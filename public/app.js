@@ -1789,7 +1789,7 @@ function renderAskThread() {
     return;
   }
   el.innerHTML = askMessages
-    .map((m) => `<div class="ask-bubble ${m.role}">${m.pending ? `<span class="loading"><span class="spinner"></span> بفكّر…</span>` : escapeHtml(m.content)}</div>`)
+    .map((m, i) => `<div class="ask-bubble ${m.role}">${m.pending ? `<span class="loading"><span class="spinner"></span> بفكّر…</span>` : escapeHtml(m.content)}${m.role === "assistant" && !m.pending && m.content ? ` <button class="tts-btn" data-i="${i}" title="اسمع الرد">🔊</button>` : ""}</div>`)
     .join("");
   el.scrollTop = el.scrollHeight;
 }
@@ -1848,6 +1848,83 @@ $("askClear")?.addEventListener("click", async () => {
   try { await api("/api/ask/history", { method: "DELETE" }); } catch {}
   askMessages.length = 0;
   renderAskThread();
+});
+
+/* ---- محادثة صوتية: تسجيل + رد صوتي ---- */
+let askRec = null, askRecChunks = [];
+async function toggleAskVoice() {
+  const mic = $("askMic");
+  if (askRec && askRec.state === "recording") { askRec.stop(); return; }
+  if (askBusy) return;
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    askMessages.push({ role: "assistant", content: "متصفحك مش بيدعم التسجيل — اكتب سؤالك 🙏" });
+    renderAskThread();
+    return;
+  }
+  let stream;
+  try { stream = await getMic(); stream.getTracks().forEach((t) => (t.enabled = true)); }
+  catch { askMessages.push({ role: "assistant", content: "لازم تسمح للمايك عشان أسمعك 🎙️" }); renderAskThread(); return; }
+  const mime = ["audio/webm", "audio/ogg", "audio/mp4"].find((m) => MediaRecorder.isTypeSupported?.(m)) || "";
+  askRec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  askRecChunks = [];
+  askRec.ondataavailable = (e) => { if (e.data.size) askRecChunks.push(e.data); };
+  askRec.onstop = async () => {
+    stream.getTracks().forEach((t) => (t.enabled = false));
+    if (mic) { mic.classList.remove("recording"); mic.textContent = "🎙️"; }
+    if (askRecChunks.length) await sendAskVoice(new Blob(askRecChunks, { type: askRec.mimeType || "audio/webm" }));
+  };
+  askRec.start();
+  if (mic) { mic.classList.add("recording"); mic.textContent = "⏹️"; }
+}
+async function sendAskVoice(blob) {
+  if (askBusy) return;
+  askBusy = true;
+  if ($("askSend")) $("askSend").disabled = true;
+  const ph = { role: "user", content: "🎙️ بسمعك وبفكّر…" };
+  askMessages.push(ph);
+  renderAskThread();
+  const scope = $("askScope")?.value || "all";
+  const date = $("askDate")?.value || "";
+  try {
+    const res = await api(`/api/ask/voice?scope=${encodeURIComponent(scope)}&date=${encodeURIComponent(date)}`, {
+      method: "POST", headers: { "Content-Type": blob.type || "audio/webm" }, body: blob,
+    });
+    const data = await res.json();
+    const i = askMessages.indexOf(ph);
+    if (i >= 0) askMessages.splice(i, 1);
+    if (data.transcript) askMessages.push({ role: "user", content: data.transcript });
+    askMessages.push({ role: "assistant", content: data.reply || data.error || "مقدرتش أرد، جرّب تاني" });
+    renderAskThread();
+    if (data.reply && !data.error) playTTS(data.reply); // رد صوتي تلقائي لما تكلّمه صوت
+  } catch {
+    const i = askMessages.indexOf(ph);
+    if (i >= 0) askMessages.splice(i, 1);
+    askMessages.push({ role: "assistant", content: "حصل خطأ في الصوت، جرّب تاني." });
+    renderAskThread();
+  } finally {
+    askBusy = false;
+    if ($("askSend")) $("askSend").disabled = false;
+  }
+}
+let ttsAudio = null;
+async function playTTS(text) {
+  try {
+    if (ttsAudio) { try { ttsAudio.pause(); } catch {} ttsAudio = null; }
+    const res = await api("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    ttsAudio = new Audio(url);
+    ttsAudio.onended = () => URL.revokeObjectURL(url);
+    await ttsAudio.play().catch(() => {});
+  } catch {}
+}
+$("askMic")?.addEventListener("click", toggleAskVoice);
+$("askThread")?.addEventListener("click", (e) => {
+  const btn = e.target.closest(".tts-btn");
+  if (!btn) return;
+  const m = askMessages[Number(btn.dataset.i)];
+  if (m && m.content) playTTS(m.content);
 });
 
 /* ===================== مركز الملفات (رفع + تصنيف) ===================== */

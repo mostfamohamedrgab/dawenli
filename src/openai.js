@@ -211,3 +211,22 @@ export async function classifyImage({ base64, mime, userId }) {
     return { category: "أخرى", description: "" };
   }
 }
+
+/* ===================== تحويل النص لصوت (TTS) ===================== */
+
+export async function textToSpeech(text, userId) {
+  const model = config.ttsModel;
+  const input = String(text || "").slice(0, 2000);
+  const res = await client.audio.speech.create({
+    model,
+    voice: config.ttsVoice,
+    input,
+    response_format: "mp3",
+  });
+  const buf = Buffer.from(await res.arrayBuffer());
+  try {
+    // تكلفة TTS تقريبية بالحروف (~$12 لكل مليون حرف لموديل mini)
+    recordAiUsage({ userId, kind: "tts", model, costUsd: (input.length / 1e6) * 12 });
+  } catch {}
+  return buf;
+}

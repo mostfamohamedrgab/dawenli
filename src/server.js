@@ -88,7 +88,7 @@ import {
   clearAskMessages,
 } from "./db.js";
 import { pushEnabled, vapidPublicKey, sendPushToUser, notifyUser } from "./push.js";
-import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage } from "./openai.js";
+import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage, textToSpeech } from "./openai.js";
 import { buildReportData } from "./report.js";
 import { runAgent } from "./agent.js";
 
@@ -207,6 +207,36 @@ const uploadLimiter = rateLimit({ bucket: "upload", max: 30, windowMs: 10 * 60 *
 const ALLOWED_UPLOAD = new Set([
   "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/heic", "image/heif", "application/pdf",
 ]);
+
+// باني سياق "اسأل دوّنلي" حسب النطاق المختار — مستخدم في الشات النصي والصوتي.
+function buildAskContext(userId, scope, date, from, to) {
+  const journalCtx = (rows) =>
+    rows.map((e) => `📅 ${e.entry_date}${e.mood ? ` (${e.mood})` : ""}: ${e.transcript || e.summary || ""}`).join("\n\n");
+  switch (scope) {
+    case "day": return journalCtx(entriesBetween(userId, date, date));
+    case "range": return journalCtx(entriesBetween(userId, from, to));
+    case "finance":
+      return listFinance(userId, 500).map((f) => `📅 ${f.entry_date} ${f.direction === "income" ? "دخل" : "صرف"} ${f.amount} ${f.currency || "جنيه"}${f.category ? " · " + f.category : ""}${f.note ? " · " + f.note : ""}`).join("\n");
+    case "health":
+      return listHealth(userId, 500).map((h) => `📅 ${h.entry_date} [${h.category}] ${h.detail}${h.body_region && h.body_region !== "عام" ? " (" + h.body_region + ")" : ""}`).join("\n");
+    case "mental":
+      return listHealth(userId, 500).filter((h) => h.category === "نفسية").map((h) => `📅 ${h.entry_date}: ${h.detail}`).join("\n");
+    case "goals":
+      return listGoals(userId).map((g) => `🎯 ${g.title}: ${g.current}${g.target ? " / " + g.target : ""}${g.unit ? " " + g.unit : ""}`).join("\n");
+    case "habits":
+      return listHabits(userId).map((h) => `🔁 ${h.title} (${h.kind === "quit" ? "بيبطّلها" : "بيعملها"}) — ستريك ${h.streak}، اتعملت ${h.total} مرة`).join("\n");
+    case "tasks":
+      return listTasks(userId, "0000-01-01", "9999-12-31").map((t) => `📌 ${t.due_date}${t.due_time ? " " + t.due_time : ""} — ${t.title} [${t.status === "done" ? "اتعملت" : "لسه"}]`).join("\n");
+    case "meals":
+      return listMeals(userId, 500).map((m) => `🍽️ ${m.entry_date}${m.at_time ? " " + m.at_time : ""}: ${m.items}${m.note ? " · " + m.note : ""}`).join("\n");
+    case "ideas":
+      return listIdeas(userId).map((i) => `💡 ${i.title}${i.detail ? " — " + i.detail : ""} [${i.status}]`).join("\n");
+    case "problems":
+      return listProblems(userId).map((p) => `🧩 ${p.title}${p.detail ? " — " + p.detail : ""} [${p.area || "-"}/${p.status}]`).join("\n");
+    default:
+      return journalCtx(listEntries(userId, 500));
+  }
+}
 
 export function startServer() {
   const app = express();
@@ -632,63 +662,7 @@ export function startServer() {
     const dateOk = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ""));
     if ((scope === "day" && !dateOk(date)) || (scope === "range" && !(dateOk(from) && dateOk(to))))
       return res.status(400).json({ error: "اختار تاريخ صحيح الأول" });
-    // السياق: كل التدوينات، يوم معيّن، أو محور بعينه (فلوس/صحة/نفسية/أهداف...)
-    // الصورة الكاملة: كلام المستخدم الخام (transcript) مش الملخص.
-    const journalCtx = (rows) =>
-      rows.map((e) => `📅 ${e.entry_date}${e.mood ? ` (${e.mood})` : ""}: ${e.transcript || e.summary || ""}`).join("\n\n");
-    let contextText = "";
-    switch (scope) {
-      case "day": contextText = journalCtx(entriesBetween(user.id, date, date)); break;
-      case "range": contextText = journalCtx(entriesBetween(user.id, from, to)); break;
-      case "finance":
-        contextText = listFinance(user.id, 500)
-          .map((f) => `📅 ${f.entry_date} ${f.direction === "income" ? "دخل" : "صرف"} ${f.amount} ${f.currency || "جنيه"}${f.category ? " · " + f.category : ""}${f.note ? " · " + f.note : ""}`)
-          .join("\n");
-        break;
-      case "health":
-        contextText = listHealth(user.id, 500)
-          .map((h) => `📅 ${h.entry_date} [${h.category}] ${h.detail}${h.body_region && h.body_region !== "عام" ? " (" + h.body_region + ")" : ""}`)
-          .join("\n");
-        break;
-      case "mental":
-        contextText = listHealth(user.id, 500)
-          .filter((h) => h.category === "نفسية")
-          .map((h) => `📅 ${h.entry_date}: ${h.detail}`)
-          .join("\n");
-        break;
-      case "goals":
-        contextText = listGoals(user.id)
-          .map((g) => `🎯 ${g.title}: ${g.current}${g.target ? " / " + g.target : ""}${g.unit ? " " + g.unit : ""}`)
-          .join("\n");
-        break;
-      case "habits":
-        contextText = listHabits(user.id)
-          .map((h) => `🔁 ${h.title} (${h.kind === "quit" ? "بيبطّلها" : "بيعملها"}) — ستريك ${h.streak}، اتعملت ${h.total} مرة`)
-          .join("\n");
-        break;
-      case "tasks":
-        contextText = listTasks(user.id, "0000-01-01", "9999-12-31")
-          .map((t) => `📌 ${t.due_date}${t.due_time ? " " + t.due_time : ""} — ${t.title} [${t.status === "done" ? "اتعملت" : "لسه"}]`)
-          .join("\n");
-        break;
-      case "meals":
-        contextText = listMeals(user.id, 500)
-          .map((m) => `🍽️ ${m.entry_date}${m.at_time ? " " + m.at_time : ""}: ${m.items}${m.note ? " · " + m.note : ""}`)
-          .join("\n");
-        break;
-      case "ideas":
-        contextText = listIdeas(user.id)
-          .map((i) => `💡 ${i.title}${i.detail ? " — " + i.detail : ""} [${i.status}]`)
-          .join("\n");
-        break;
-      case "problems":
-        contextText = listProblems(user.id)
-          .map((p) => `🧩 ${p.title}${p.detail ? " — " + p.detail : ""} [${p.area || "-"}/${p.status}]`)
-          .join("\n");
-        break;
-      default:
-        contextText = journalCtx(listEntries(user.id, 500)); // all
-    }
+    const contextText = buildAskContext(user.id, scope, date, from, to);
     try {
       const reply = await chatAboutJournal({ messages: clean, contextText, userId: user.id });
       // نحفظ الرسالة الجديدة + الرد عشان المحادثة تفضل موجودة بعد الريلود
@@ -712,6 +686,53 @@ export function startServer() {
     if (!user) return;
     clearAskMessages(user.id);
     res.json({ ok: true });
+  });
+
+  // اسأل دوّنلي بالصوت: نفرّغ الصوت ونرد ونحفظ المحادثة
+  app.post(
+    "/api/ask/voice",
+    voiceLimiter,
+    express.raw({ type: ["audio/*", "application/octet-stream"], limit: "25mb" }),
+    async (req, res) => {
+      const user = gate(req, res);
+      if (!user) return;
+      const buf = req.body;
+      if (!Buffer.isBuffer(buf) || !buf.length) return res.status(400).json({ error: "مفيش صوت" });
+      const scope = String(req.query.scope || "all");
+      const date = String(req.query.date || "");
+      if (scope === "day" && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "اختار تاريخ صحيح الأول" });
+      const ext = String(req.headers["content-type"] || "").includes("ogg") ? "ogg" : "webm";
+      try {
+        const transcript = await transcribe(buf, `ask.${ext}`, user.id);
+        if (!transcript) return res.status(422).json({ error: "مقدرتش أفهم الصوت، جرّب تاني" });
+        const contextText = buildAskContext(user.id, scope, date);
+        const messages = [...listAskMessages(user.id, 20), { role: "user", content: transcript }];
+        const reply = await chatAboutJournal({ messages, contextText, userId: user.id });
+        addAskMessage(user.id, "user", transcript);
+        addAskMessage(user.id, "assistant", reply);
+        res.json({ transcript, reply });
+      } catch (err) {
+        console.error("ask voice error:", err);
+        res.status(500).json({ error: "حصل خطأ في معالجة الصوت، جرّب تاني" });
+      }
+    }
+  );
+
+  // تحويل رد لصوت (TTS) — للرد الصوتي في الشات
+  app.post("/api/tts", voiceLimiter, async (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const text = String(req.body?.text || "").trim();
+    if (!text) return res.status(400).json({ error: "مفيش نص" });
+    try {
+      const buf = await textToSpeech(text, user.id);
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Cache-Control", "no-store");
+      res.send(buf);
+    } catch (err) {
+      console.error("tts error:", err);
+      res.status(500).json({ error: "فشل تحويل النص لصوت" });
+    }
   });
 
   /* ===== مركز الملفات: رفع (raw) + تصنيف بالرؤية + عرض ===== */
