@@ -1833,6 +1833,22 @@ $("askForm")?.addEventListener("submit", async (e) => {
     renderAskThread();
   }
 });
+// نحمّل المحادثة المحفوظة من السيرفر عشان تفضل موجودة بعد الريلود
+async function loadAskHistory() {
+  try {
+    const h = await api("/api/ask/history").then((r) => r.json());
+    askMessages.length = 0;
+    for (const m of h || []) if (m && m.content) askMessages.push({ role: m.role, content: m.content });
+  } catch {}
+  renderAskThread();
+}
+$("askClear")?.addEventListener("click", async () => {
+  if (!askMessages.length) return;
+  if (!(await askConfirm())) return;
+  try { await api("/api/ask/history", { method: "DELETE" }); } catch {}
+  askMessages.length = 0;
+  renderAskThread();
+});
 
 /* ===================== مركز الملفات (رفع + تصنيف) ===================== */
 const FILE_CAT_ICON = { "دواء": "💊", "روشتة": "📝", "تحليل": "🧪", "أشعة": "🩻", "فاتورة": "🧾", "مستند": "📄", "أخرى": "📎" };
@@ -1987,6 +2003,7 @@ async function loadAll(rerender = true) {
 
 loadAll().then(() => {
   renderJournal();
+  loadAskHistory();
   if (state.me && !localStorage.getItem("dawenli_tour_v1")) setTimeout(startTour, 800);
 });
 

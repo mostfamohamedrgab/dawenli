@@ -83,6 +83,9 @@ import {
   updateHabitFields,
   getFinanceBudget,
   setFinanceBudget,
+  addAskMessage,
+  listAskMessages,
+  clearAskMessages,
 } from "./db.js";
 import { pushEnabled, vapidPublicKey, sendPushToUser, notifyUser } from "./push.js";
 import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage } from "./openai.js";
@@ -630,8 +633,9 @@ export function startServer() {
     if ((scope === "day" && !dateOk(date)) || (scope === "range" && !(dateOk(from) && dateOk(to))))
       return res.status(400).json({ error: "اختار تاريخ صحيح الأول" });
     // السياق: كل التدوينات، يوم معيّن، أو محور بعينه (فلوس/صحة/نفسية/أهداف...)
+    // الصورة الكاملة: كلام المستخدم الخام (transcript) مش الملخص.
     const journalCtx = (rows) =>
-      rows.map((e) => `📅 ${e.entry_date}${e.mood ? ` (${e.mood})` : ""}: ${e.summary || e.transcript || ""}`).join("\n\n");
+      rows.map((e) => `📅 ${e.entry_date}${e.mood ? ` (${e.mood})` : ""}: ${e.transcript || e.summary || ""}`).join("\n\n");
     let contextText = "";
     switch (scope) {
       case "day": contextText = journalCtx(entriesBetween(user.id, date, date)); break;
@@ -687,11 +691,27 @@ export function startServer() {
     }
     try {
       const reply = await chatAboutJournal({ messages: clean, contextText, userId: user.id });
+      // نحفظ الرسالة الجديدة + الرد عشان المحادثة تفضل موجودة بعد الريلود
+      const lastUser = [...clean].reverse().find((m) => m.role === "user");
+      if (lastUser) addAskMessage(user.id, "user", lastUser.content);
+      addAskMessage(user.id, "assistant", reply);
       res.json({ reply });
     } catch (err) {
       console.error("ask error:", err);
       res.status(500).json({ error: "حصل خطأ، جرّب تاني" });
     }
+  });
+  // تاريخ محادثة اسأل دوّنلي (محفوظ)
+  app.get("/api/ask/history", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listAskMessages(user.id, 200));
+  });
+  app.delete("/api/ask/history", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    clearAskMessages(user.id);
+    res.json({ ok: true });
   });
 
   /* ===== مركز الملفات: رفع (raw) + تصنيف بالرؤية + عرض ===== */

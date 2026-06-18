@@ -259,6 +259,16 @@ db.exec(`
     updated_at  TEXT NOT NULL,
     UNIQUE(user_id, month)
   );
+
+  -- محادثة "اسأل دوّنلي" — بنحفظها عشان تفضل موجودة لو رجعنا ليها بعد الريلود.
+  CREATE TABLE IF NOT EXISTS ask_messages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    role        TEXT NOT NULL,   -- user | assistant
+    content     TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_ask_user ON ask_messages(user_id, id);
 `);
 
 /* ===================== Migrations ===================== */
@@ -1365,6 +1375,23 @@ export function setFinanceBudget(userId, month, { budget, goal }) {
   const g = goal === "" || goal == null ? null : Number(goal);
   upsertBudgetStmt.run(userId, month, b, g, now());
   return getFinanceBudget(userId, month);
+}
+
+/* ===================== محادثة اسأل دوّنلي (محفوظة) ===================== */
+
+const insertAskStmt = db.prepare(`INSERT INTO ask_messages (created_at, user_id, role, content) VALUES (?, ?, ?, ?)`);
+export function addAskMessage(userId, role, content) {
+  if (!content) return;
+  insertAskStmt.run(now(), userId, role === "assistant" ? "assistant" : "user", String(content));
+}
+export function listAskMessages(userId, limit = 200) {
+  return db
+    .prepare(`SELECT role, content FROM ask_messages WHERE user_id = ? ORDER BY id DESC LIMIT ?`)
+    .all(userId, limit)
+    .reverse();
+}
+export function clearAskMessages(userId) {
+  return db.prepare(`DELETE FROM ask_messages WHERE user_id = ?`).run(userId).changes;
 }
 
 /* ===================== تعديل عام لأي صف (مرونة التعديل) ===================== */
