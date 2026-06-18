@@ -405,7 +405,9 @@ a { color: inherit; }
 /* ===========================================================================
    هيكل التطبيق: سايدبار + محتوى
    =========================================================================== */
-.dw-app { display: flex; min-height: 100vh; min-height: 100dvh; background: var(--bg-app); }
+/* بنحدّد عرض أقصى للتطبيق كله ونوسّطه — فعلى الشاشات العريضة الفراغ يتوزّع
+   متساوي على الطرفين (شكل مقصود) بدل فجوة على ناحية واحدة. */
+.dw-app { display: flex; min-height: 100vh; min-height: 100dvh; background: var(--bg-app); max-width: 1400px; margin-inline: auto; }
 
 .dw-sidebar {
   width: 256px;
@@ -506,11 +508,7 @@ a { color: inherit; }
   min-width: 0;
   padding: clamp(20px, 4vw, 44px);
   width: 100%;
-  max-width: 1060px;
-  /* نلزّق المحتوى ناحية السايدبار (inline-start) فالفراغ الزيادة على الشاشة العريضة
-     يروح للطرف البعيد بدل ما يبقى فجوة بين المحتوى والسايدبار. */
-  margin-inline-start: 0;
-  margin-inline-end: auto;
+  /* بيملا المساحة جنب السايدبار جوه التطبيق الموسّط — مفيش فجوة ولا لزقة على ناحية. */
 }
 
 /* توب بار + شريط تابات الموبايل — متخفيين على الديسكتوب */
@@ -1521,7 +1519,9 @@ select.field { cursor: pointer; }
 
 .voice-fab {
   position: fixed; z-index: 70;
-  inset-inline-start: 20px; bottom: 24px;
+  /* يفضل جنب حافة التطبيق الموسّط (مش حافة الشاشة) على الشاشات العريضة */
+  inset-inline-start: max(20px, calc((100vw - 1400px) / 2 + 20px));
+  bottom: 24px;
   width: 60px; height: 60px;
   border: none; border-radius: 50%;
   background: var(--brand); color: var(--on-accent);
