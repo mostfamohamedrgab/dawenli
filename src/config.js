@@ -17,8 +17,9 @@ export const config = {
   // بـ gpt-4o-mini من ملفات .env القديمة فميستخرجش حاجة من الكلام
   agentModel: process.env.OPENAI_AGENT_MODEL || "gpt-4o",
   analysisModel: process.env.OPENAI_ANALYSIS_MODEL || "gpt-4o",
-  // تحويل النص لصوت (رد صوتي في الشات)
-  ttsModel: process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts",
+  // تحويل النص لصوت (رد صوتي في الشات) — tts-1 متاح للكل ويدعم العربي.
+  // لو الحساب عنده access لـ gpt-4o-mini-tts (أحسن للعربي) فعّله من OPENAI_TTS_MODEL.
+  ttsModel: process.env.OPENAI_TTS_MODEL || "tts-1",
   ttsVoice: process.env.OPENAI_TTS_VOICE || "alloy",
   port: Number(process.env.PORT || 3000),
   dashboardPassword: process.env.DASHBOARD_PASSWORD || "change-me",
