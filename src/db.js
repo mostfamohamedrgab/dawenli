@@ -293,6 +293,11 @@ const ownerStmt = db.prepare(`SELECT * FROM users WHERE is_owner = 1 ORDER BY id
 export function getUserById(id) {
   return getUserByIdStmt.get(Number(id)) || null;
 }
+// تحديث آخر ظهور — بيتنده مع كل نشاط فعلي للمستخدم (مهم للتذكيرات والمستخدمين النشطين)
+const touchUserStmt = db.prepare(`UPDATE users SET last_seen = ? WHERE id = ?`);
+export function touchUser(id) {
+  if (id) touchUserStmt.run(now(), Number(id));
+}
 export function ownerUser() {
   return ownerStmt.get() || null;
 }
@@ -501,17 +506,35 @@ export const FINANCE_CATEGORIES = [
   "أخرى",
 ];
 
+// تطبيع نص للمقارنة (شيل المسافات الزيادة + حروف صغيرة) — لكشف التكرار.
+export function normNote(s) {
+  return String(s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 const insertFinanceStmt = db.prepare(`
   INSERT INTO finance (created_at, user_id, entry_date, direction, amount, currency, category, note)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `);
+const findDupFinanceStmt = db.prepare(
+  `SELECT id, note FROM finance WHERE user_id = ? AND entry_date = ? AND direction = ? AND amount = ?`
+);
 export function addFinance({ userId, entryDate, direction, amount, currency, category, note }) {
+  const eDate = entryDate || today();
+  const dir = direction === "income" ? "income" : "expense";
+  const amt = Number(amount) || 0;
+  // حاجز تكرار: نفس اليوم + نفس الاتجاه + نفس المبلغ + ملاحظة مطابقة (بعد تطبيع) = نفس
+  // القيد (من تسجيل صوتي تاني مثلاً) — نرجّع القديم بدل ما نكرّر. ملاحظة مختلفة = قيد مختلف.
+  // بنمنع التكرار بس لما فيه ملاحظة فعلية مطابقة — عشان منخلطش مصروفين حقيقيين
+  // بنفس المبلغ ومن غير وصف (دول بيفضلوا منفصلين).
+  const nn = normNote(note);
+  const existing = nn ? findDupFinanceStmt.all(userId, eDate, dir, amt).find((r) => normNote(r.note) === nn) : null;
+  if (existing) return Number(existing.id);
   const info = insertFinanceStmt.run(
     now(),
     userId,
-    entryDate || today(),
-    direction === "income" ? "income" : "expense",
-    Number(amount) || 0,
+    eDate,
+    dir,
+    amt,
     currency || "جنيه",
     category && FINANCE_CATEGORIES.includes(category) ? category : category || "أخرى",
     note || null
@@ -1186,10 +1209,20 @@ export function profileForAgent(userId) {
 const insertIdeaStmt = db.prepare(
   `INSERT INTO ideas (created_at, user_id, title, detail, status) VALUES (?, ?, ?, ?, ?)`
 );
+// للكشف عن فكرة مكررة: نقارن بالأفكار النشطة بس (مش المنتهية) — عشان فكرة قديمة خلصت
+// مايمنعش فكرة جديدة بنفس العنوان.
+const activeIdeasForDupStmt = db.prepare(
+  `SELECT id, title FROM ideas WHERE user_id = ? AND status != 'done' ORDER BY id DESC LIMIT 200`
+);
 export function addIdea({ userId, title, detail, status }) {
   if (!title) return null;
+  const t = String(title).trim();
+  const nn = normNote(t);
+  // مانكرّرش فكرة نشطة موجودة بنفس العنوان (بعد تطبيع) — حتى لو اتقالت في يوم تاني.
+  const dup = activeIdeasForDupStmt.all(userId).find((i) => normNote(i.title) === nn);
+  if (dup) return db.prepare(`SELECT * FROM ideas WHERE id = ?`).get(dup.id);
   const st = ["inbox", "planned", "done"].includes(status) ? status : "inbox";
-  const info = insertIdeaStmt.run(now(), userId, String(title).trim(), detail || null, st);
+  const info = insertIdeaStmt.run(now(), userId, t, detail || null, st);
   return db.prepare(`SELECT * FROM ideas WHERE id = ?`).get(Number(info.lastInsertRowid));
 }
 export function listIdeas(userId, limit = 200) {

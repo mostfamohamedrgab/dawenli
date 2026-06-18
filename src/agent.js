@@ -14,6 +14,9 @@ import {
   listEntries,
   entriesSince,
   addFinance,
+  deleteFinance,
+  normNote,
+  touchUser,
   financeSince,
   financeBetween,
   FINANCE_CATEGORIES,
@@ -104,6 +107,21 @@ const TOOLS = [
           date: { type: "string", description: "YYYY-MM-DD" },
         },
         required: ["direction", "amount"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_finance",
+      description:
+        "امسح قيد مصروف/دخل غلط بالـ id بتاعه. استخدمه لما المستخدم يقول إن قيد اتسجّل غلط أو يطلب يلغيه أو يصحّحه: هات الـ id الأول بـ get_data (topic=finance)، امسح الغلط، وبعدين سجّل الصح بـ log_finance. ماتضيفش قيد جديد من غير ما تمسح الغلط الأول — عشان مايحصلش تكرار.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "number", description: "id القيد المالي اللي هيتمسح (من get_data)" },
+        },
+        required: ["id"],
       },
     },
   },
@@ -386,6 +404,12 @@ function executeTool(ctx, name, args) {
     case "log_finance": {
       const amount = Number(args.amount);
       if (!(amount > 0)) return { result: { ok: false, error: "amount لازم رقم موجب" } };
+      // حاجز تكرار داخل نفس اللفة: نفس (اليوم+الاتجاه+المبلغ+الملاحظة) متتسجّلش مرتين في
+      // نفس الرسالة (الـ DB كمان بيمنع التكرار عبر الرسائل في addFinance).
+      const finDir = args.direction === "income" ? "income" : "expense";
+      const finKey = `${date}|${finDir}|${amount}|${normNote(args.note)}`;
+      if (ctx.seenFinance?.has(finKey)) return { result: { ok: true, duplicate: true } };
+      ctx.seenFinance?.add(finKey);
       addFinance({
         userId,
         entryDate: date,
@@ -400,6 +424,12 @@ function executeTool(ctx, name, args) {
         result: { ok: true },
         receipt: `💰 ${sign}: ${fmtNum(amount)} ${args.currency || "جنيه"}${args.category ? " · " + args.category : ""}${args.note ? " · " + args.note : ""}`,
       };
+    }
+    case "delete_finance": {
+      const id = Number(args.id);
+      if (!(id > 0)) return { result: { ok: false, error: "محتاج id صحيح" } };
+      const ok = deleteFinance(userId, id);
+      return { result: { ok }, receipt: ok ? `🗑️ اتمسح قيد مالي غلط (#${id})` : `⚠️ ملقيتش القيد #${id}` };
     }
     case "log_idea": {
       if (!args.title) return { result: { ok: false, error: "محتاج عنوان للفكرة" } };
@@ -551,7 +581,7 @@ function executeTool(ctx, name, args) {
               journal: journal.map((e) => ({ date: e.entry_date, mood: e.mood, text: e.summary || (e.transcript || "").slice(0, 200) })),
               meals: meals.map((m) => ({ date: m.entry_date, items: m.items, time: m.at_time, note: m.note })),
               health: health.map((h) => ({ date: h.entry_date, category: h.category, detail: h.detail })),
-              finance: fin.map((f) => ({ date: f.entry_date, dir: f.direction, amount: f.amount, category: f.category, note: f.note })),
+              finance: fin.map((f) => ({ id: f.id, date: f.entry_date, dir: f.direction, amount: f.amount, category: f.category, note: f.note })),
               empty: !journal.length && !meals.length && !health.length && !fin.length,
             },
           };
@@ -567,7 +597,7 @@ function executeTool(ctx, name, args) {
             result: {
               from, to, income, expense, net: income - expense,
               expense_by_category: byCat,
-              items: rows.slice(-25).map((r) => ({ date: r.entry_date, dir: r.direction, amount: r.amount, category: r.category, note: r.note })),
+              items: rows.slice(-25).map((r) => ({ id: r.id, date: r.entry_date, dir: r.direction, amount: r.amount, category: r.category, note: r.note })),
             },
           };
         }
@@ -660,7 +690,7 @@ function buildSnapshot(userId) {
     spent_today: spentToday,
     // قائمة مصاريف/دخل النهاردة المسجّلة فعلًا — عشان الـ agent يقارن ومايكرّرش نفس القيد
     finance_today: todayFinance.map(
-      (f) => `${f.direction === "income" ? "دخل" : "صرف"} ${f.amount} ${f.currency || "جنيه"}${f.category ? " · " + f.category : ""}${f.note ? " · " + f.note : ""}`
+      (f) => `#${f.id} ${f.direction === "income" ? "دخل" : "صرف"} ${f.amount} ${f.currency || "جنيه"}${f.category ? " · " + f.category : ""}${f.note ? " · " + f.note : ""}`
     ),
     goals: goals.map((g) => `${g.title}: ${g.current}${g.unit ? " " + g.unit : ""}${g.target ? ` من ${g.target}` : ""}`),
     habits: habits.map((h) => `${h.title} (${h.kind === "quit" ? "بيبطّلها" : "بيعملها"})${h.doneToday ? " ✓ اتعملت النهاردة" : ""} — ستريك ${h.streak}`),
@@ -691,6 +721,7 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 - الصحة النفسية: قلق، توتر، حزن، ضغط نفسي → log_health بـ category="نفسية" و body_region="راس".
 - صحة حد تاني غير المستخدم ماتسجّلهاش خالص.
 - **متسجّلش نفس الحاجة مرتين (مهم جدًا في الفلوس):** في سياقك \`finance_today\` فيها كل المصاريف/الدخل المسجّلة النهاردة. **قبل** أي نداء \`log_finance\`، بُص عليها كويس: لو نفس المبلغ (أو قريب منه) ووصف مشابه أو نفس البند اتسجّل خلاص — حتى لو المستخدم قاله بصيغة تانية أو في تسجيل صوتي منفصل (مثلاً «موزع واي فاي للبي سي ٤٠٠» و«موزع واي فاي ٤٠٠»، أو «أبو طارق ٩٥» و«أبو طارق كشري ٩٥») → **ماتسجّلوش تاني**. المستخدم بيدردش وبيكرّر نفس الحاجة بكلام مختلف، والتكرار ده بيبوّظ مجموع مصاريفه. لو عندك شك حقيقي إنهم عمليتين مختلفتين بنفس المبلغ، اسأله سؤال قصير («ده غير الـ ٤٠٠ اللي سجّلتهم قبل كده؟») بدل ما تسجّل تكرار. نفس المبدأ لباقي المحاور (أكل، صحة، مهام): لو واضح إنه متسجّل، بلاش تكرار.
+- **التصحيح/الإلغاء في الفلوس (مهم — ده كان بيعمل تكرار):** لو المستخدم قال إن قيد مالي اتسجّل غلط أو عايز يلغيه أو يغيّر مبلغه/بنده/وصفه («القيد ده غلط»، «ده مش X ده Y»، «المبلغ غلط»، «ألغِ المصروف الفلاني») → **ماتسجّلش قيد جديد على طول**. هات الـ id الأول بـ get_data (topic=finance أو day)، امسح القيد الغلط بـ delete_finance بالـ id، وبعدها لو فيه قيمة صحيحة سجّلها بـ log_finance. كده التصحيح مايعملش نسخة زيادة.
 
 # الذاكرة الدائمة عن الشخص (remember)
 - في سياقك "profile" فيه أهم المعلومات الثابتة عن الشخص — اقراها واتعامل معاه على أساسها (مثلاً لو عنده مرض مزمن، خد باله في كلامك).
@@ -724,6 +755,8 @@ const HISTORY_LIMIT = 8;
 
 export async function runAgent({ user, text, kind = "text" }) {
   const userId = user.id;
+  touchUser(userId); // حدّث آخر ظهور مع كل نشاط فعلي
+  const seenFinance = new Set(); // حاجز تكرار للفلوس داخل نفس الرسالة
   const snapshot = buildSnapshot(userId);
   const history = recentConversations(userId, HISTORY_LIMIT);
 
@@ -773,7 +806,7 @@ export async function runAgent({ user, text, kind = "text" }) {
       } catch {}
       let out;
       try {
-        out = executeTool({ userId, sourceText: text }, tc.function.name, args);
+        out = executeTool({ userId, sourceText: text, seenFinance }, tc.function.name, args);
       } catch (err) {
         // اللوج ده بيطلع في pm2 logs — أهم حاجة للتشخيص على السيرفر
         console.error(`❌ tool ${tc.function.name} failed with args ${JSON.stringify(args)}:`, err);

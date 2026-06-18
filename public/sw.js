@@ -1,5 +1,5 @@
 /* دوّنلي — Service Worker (PWA: تثبيت + أوفلاين خفيف + إشعارات) */
-const CACHE = "dawenli-v11";
+const CACHE = "dawenli-v12";
 // أصول ثابتة آمنة للتخزين (مش بيانات مستخدم).
 const SHELL = [
   "/style.css",
@@ -29,14 +29,26 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // التنقّل (الصفحات): الشبكة الأول، ولو النت قاطع نرجع آخر نسخة متخزّنة.
-  if (req.mode === "navigate") {
-    e.respondWith(fetch(req).catch(() => caches.match(req).then((r) => r || caches.match("/"))));
+  // التنقّل (الصفحات) + الكود/الستايل (app.js, style.css): الشبكة الأول عشان أي
+  // deploy يظهر فورًا، ولو النت قاطع نرجع آخر نسخة متخزّنة. (الـ stale-while-revalidate
+  // كان بيعرض ستايل قديم بعد كل نشر.)
+  if (req.mode === "navigate" || url.pathname === "/style.css" || url.pathname === "/app.js") {
+    const isNav = req.mode === "navigate";
+    e.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res.ok) caches.open(CACHE).then((c) => c.put(req, res.clone()));
+          return res;
+        })
+        // أوفلاين: نرجّع آخر نسخة متخزّنة؛ للتنقّل بس نرجّع الـ shell، أما css/js
+        // فلو مش متخزّنين نسيبه يفشل نظيف (منرجّعش HTML مكان ملف ستايل/كود).
+        .catch(() => caches.match(req).then((r) => r || (isNav ? caches.match("/") : undefined)))
+    );
     return;
   }
 
-  // الأصول الثابتة: stale-while-revalidate. مابنخزّنش نداءات الـ API.
-  const isAsset = url.pathname.startsWith("/assets/") || url.pathname === "/style.css";
+  // الأصول الثابتة (أيقونات/لوجو نادرًا بتتغيّر): stale-while-revalidate. مابنخزّنش نداءات الـ API.
+  const isAsset = url.pathname.startsWith("/assets/");
   if (isAsset) {
     e.respondWith(
       caches.match(req).then((cached) => {

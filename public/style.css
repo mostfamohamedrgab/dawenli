@@ -112,7 +112,7 @@
 
 * , *::before, *::after { box-sizing: border-box; }
 
-html { direction: rtl; text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+html { direction: rtl; text-size-adjust: 100%; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 
 body {
   margin: 0;
@@ -122,6 +122,9 @@ body {
   background-image: var(--paper-grain);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* شبكة أمان: أي محتوى نص طويل (لينك/رقم/كلمة من غير مسافات) ميدفعش الصفحة أفقيًا
+     فتتزنق في عمود على الجنب في RTL. مع ده overflow-wrap على حاويات النص. */
+  overflow-x: hidden;
 }
 
 h1, h2, h3, h4 {
@@ -592,7 +595,9 @@ a { color: inherit; }
 
 /* شيت «أقسام أكتر» (موبايل) */
 .more-sheet {
-  position: fixed; inset-inline: 0; bottom: 0; z-index: 60;
+  /* z-index لازم يبقى فوق الـ scrim (chat-scrim = 80) زي ما .chat-sheet (85) فوقه —
+     كان 60 تحت الـ scrim فالضغطات كانت بتروح للـ scrim ويقفل الشيت = "مش بيجيب بيانات". */
+  position: fixed; inset-inline: 0; bottom: 0; z-index: 85;
   background: var(--surface-card);
   border-radius: 22px 22px 0 0;
   box-shadow: 0 -12px 40px rgba(40, 36, 32, .18);
@@ -1659,6 +1664,14 @@ select.field { cursor: pointer; }
 .notif-item .ni-body { flex: 1; min-width: 0; }
 .notif-item .ni-title { font-weight: 700; font-size: var(--text-sm); margin-bottom: 2px; }
 .notif-item .ni-text { font-size: var(--text-sm); color: var(--ink-muted); line-height: 1.5; word-break: break-word; }
+
+/* كل حاويات النص الحر (كلام المستخدم/الـ agent) لازم تلفّ الكلمات الطويلة بدل ما
+   تدفع الصفحة أفقيًا وتزنقها في عمود على الجنب — خصوصًا في RTL. */
+.ic-title, .ic-detail, .pc-title, .pc-detail, .lr-text, .entry-card .e-summary,
+.bubble, .list-row .lm .l2, .task-row .task-title, .analysis-result, .gl-note {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .notif-item .ni-time { font-size: var(--text-xs); color: var(--ink-faint); margin-top: 5px; }
 .notif-item .ni-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--health); flex: none; margin-top: 7px; }
 .notif-empty { text-align: center; color: var(--ink-faint); font-size: var(--text-sm); padding: 44px 16px; }
