@@ -627,13 +627,62 @@ export function startServer() {
     const dateOk = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ""));
     if ((scope === "day" && !dateOk(date)) || (scope === "range" && !(dateOk(from) && dateOk(to))))
       return res.status(400).json({ error: "اختار تاريخ صحيح الأول" });
-    let entries;
-    if (scope === "day") entries = entriesBetween(user.id, date, date);
-    else if (scope === "range") entries = entriesBetween(user.id, from, to);
-    else entries = listEntries(user.id, 500);
-    const contextText = entries
-      .map((e) => `📅 ${e.entry_date}${e.mood ? ` (${e.mood})` : ""}: ${e.summary || e.transcript || ""}`)
-      .join("\n\n");
+    // السياق: كل التدوينات، يوم معيّن، أو محور بعينه (فلوس/صحة/نفسية/أهداف...)
+    const journalCtx = (rows) =>
+      rows.map((e) => `📅 ${e.entry_date}${e.mood ? ` (${e.mood})` : ""}: ${e.summary || e.transcript || ""}`).join("\n\n");
+    let contextText = "";
+    switch (scope) {
+      case "day": contextText = journalCtx(entriesBetween(user.id, date, date)); break;
+      case "range": contextText = journalCtx(entriesBetween(user.id, from, to)); break;
+      case "finance":
+        contextText = listFinance(user.id, 500)
+          .map((f) => `📅 ${f.entry_date} ${f.direction === "income" ? "دخل" : "صرف"} ${f.amount} ${f.currency || "جنيه"}${f.category ? " · " + f.category : ""}${f.note ? " · " + f.note : ""}`)
+          .join("\n");
+        break;
+      case "health":
+        contextText = listHealth(user.id, 500)
+          .map((h) => `📅 ${h.entry_date} [${h.category}] ${h.detail}${h.body_region && h.body_region !== "عام" ? " (" + h.body_region + ")" : ""}`)
+          .join("\n");
+        break;
+      case "mental":
+        contextText = listHealth(user.id, 500)
+          .filter((h) => h.category === "نفسية")
+          .map((h) => `📅 ${h.entry_date}: ${h.detail}`)
+          .join("\n");
+        break;
+      case "goals":
+        contextText = listGoals(user.id)
+          .map((g) => `🎯 ${g.title}: ${g.current}${g.target ? " / " + g.target : ""}${g.unit ? " " + g.unit : ""}`)
+          .join("\n");
+        break;
+      case "habits":
+        contextText = listHabits(user.id)
+          .map((h) => `🔁 ${h.title} (${h.kind === "quit" ? "بيبطّلها" : "بيعملها"}) — ستريك ${h.streak}، اتعملت ${h.total} مرة`)
+          .join("\n");
+        break;
+      case "tasks":
+        contextText = listTasks(user.id, "0000-01-01", "9999-12-31")
+          .map((t) => `📌 ${t.due_date}${t.due_time ? " " + t.due_time : ""} — ${t.title} [${t.status === "done" ? "اتعملت" : "لسه"}]`)
+          .join("\n");
+        break;
+      case "meals":
+        contextText = listMeals(user.id, 500)
+          .map((m) => `🍽️ ${m.entry_date}${m.at_time ? " " + m.at_time : ""}: ${m.items}${m.note ? " · " + m.note : ""}`)
+          .join("\n");
+        break;
+      case "ideas":
+        contextText = listIdeas(user.id)
+          .map((i) => `💡 ${i.title}${i.detail ? " — " + i.detail : ""} [${i.status}]`)
+          .join("\n");
+        break;
+      case "problems":
+        contextText = listProblems(user.id)
+          .map((p) => `🧩 ${p.title}${p.detail ? " — " + p.detail : ""} [${p.area || "-"}/${p.status}]`)
+          .join("\n");
+        break;
+      default:
+        contextText = journalCtx(listEntries(user.id, 500)); // all
+    }
     try {
       const reply = await chatAboutJournal({ messages: clean, contextText, userId: user.id });
       res.json({ reply });
