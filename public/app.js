@@ -1906,17 +1906,17 @@ async function sendAskVoice(blob) {
     if ($("askSend")) $("askSend").disabled = false;
   }
 }
-let ttsAudio = null;
-async function playTTS(text) {
+// تحويل النص لصوت عبر المتصفح (Web Speech API) — مجاني وبيدعم العربي على الموبايل،
+// ومش محتاج access لموديل TTS من OpenAI.
+function playTTS(text) {
   try {
-    if (ttsAudio) { try { ttsAudio.pause(); } catch {} ttsAudio = null; }
-    const res = await api("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    ttsAudio = new Audio(url);
-    ttsAudio.onended = () => URL.revokeObjectURL(url);
-    await ttsAudio.play().catch(() => {});
+    if (!("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(String(text || "").slice(0, 1200));
+    u.lang = "ar-EG";
+    const ar = (speechSynthesis.getVoices() || []).find((v) => /^ar/i.test(v.lang));
+    if (ar) u.voice = ar;
+    speechSynthesis.speak(u);
   } catch {}
 }
 $("askMic")?.addEventListener("click", toggleAskVoice);
