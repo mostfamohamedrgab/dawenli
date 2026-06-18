@@ -1680,7 +1680,8 @@ function exportJournal() {
     lines.push(`تدوينات يوم ${fmtDate(e.entry_date)}`);
     if (e.mood) lines.push(`المزاج: ${e.mood}`);
     lines.push("");
-    lines.push((e.summary || e.transcript || "").trim());
+    // الكلام الخام كامل زي ما اتقال/اتكتب (transcript) — مش التلخيص
+    lines.push((e.transcript || e.summary || "").trim());
     lines.push("");
   }
   const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
