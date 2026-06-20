@@ -244,6 +244,7 @@ function gotoTab(tab) {
   if (tab === "problems") renderProblemsPage();
   if (tab === "ask") renderAskPage();
   if (tab === "files") renderFilesPage();
+  if (tab === "thoughts") renderThoughts();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 $("sideNav").addEventListener("click", (e) => {
@@ -475,10 +476,16 @@ let recTimer = null;
 let recStartedAt = 0;
 let recCancelled = false;
 let audioCtx = null, waveAnalyser = null, waveRaf = null, wakeLock = null, micStream = null;
-const MAX_REC_MS = 7 * 60 * 1000; // أقصى مدة تسجيل في المرة = ٧ دقايق
-
+// التسجيل بيشتغل في سياقين: log (الكومبوزر) و thought (خواطر — مدة أطول، خام)
+const REC_CTX = {
+  log:     { bar: "recBar",        time: "recTime",     mic: "micBtn",     prog: "recProgress",     out: "composerResult", btn: "composerBtn", endpoint: "/api/voice",          mode: "log",     maxMs: 7 * 60 * 1000 },
+  thought: { bar: "thoughtRecBar", time: "thoughtTime", mic: "thoughtMic", prog: "thoughtProgress", out: "thoughtResult",  btn: "thoughtSave", endpoint: "/api/thoughts/voice", mode: "thought", maxMs: 20 * 60 * 1000 },
+};
+let recCtxKey = "log";
+const rc = () => REC_CTX[recCtxKey];
 function recElems() {
-  return { bar: $("recBar"), time: $("recTime"), mic: $("micBtn"), comp: $("composerBtn") };
+  const c = rc();
+  return { bar: $(c.bar), time: $(c.time), mic: $(c.mic), comp: $(c.btn) };
 }
 function fmtRecTime(ms) {
   const s = Math.floor(ms / 1000);
@@ -496,7 +503,7 @@ function startWave(stream) {
     waveAnalyser.fftSize = 64;
     waveAnalyser.smoothingTimeConstant = 0.75;
     src.connect(waveAnalyser);
-    const wave = $("recBar").querySelector(".rec-wave");
+    const wave = $(rc().bar).querySelector(".rec-wave");
     const bars = wave.querySelectorAll("i");
     wave.classList.add("live");
     const data = new Uint8Array(waveAnalyser.frequencyBinCount);
@@ -519,7 +526,7 @@ function stopWave() {
   if (waveRaf) { cancelAnimationFrame(waveRaf); waveRaf = null; }
   if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
   waveAnalyser = null;
-  const wave = $("recBar")?.querySelector(".rec-wave");
+  const wave = $(rc().bar)?.querySelector(".rec-wave");
   if (wave) {
     wave.classList.remove("live");
     wave.querySelectorAll("i").forEach((b) => (b.style.transform = ""));
@@ -615,9 +622,10 @@ async function updatePendingBanner() {
 }
 window.addEventListener("online", () => drainPending());
 
-async function startRecording() {
+async function startRecording(key = "log") {
+  recCtxKey = REC_CTX[key] ? key : "log";
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-    $("composerResult").innerHTML = `<div class="comp-reply">متصفحك مش بيدعم التسجيل الصوتي — اكتب عن يومك في الخانة فوق وأنا أرتّبه 🙏</div>`;
+    $(rc().out).innerHTML = `<div class="comp-reply">متصفحك مش بيدعم التسجيل الصوتي — اكتب بدل الصوت 🙏</div>`;
     return;
   }
   let stream;
@@ -625,7 +633,7 @@ async function startRecording() {
     stream = await getMic();
     stream.getTracks().forEach((t) => (t.enabled = true));
   } catch {
-    $("composerResult").innerHTML = `<div class="comp-reply">لازم تسمح للمايك عشان أسجّل صوتك 🎙️</div>`;
+    $(rc().out).innerHTML = `<div class="comp-reply">لازم تسمح للمايك عشان أسجّل صوتك 🎙️</div>`;
     return;
   }
   // اختار صيغة يدعمها المتصفح
@@ -645,7 +653,7 @@ async function startRecording() {
     mic.classList.remove("hidden");
     if (recCancelled || !recChunks.length) return;
     const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || "audio/webm" });
-    const pendId = await savePending(blob, "/api/voice"); // اتحفظ فورًا — مايضيعش لو حصل أي حاجة
+    const pendId = await savePending(blob, rc().endpoint); // اتحفظ فورًا — مايضيعش لو حصل أي حاجة
     await sendVoice(blob, pendId);
   };
   mediaRecorder.start();
@@ -655,19 +663,20 @@ async function startRecording() {
   bar.classList.remove("hidden");
   time.textContent = "0:00";
   bar.classList.remove("warn");
-  const prog = $("recProgress");
+  const prog = $(rc().prog);
   if (prog) prog.style.width = "0%";
   startWave(stream);
   requestWakeLock();
   document.addEventListener("visibilitychange", onRecVisibility);
+  const maxMs = rc().maxMs;
   recTimer = setInterval(() => {
     const elapsed = Date.now() - recStartedAt;
-    const remaining = MAX_REC_MS - elapsed;
+    const remaining = maxMs - elapsed;
     const warn = remaining <= 45000; // آخر ٤٥ ثانية = تحذير
     bar.classList.toggle("warn", warn);
     time.textContent = warn ? `⚠️ باقي ${fmtRecTime(Math.max(0, remaining))}` : fmtRecTime(elapsed);
-    if (prog) prog.style.width = `${Math.min(100, (elapsed / MAX_REC_MS) * 100)}%`;
-    if (remaining <= 0) stopRecording(); // سقف ٧ دقايق
+    if (prog) prog.style.width = `${Math.min(100, (elapsed / maxMs) * 100)}%`;
+    if (remaining <= 0) stopRecording(); // سقف المدة حسب السياق
   }, 250);
 }
 function stopRecording() {
@@ -678,20 +687,21 @@ function cancelRecording() {
   stopRecording();
 }
 async function sendVoice(blob, pendId) {
-  const out = $("composerResult");
+  const c = rc();
+  const out = $(c.out);
   const { comp, mic } = recElems();
   comp.disabled = true; mic.disabled = true;
-  out.innerHTML = `<div class="comp-reply"><span class="loading"><span class="spinner"></span> بفرّغ صوتك وبرتّبه…</span></div>`;
+  out.innerHTML = `<div class="comp-reply"><span class="loading"><span class="spinner"></span> ${c.mode === "thought" ? "بفرّغ كلامك…" : "بفرّغ صوتك وبرتّبه…"}</span></div>`;
   try {
-    const res = await api("/api/voice", {
+    const res = await api(c.endpoint, {
       method: "POST",
       headers: { "Content-Type": blob.type || "audio/webm" },
       body: blob,
     });
     const data = await res.json();
     await removePending(pendId); // اتبعت بنجاح → نشيله من المحفوظ
-    renderComposerResult(data, data.transcript);
-    if (!data.error) await loadAll(false);
+    if (c.mode === "thought") { renderThoughtResult(data); if (!data.error) await loadThoughts(); }
+    else { renderComposerResult(data, data.transcript); if (!data.error) await loadAll(false); }
   } catch {
     // النت فصل / فشل الرفع — التسجيل محفوظ في IndexedDB وهيتبعت لوحده
     out.innerHTML = `<div class="comp-reply">📡 النت فصل — تسجيلك <b>محفوظ</b> وهيتبعت لوحده أول ما النت يرجع (أو اضغط شارة «تسجيل محفوظ» تحت).</div>`;
@@ -700,9 +710,56 @@ async function sendVoice(blob, pendId) {
     comp.disabled = false; mic.disabled = false;
   }
 }
-$("micBtn").addEventListener("click", startRecording);
+$("micBtn").addEventListener("click", () => startRecording("log"));
 $("recStop").addEventListener("click", stopRecording);
 $("recCancel").addEventListener("click", cancelRecording);
+$("thoughtMic")?.addEventListener("click", () => startRecording("thought"));
+$("thoughtStop")?.addEventListener("click", stopRecording);
+$("thoughtCancel")?.addEventListener("click", cancelRecording);
+
+/* ===================== خواطر / عصف ذهني ===================== */
+function renderThoughtResult(data) {
+  const out = $("thoughtResult");
+  if (!out) return;
+  if (data.error) { out.innerHTML = `<div class="comp-reply">${escapeHtml(data.error)}</div>`; return; }
+  const heard = data.transcript ? `<div class="comp-hint" style="margin-bottom:6px">🎙️ «${escapeHtml(data.transcript)}»</div>` : "";
+  out.innerHTML = `${heard}<div class="comp-reply">💭 اتسجّلت في خواطرك</div>`;
+  setTimeout(() => { if ($("thoughtResult")) $("thoughtResult").innerHTML = ""; }, 4000);
+}
+async function thoughtSaveText() {
+  const ta = $("thoughtText");
+  const text = ta.value.trim();
+  if (!text) return;
+  const btn = $("thoughtSave");
+  btn.disabled = true;
+  try {
+    const res = await api("/api/thoughts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    const data = await res.json();
+    if (!data.error) { ta.value = ""; await loadThoughts(); } else renderThoughtResult(data);
+  } catch { renderThoughtResult({ error: "حصل خطأ، جرّب تاني." }); }
+  finally { btn.disabled = false; }
+}
+async function loadThoughts() {
+  try { state.thoughts = await api("/api/thoughts").then((r) => r.json()); } catch { state.thoughts = state.thoughts || []; }
+  renderThoughts();
+}
+function renderThoughts() {
+  const el = $("thoughtsList");
+  if (!el) return;
+  const data = state.thoughts || [];
+  if (!data.length) {
+    el.innerHTML = emptyState("لا توجد خواطر بعد", "افتح المايك واتكلّم بحرية (لحد ٢٠ دقيقة)، أو اكتب فكرة — بنحفظها زي ما هي.");
+    return;
+  }
+  el.innerHTML = data.map((t) => `
+    <div class="thought-card">
+      <button class="icon-btn th-del" onclick="del('thoughts', ${t.id})" title="حذف">🗑️</button>
+      <div class="th-text">${escapeHtml(t.text)}</div>
+      <div class="th-meta">${t.kind === "voice" ? "🎙️" : "✍️"} ${fmtDateTime(t.created_at)}</div>
+    </div>`).join("");
+}
+$("thoughtSave")?.addEventListener("click", thoughtSaveText);
+$("thoughtText")?.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) thoughtSaveText(); });
 
 /* ===================== النظرة العامة ===================== */
 function computeStreak(entries) {
@@ -2104,7 +2161,7 @@ $("logoutBtn").addEventListener("click", logout);
 
 async function loadAll(rerender = true) {
   try {
-    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files, budget] = await Promise.all([
+    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files, budget, th] = await Promise.all([
       api("/api/me").then((r) => r.json()),
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
@@ -2121,12 +2178,14 @@ async function loadAll(rerender = true) {
       api("/api/problems").then((r) => r.json()),
       api("/api/files").then((r) => r.json()),
       api("/api/finance-budget").then((r) => r.json()),
+      api("/api/thoughts").then((r) => r.json()),
     ]);
     state.me = me;
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
     state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin;
     state.tasks = tasks; state.categories = cats; state.profile = prof;
     state.ideas = idea; state.problems = prob; state.files = files; state.finBudget = budget;
+    state.thoughts = th;
   } catch { return; }
 
   const first = (state.me?.name || "د").trim()[0] || "د";
@@ -2146,6 +2205,7 @@ async function loadAll(rerender = true) {
   if (active === "ideas") renderIdeasPage();
   if (active === "problems") renderProblemsPage();
   if (active === "files") renderFilesPage();
+  if (active === "thoughts") renderThoughts();
 }
 
 loadAll().then(() => {

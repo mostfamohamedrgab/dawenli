@@ -216,6 +216,15 @@ db.exec(`
     status      TEXT NOT NULL DEFAULT 'inbox', -- inbox | planned | done
     task_id     INTEGER
   );
+
+  -- خواطر / عصف ذهني: كلام حُرّ طويل خام (مش بيتفكّك للعوالم)
+  CREATE TABLE IF NOT EXISTS thoughts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    text        TEXT NOT NULL,
+    kind        TEXT DEFAULT 'text'
+  );
   CREATE INDEX IF NOT EXISTS idx_ideas_user ON ideas(user_id, id);
 
   -- المشاكل والهموم: حاجة مضايقة المستخدم وعايز يتخلص منها. الـ agent بيطلّعها من
@@ -1272,6 +1281,20 @@ export function setIdeaStatus(userId, id, status) {
 }
 export function deleteIdea(userId, id) {
   return db.prepare(`DELETE FROM ideas WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+}
+
+/* ===== خواطر / عصف ذهني — كلام حُرّ خام (مش بيتفكّك) ===== */
+export function addThought(userId, text, kind = "text") {
+  const t = String(text || "").trim();
+  if (!t) return null;
+  const info = db.prepare(`INSERT INTO thoughts (created_at, user_id, text, kind) VALUES (?, ?, ?, ?)`).run(now(), userId, t, kind);
+  return db.prepare(`SELECT id, created_at, text, kind FROM thoughts WHERE id = ?`).get(Number(info.lastInsertRowid));
+}
+export function listThoughts(userId, limit = 200) {
+  return db.prepare(`SELECT id, created_at, text, kind FROM thoughts WHERE user_id = ? ORDER BY id DESC LIMIT ?`).all(userId, limit);
+}
+export function deleteThought(userId, id) {
+  return db.prepare(`DELETE FROM thoughts WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
 }
 // لقطة مختصرة للـ agent عشان مايكرّرش نفس الفكرة
 export function recentIdeas(userId, limit = 12) {

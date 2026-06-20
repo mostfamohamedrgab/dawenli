@@ -1791,3 +1791,17 @@ select.field { cursor: pointer; }
 }
 .pending-voice b { font-size: 1.05em; }
 @media (max-width: 760px) { .pending-voice { bottom: calc(146px + env(safe-area-inset-bottom)); } }
+
+/* ===== خواطر / عصف ذهني ===== */
+.thought-card {
+  position: relative;
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 14px 16px;
+}
+.thought-card .th-text { font-size: var(--text-sm); line-height: 1.75; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+.thought-card .th-meta { font-size: var(--text-xs); color: var(--ink-faint); margin-top: 8px; }
+.thought-card .th-del { position: absolute; inset-inline-start: 8px; top: 8px; width: 26px; height: 26px; opacity: .55; }
+.thought-card .th-del:hover { opacity: 1; }

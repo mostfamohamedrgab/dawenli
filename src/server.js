@@ -63,6 +63,9 @@ import {
   listIdeas,
   setIdeaStatus,
   deleteIdea,
+  addThought,
+  listThoughts,
+  deleteThought,
   addProblem,
   listProblems,
   setProblemStatus,
@@ -857,6 +860,46 @@ export function startServer() {
         res.json({ transcript, reply, receipts });
       } catch (err) {
         console.error("dashboard voice error:", err);
+        res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني" });
+      }
+    }
+  );
+
+  /* ===== خواطر / عصف ذهني ===== */
+  app.get("/api/thoughts", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listThoughts(user.id));
+  });
+  app.post("/api/thoughts", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const t = addThought(user.id, (req.body || {}).text, "text");
+    if (!t) return res.status(400).json({ error: "اكتب خاطرة الأول" });
+    res.json({ ok: true, thought: t });
+  });
+  app.delete("/api/thoughts/:id", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: deleteThought(user.id, Number(req.params.id)) });
+  });
+  app.post(
+    "/api/thoughts/voice",
+    voiceLimiter,
+    express.raw({ type: ["audio/*", "application/octet-stream"], limit: "25mb" }),
+    async (req, res) => {
+      const user = gate(req, res);
+      if (!user) return;
+      const buf = req.body;
+      if (!buf || !buf.length) return res.status(400).json({ error: "مفيش صوت" });
+      const ext = (req.headers["content-type"] || "").includes("ogg") ? "ogg" : "webm";
+      try {
+        const transcript = await transcribe(buf, `thought.${ext}`, user.id);
+        if (!transcript) return res.status(422).json({ error: "مقدرتش أفهم الصوت، جرّب تاني" });
+        const thought = addThought(user.id, transcript, "voice");
+        res.json({ transcript, thought });
+      } catch (err) {
+        console.error("thought voice error:", err);
         res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني" });
       }
     }
