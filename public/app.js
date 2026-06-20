@@ -550,6 +550,71 @@ async function getMic() {
 }
 window.addEventListener("pagehide", () => { micStream?.getTracks().forEach((t) => t.stop()); micStream = null; });
 
+/* ===== حماية التسجيل من الضياع: نحفظه في IndexedDB ونعيد المحاولة لو النت فصل ===== */
+function voiceIDB() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open("dawenli-voice", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("pending", { keyPath: "id", autoIncrement: true });
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+async function savePending(blob, endpoint) {
+  try {
+    const db = await voiceIDB();
+    return await new Promise((resolve, reject) => {
+      const req = db.transaction("pending", "readwrite").objectStore("pending")
+        .add({ blob, type: blob.type || "audio/webm", endpoint, ts: Date.now() });
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  } catch { return null; }
+}
+async function removePending(id) {
+  if (id == null) return;
+  try { const db = await voiceIDB(); db.transaction("pending", "readwrite").objectStore("pending").delete(id); } catch {}
+}
+async function allPending() {
+  try {
+    const db = await voiceIDB();
+    return await new Promise((resolve) => {
+      const req = db.transaction("pending", "readonly").objectStore("pending").getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+  } catch { return []; }
+}
+let _draining = false;
+async function drainPending(manual = false) {
+  if (_draining || (!navigator.onLine && !manual)) return;
+  _draining = true;
+  let sent = 0;
+  try {
+    for (const it of await allPending()) {
+      try {
+        const res = await api(it.endpoint || "/api/voice", { method: "POST", headers: { "Content-Type": it.type }, body: it.blob });
+        const data = await res.json().catch(() => ({}));
+        if (!data.error) { await removePending(it.id); sent++; }
+        else break;
+      } catch { break; } // النت لسه واقع — نسيبهم للمرة الجاية
+    }
+    if (sent) await loadAll(false);
+  } finally { _draining = false; updatePendingBanner(); }
+}
+async function updatePendingBanner() {
+  const n = (await allPending()).length;
+  let el = $("pendingVoice");
+  if (!n) { el?.remove(); return; }
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "pendingVoice"; el.className = "pending-voice";
+    document.body.appendChild(el);
+    el.addEventListener("click", () => drainPending(true));
+  }
+  el.innerHTML = `📡 <b>${arNum(n)}</b> تسجيل محفوظ — اضغط للإرسال`;
+}
+window.addEventListener("online", () => drainPending());
+
 async function startRecording() {
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
     $("composerResult").innerHTML = `<div class="comp-reply">متصفحك مش بيدعم التسجيل الصوتي — اكتب عن يومك في الخانة فوق وأنا أرتّبه 🙏</div>`;
@@ -579,7 +644,9 @@ async function startRecording() {
     bar.classList.add("hidden");
     mic.classList.remove("hidden");
     if (recCancelled || !recChunks.length) return;
-    await sendVoice(new Blob(recChunks, { type: mediaRecorder.mimeType || "audio/webm" }));
+    const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+    const pendId = await savePending(blob, "/api/voice"); // اتحفظ فورًا — مايضيعش لو حصل أي حاجة
+    await sendVoice(blob, pendId);
   };
   mediaRecorder.start();
   recStartedAt = Date.now();
@@ -610,7 +677,7 @@ function cancelRecording() {
   recCancelled = true;
   stopRecording();
 }
-async function sendVoice(blob) {
+async function sendVoice(blob, pendId) {
   const out = $("composerResult");
   const { comp, mic } = recElems();
   comp.disabled = true; mic.disabled = true;
@@ -622,10 +689,13 @@ async function sendVoice(blob) {
       body: blob,
     });
     const data = await res.json();
+    await removePending(pendId); // اتبعت بنجاح → نشيله من المحفوظ
     renderComposerResult(data, data.transcript);
     if (!data.error) await loadAll(false);
   } catch {
-    out.innerHTML = `<div class="comp-reply">حصل خطأ في معالجة الصوت، جرّب تاني.</div>`;
+    // النت فصل / فشل الرفع — التسجيل محفوظ في IndexedDB وهيتبعت لوحده
+    out.innerHTML = `<div class="comp-reply">📡 النت فصل — تسجيلك <b>محفوظ</b> وهيتبعت لوحده أول ما النت يرجع (أو اضغط شارة «تسجيل محفوظ» تحت).</div>`;
+    updatePendingBanner();
   } finally {
     comp.disabled = false; mic.disabled = false;
   }
@@ -2081,6 +2151,8 @@ async function loadAll(rerender = true) {
 loadAll().then(() => {
   renderJournal();
   loadAskHistory();
+  updatePendingBanner();   // لو فيه تسجيل محفوظ من مرة فاتت
+  drainPending();          // وابعته لو النت موجود
   if (state.me && !localStorage.getItem("dawenli_tour_v1")) setTimeout(startTour, 800);
 });
 

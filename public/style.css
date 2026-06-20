@@ -1771,3 +1771,23 @@ select.field { cursor: pointer; }
 @media (max-width: 760px) {
   .notif-panel { top: 8px; inset-inline-end: 8px; inset-inline-start: 8px; width: auto; }
 }
+
+/* ===== شارة التسجيلات المحفوظة (لو النت فصل) ===== */
+.pending-voice {
+  position: fixed;
+  inset-inline-start: 16px;
+  bottom: calc(150px + env(safe-area-inset-bottom));
+  z-index: 72;
+  background: var(--finances-deep, #b06a1f);
+  color: #fff;
+  font: 700 var(--text-sm, 13px)/1 var(--font-body, sans-serif);
+  padding: 10px 14px;
+  border-radius: var(--radius-pill, 999px);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  -webkit-tap-highlight-color: transparent;
+  animation: tourFade .25s ease;
+}
+.pending-voice b { font-size: 1.05em; }
+@media (max-width: 760px) { .pending-voice { bottom: calc(146px + env(safe-area-inset-bottom)); } }
