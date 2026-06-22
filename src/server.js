@@ -46,6 +46,7 @@ import {
   reopenTask,
   deleteTask,
   aiUsageSummary,
+  userUsageCost,
   listProfileFacts,
   upsertProfileFact,
   deleteProfileFact,
@@ -473,6 +474,12 @@ export function startServer() {
       isOwner: !!user.is_owner,
       today: localToday(),
     });
+  });
+  // تكلفة المستخدم على الذكاء الاصطناعي — يظهر له في الرئيسية
+  app.get("/api/my-usage", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(userUsageCost(user.id));
   });
 
   /* ===== إشعارات PWA (Web Push) ===== */

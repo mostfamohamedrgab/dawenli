@@ -834,6 +834,12 @@ function renderOverview() {
   $("heroSub").textContent = streak > 0 ? "هذه حياتك مرتّبة — حتى الآن." : "ابدأ بخطوة صغيرة — احكِ لي عن يومك.";
   $("todayChip").textContent = `🗓 ${fmtDate(TODAY())}`;
   $("streakChip").textContent = `🔥 ${arNum(streak)} ${streak === 1 ? "يوم" : "أيام"}`;
+  const mu = state.myUsage;
+  if (mu && $("costChip")) {
+    $("costChip").style.display = "";
+    $("costChip").textContent = `💸 $${Number(mu.total || 0).toFixed(2)}`;
+    $("costChip").title = `إجمالي تكلفتك على الذكاء الاصطناعي · الشهر ده: $${Number(mu.month || 0).toFixed(2)}`;
+  }
   renderProfile();
 
   // كروت العوالم بأرقام حقيقية
@@ -1285,6 +1291,7 @@ async function updateGoal(id) {
 window.updateGoal = updateGoal;
 
 async function openGoalDetail(id) {
+  closeGoalDetail(); // امنع تكرار الموديل فوق بعضه (كان بيغطّي على الزراير)
   const goal = state.goals.find((g) => g.id === id);
   if (!goal) return;
   let log = [];
@@ -2198,7 +2205,7 @@ $("logoutBtn").addEventListener("click", logout);
 
 async function loadAll(rerender = true) {
   try {
-    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files, budget, th] = await Promise.all([
+    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files, budget, th, mu] = await Promise.all([
       api("/api/me").then((r) => r.json()),
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
@@ -2216,13 +2223,14 @@ async function loadAll(rerender = true) {
       api("/api/files").then((r) => r.json()),
       api("/api/finance-budget").then((r) => r.json()),
       api("/api/thoughts").then((r) => r.json()),
+      api("/api/my-usage").then((r) => r.json()),
     ]);
     state.me = me;
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
     state.conditions = cond; state.meals = m; state.habits = hab; state.finance = fin;
     state.tasks = tasks; state.categories = cats; state.profile = prof;
     state.ideas = idea; state.problems = prob; state.files = files; state.finBudget = budget;
-    state.thoughts = th;
+    state.thoughts = th; state.myUsage = mu;
   } catch { return; }
 
   const first = (state.me?.name || "د").trim()[0] || "د";

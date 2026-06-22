@@ -1149,6 +1149,14 @@ const usageByKindStmt = db.prepare(`
          COALESCE(SUM(audio_seconds), 0) AS audio_seconds
   FROM ai_usage GROUP BY kind, model ORDER BY cost_usd DESC
 `);
+// تكلفة الـ AI لمستخدم واحد (إجمالي + الشهر الحالي) — يظهر له في الرئيسية
+export function userUsageCost(userId) {
+  const monthStart = today().slice(0, 8) + "01";
+  return {
+    total: db.prepare(`SELECT COALESCE(SUM(cost_usd),0) c FROM ai_usage WHERE user_id = ?`).get(userId).c,
+    month: db.prepare(`SELECT COALESCE(SUM(cost_usd),0) c FROM ai_usage WHERE user_id = ? AND usage_date >= ?`).get(userId, monthStart).c,
+  };
+}
 const usageDailyStmt = db.prepare(`
   SELECT usage_date,
          COALESCE(SUM(cost_usd), 0) AS cost_usd,
