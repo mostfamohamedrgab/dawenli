@@ -763,7 +763,7 @@ export function goalLog(userId, goalId, limit = 60) {
   return db
     .prepare(
       `SELECT id, created_at, delta, current_after, note FROM goal_log
-       WHERE user_id = ? AND goal_id = ? ORDER BY id DESC LIMIT ?`
+       WHERE user_id = ? AND goal_id = ? ORDER BY created_at DESC, id DESC LIMIT ?`
     )
     .all(userId, goalId, limit);
 }
