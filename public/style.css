@@ -1809,3 +1809,5 @@ select.field { cursor: pointer; }
 /* زر حذف بند في سجل الهدف */
 .gl-row .gl-del { flex: none; width: 26px; height: 26px; opacity: .5; }
 .gl-row .gl-del:hover { opacity: 1; color: var(--danger-deep, #b52b27); }
+.gl-row .gl-edit { flex: none; width: 26px; height: 26px; opacity: .5; }
+.gl-row .gl-edit:hover { opacity: 1; }

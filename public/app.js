@@ -1294,11 +1294,12 @@ async function openGoalDetail(id) {
   const rows = log.length
     ? log.map((e) => {
         const delta = e.delta == null ? "" : (e.delta >= 0 ? `+${arNum(e.delta)}` : `−${arNum(Math.abs(e.delta))}`);
-        return `<div class="gl-row">
+        return `<div class="gl-row" id="gl-row-${e.id}" data-delta="${e.delta ?? ""}">
           <span class="gl-delta ${e.delta >= 0 ? "pos" : "neg"}">${delta}${delta ? unit : ""}</span>
           <div class="gl-mid"><div class="gl-note">${escapeHtml(e.note || "تحديث")}</div><div class="gl-date">${fmtShort(e.created_at.slice(0, 10))}</div></div>
           <span class="gl-after">الإجمالي ${arNum(e.current_after)}</span>
-          <button class="icon-btn gl-del" onclick="deleteGoalLogEntry(${e.id}, ${id})" title="امسح البند ده">🗑️</button>
+          <button class="icon-btn gl-edit" onclick="editGoalLogEntry(${e.id}, ${id})" title="عدّل البند">✏️</button>
+          <button class="icon-btn gl-del" onclick="deleteGoalLogEntry(${e.id}, ${id})" title="امسح البند">🗑️</button>
         </div>`;
       }).join("")
     : `<div class="muted" style="text-align:center;padding:24px">لا توجد تحديثات على هذا الهدف بعد — بمجرد أن تزيد فيه ستجد السجل هنا.</div>`;
@@ -1326,6 +1327,33 @@ async function deleteGoalLogEntry(logId, goalId) {
 window.openGoalDetail = openGoalDetail;
 window.closeGoalDetail = closeGoalDetail;
 window.deleteGoalLogEntry = deleteGoalLogEntry;
+// تعديل بند في سجل الهدف (التفاصيل + المبلغ) inline
+function editGoalLogEntry(logId, goalId) {
+  const row = document.getElementById(`gl-row-${logId}`);
+  if (!row) return;
+  const delta = row.dataset.delta || "";
+  const note = row.querySelector(".gl-note")?.textContent || "";
+  row.innerHTML = `
+    <input type="number" class="field" id="gle-d-${logId}" style="width:84px" />
+    <input type="text" class="field" id="gle-n-${logId}" placeholder="التفاصيل (مثلاً: من التعاون مع aix)" style="flex:1" />
+    <button class="icon-btn" onclick="saveGoalLogEdit(${logId}, ${goalId})" title="حفظ">✓</button>
+    <button class="icon-btn" onclick="openGoalDetail(${goalId})" title="إلغاء">✕</button>`;
+  document.getElementById(`gle-d-${logId}`).value = delta;
+  document.getElementById(`gle-n-${logId}`).value = note === "تحديث" ? "" : note;
+  document.getElementById(`gle-n-${logId}`).focus();
+}
+async function saveGoalLogEdit(logId, goalId) {
+  const delta = Number(document.getElementById(`gle-d-${logId}`).value);
+  const note = document.getElementById(`gle-n-${logId}`).value.trim();
+  try {
+    await api(`/api/goals/log/${logId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ delta, note }) });
+  } catch { return; }
+  await loadAll(false);
+  closeGoalDetail();
+  openGoalDetail(goalId);
+}
+window.editGoalLogEntry = editGoalLogEntry;
+window.saveGoalLogEdit = saveGoalLogEdit;
 
 $("goalForm").addEventListener("submit", async (e) => {
   e.preventDefault();

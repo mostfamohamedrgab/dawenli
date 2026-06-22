@@ -778,6 +778,25 @@ export function deleteGoalLog(userId, logId) {
   }
   return true;
 }
+// تعديل بند في سجل الهدف: التفاصيل (note) و/أو المبلغ (delta) — وبيعدّل رصيد الهدف بالفرق
+export function updateGoalLog(userId, logId, { delta, note } = {}) {
+  const row = db.prepare(`SELECT goal_id, delta FROM goal_log WHERE id = ? AND user_id = ?`).get(logId, userId);
+  if (!row) return false;
+  const sets = [], vals = [];
+  if (note !== undefined) { sets.push("note = ?"); vals.push(note || null); }
+  if (delta !== undefined && delta !== null && Number(delta) !== Number(row.delta)) {
+    const diff = Number(delta) - Number(row.delta || 0);
+    sets.push("delta = ?"); vals.push(Number(delta));
+    sets.push("current_after = current_after + ?"); vals.push(diff);
+    db.prepare(`UPDATE goals SET current = MAX(0, current + ?), updated_at = ? WHERE id = ? AND user_id = ?`)
+      .run(diff, now(), row.goal_id, userId);
+  }
+  if (sets.length) {
+    vals.push(logId, userId);
+    db.prepare(`UPDATE goal_log SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`).run(...vals);
+  }
+  return true;
+}
 
 /* ===================== Tasks (مهام + تقويم) ===================== */
 
