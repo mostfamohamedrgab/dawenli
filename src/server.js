@@ -331,21 +331,9 @@ export function startServer() {
   });
 
   // حساب جديد بالإيميل
-  app.post("/api/signup", loginLimiter, (req, res) => {
-    const { name, email, password } = req.body || {};
-    const cleanEmail = String(email || "").trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(cleanEmail))
-      return res.status(400).json({ ok: false, error: "اكتب إيميل صحيح" });
-    if (!password || String(password).length < 6)
-      return res.status(400).json({ ok: false, error: "كلمة السر لازم ٦ حروف على الأقل" });
-    const user = createEmailUser({
-      name: String(name || "").trim() || null,
-      email: cleanEmail,
-      passwordHash: hashPassword(password),
-    });
-    if (!user) return res.status(409).json({ ok: false, error: "الإيميل ده متسجّل قبل كده — ادخل عادي" });
-    openSession(res, user.id, true);
-    return res.json({ ok: true });
+  // التسجيل العام مقفول — الحسابات بتتعمل من لوحة الأدمن بس
+  app.post("/api/signup", loginLimiter, (_req, res) => {
+    return res.status(403).json({ ok: false, error: "التسجيل مقفول — تواصل مع الأدمن عشان يفتحلك حساب" });
   });
 
   app.post("/api/logout", (req, res) => {
@@ -440,6 +428,22 @@ export function startServer() {
       usage: aiUsageSummary(30),
       pricing: PRICING,
     });
+  });
+  // إنشاء حساب مستخدم من الأدمن (التسجيل العام مقفول)
+  app.post("/api/admin/users", (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    const { name, email, password } = req.body || {};
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) return res.status(400).json({ error: "اكتب إيميل صحيح" });
+    if (!password || String(password).length < 6) return res.status(400).json({ error: "كلمة السر لازم ٦ حروف على الأقل" });
+    const user = createEmailUser({
+      name: String(name || "").trim() || null,
+      email: cleanEmail,
+      passwordHash: hashPassword(password),
+    });
+    if (!user) return res.status(409).json({ error: "الإيميل ده متسجّل قبل كده" });
+    res.json({ ok: true, user: { id: user.id, email: cleanEmail, name: user.name } });
   });
   // تفاصيل مستخدم واحد (قراءة فقط للمراقبة)
   app.get("/api/admin/users/:id", (req, res) => {

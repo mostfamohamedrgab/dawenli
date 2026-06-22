@@ -175,4 +175,36 @@ $("logoutBtn").addEventListener("click", async () => {
   window.location.href = "/admin/login";
 });
 
+// إنشاء حساب مستخدم جديد (الأدمن بس)
+$("newUserForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const out = $("nuResult");
+  const body = {
+    name: $("nuName").value.trim(),
+    email: $("nuEmail").value.trim(),
+    password: $("nuPass").value,
+  };
+  out.style.color = "var(--ink-muted)"; out.textContent = "ثواني…";
+  try {
+    const res = await api("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      out.style.color = "var(--brand-deep)";
+      out.textContent = `✅ اتعمل حساب: ${data.user.email}`;
+      $("nuName").value = ""; $("nuEmail").value = ""; $("nuPass").value = "";
+      load();
+    } else {
+      out.style.color = "var(--danger-deep, #b52b27)";
+      out.textContent = data.error || "حصل خطأ";
+    }
+  } catch {
+    out.style.color = "var(--danger-deep, #b52b27)";
+    out.textContent = "حصل خطأ، جرّب تاني";
+  }
+});
+
 load();
