@@ -24,6 +24,7 @@ import {
   deleteGoal,
   setGoalCurrent,
   goalLog,
+  deleteGoalLog,
   listConversations,
   deleteConversation,
   listConditions,
@@ -1078,6 +1079,12 @@ export function startServer() {
     const user = gate(req, res);
     if (!user) return;
     res.json(goalLog(user.id, Number(req.params.id)));
+  });
+  // حذف بند من سجل الهدف (بيطرح الدلتا من رصيد الهدف)
+  app.delete("/api/goals/log/:logId", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: deleteGoalLog(user.id, Number(req.params.logId)) });
   });
 
   // معالج أخطاء عام — يرجّع JSON نضيف بدل صفحة HTML أو سوكت معلّق (أخطاء body-parser

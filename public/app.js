@@ -1298,6 +1298,7 @@ async function openGoalDetail(id) {
           <span class="gl-delta ${e.delta >= 0 ? "pos" : "neg"}">${delta}${delta ? unit : ""}</span>
           <div class="gl-mid"><div class="gl-note">${escapeHtml(e.note || "تحديث")}</div><div class="gl-date">${fmtShort(e.created_at.slice(0, 10))}</div></div>
           <span class="gl-after">الإجمالي ${arNum(e.current_after)}</span>
+          <button class="icon-btn gl-del" onclick="deleteGoalLogEntry(${e.id}, ${id})" title="امسح البند ده">🗑️</button>
         </div>`;
       }).join("")
     : `<div class="muted" style="text-align:center;padding:24px">لا توجد تحديثات على هذا الهدف بعد — بمجرد أن تزيد فيه ستجد السجل هنا.</div>`;
@@ -1315,8 +1316,16 @@ async function openGoalDetail(id) {
   ov.addEventListener("click", (e) => { if (e.target === ov) closeGoalDetail(); });
 }
 function closeGoalDetail() { $("goalDetailOv")?.remove(); }
+// حذف بند غلط من سجل الهدف — بيطرح قيمته من رصيد الهدف ويحدّث العرض
+async function deleteGoalLogEntry(logId, goalId) {
+  try { await api(`/api/goals/log/${logId}`, { method: "DELETE" }); } catch { return; }
+  await loadAll(false);
+  closeGoalDetail();
+  openGoalDetail(goalId);
+}
 window.openGoalDetail = openGoalDetail;
 window.closeGoalDetail = closeGoalDetail;
+window.deleteGoalLogEntry = deleteGoalLogEntry;
 
 $("goalForm").addEventListener("submit", async (e) => {
   e.preventDefault();

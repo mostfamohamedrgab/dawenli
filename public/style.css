@@ -1805,3 +1805,7 @@ select.field { cursor: pointer; }
 .thought-card .th-meta { font-size: var(--text-xs); color: var(--ink-faint); margin-top: 8px; }
 .thought-card .th-del { position: absolute; inset-inline-start: 8px; top: 8px; width: 26px; height: 26px; opacity: .55; }
 .thought-card .th-del:hover { opacity: 1; }
+
+/* زر حذف بند في سجل الهدف */
+.gl-row .gl-del { flex: none; width: 26px; height: 26px; opacity: .5; }
+.gl-row .gl-del:hover { opacity: 1; color: var(--danger-deep, #b52b27); }

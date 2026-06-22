@@ -767,6 +767,17 @@ export function goalLog(userId, goalId, limit = 60) {
     )
     .all(userId, goalId, limit);
 }
+// حذف بند من سجل الهدف + تعديل رصيد الهدف بطرح الدلتا بتاعته (لو غلط)
+export function deleteGoalLog(userId, logId) {
+  const row = db.prepare(`SELECT goal_id, delta FROM goal_log WHERE id = ? AND user_id = ?`).get(logId, userId);
+  if (!row) return false;
+  db.prepare(`DELETE FROM goal_log WHERE id = ? AND user_id = ?`).run(logId, userId);
+  if (row.delta != null) {
+    db.prepare(`UPDATE goals SET current = MAX(0, current - ?), updated_at = ? WHERE id = ? AND user_id = ?`)
+      .run(Number(row.delta), now(), row.goal_id, userId);
+  }
+  return true;
+}
 
 /* ===================== Tasks (مهام + تقويم) ===================== */
 
