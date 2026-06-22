@@ -834,11 +834,10 @@ function renderOverview() {
   $("heroSub").textContent = streak > 0 ? "هذه حياتك مرتّبة — حتى الآن." : "ابدأ بخطوة صغيرة — احكِ لي عن يومك.";
   $("todayChip").textContent = `🗓 ${fmtDate(TODAY())}`;
   $("streakChip").textContent = `🔥 ${arNum(streak)} ${streak === 1 ? "يوم" : "أيام"}`;
-  const mu = state.myUsage;
-  if (mu && $("costChip")) {
-    $("costChip").style.display = "";
-    $("costChip").textContent = `💸 $${Number(mu.total || 0).toFixed(2)}`;
-    $("costChip").title = `إجمالي تكلفتك على الذكاء الاصطناعي · الشهر ده: $${Number(mu.month || 0).toFixed(2)}`;
+  if ($("costChip")) {
+    const mu = state.myUsage || { total: 0, month: 0 };
+    $("costChip").textContent = `💸 كلّفت $${Number(mu.total || 0).toFixed(2)}`;
+    $("costChip").title = `إجمالي استهلاكك على الذكاء الاصطناعي · الشهر ده: $${Number(mu.month || 0).toFixed(2)}`;
   }
   renderProfile();
 
