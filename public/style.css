@@ -626,6 +626,7 @@ a { color: inherit; }
 .more-item .mi-ico { font-size: 26px; }
 .more-item.ideas    { border-color: var(--ideas-tint); }
 .more-item.problems { border-color: var(--problems-tint); }
+.more-sec { grid-column: 1 / -1; font: var(--type-label); color: var(--ink-muted); margin: 4px 2px -2px; }
 
 /* ===================== اسأل دوّنلي (شات سياقي) ===================== */
 .ask-scope { display: flex; gap: 8px; align-items: center; }
