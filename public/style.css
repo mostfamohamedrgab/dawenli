@@ -713,6 +713,40 @@ a { color: inherit; }
 .bb-alert.danger { color: var(--danger-deep); background: var(--health-wash); }
 .bb-alert.warn { color: var(--habits-deep); background: var(--habits-wash); }
 
+/* ===================== الأصول ===================== */
+.assets-total {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  padding: 18px 22px;
+  background: linear-gradient(120deg, var(--finances-wash), var(--surface-card));
+  border: 1.5px solid var(--finances-tint);
+  border-radius: var(--radius-md);
+}
+.at-main { display: flex; flex-direction: column; gap: 2px; }
+.at-label { font: var(--type-label); color: var(--ink-muted); }
+.at-value { font-family: var(--font-display); font-weight: 800; font-size: 28px; color: var(--finances-deep); }
+.at-breakdown { display: flex; gap: 14px; flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-muted); }
+.assets-market { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: var(--text-sm); color: var(--ink-muted); padding: 0 4px; }
+.assets-market b { color: var(--ink); }
+.asset-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.asset-form .field { flex: 1; min-width: 110px; }
+.assets-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.asset-card {
+  background: var(--surface-card); border: 1.5px solid var(--hairline);
+  border-right: 3px solid var(--finances); border-radius: var(--radius-md); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.asset-card.asset-gold { border-right-color: var(--coin); }
+.asset-card.asset-other { border-right-color: var(--goals); }
+.asset-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.asset-name { font-weight: 800; }
+.asset-val { font-weight: 900; color: var(--finances-deep); white-space: nowrap; }
+.asset-mid { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.asset-detail { font-size: var(--text-sm); color: var(--ink-muted); overflow-wrap: anywhere; }
+.asset-goal { display: flex; flex-direction: column; gap: 4px; }
+.asset-goal .ag-track { height: 8px; background: var(--paper-deep); border-radius: var(--radius-pill); overflow: hidden; }
+.asset-goal .ag-fill { height: 100%; background: var(--finances); border-radius: var(--radius-pill); }
+.asset-goal span { font-size: var(--text-xs); color: var(--ink-muted); }
+
 .date-chip, .streak-chip {
   display: inline-flex;
   align-items: center;

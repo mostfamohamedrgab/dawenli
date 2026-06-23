@@ -92,6 +92,12 @@ import {
   addAskMessage,
   listAskMessages,
   clearAskMessages,
+  addAsset,
+  listAssets,
+  updateAsset,
+  deleteAsset,
+  getAssetMarket,
+  setAssetMarket,
 } from "./db.js";
 import { pushEnabled, vapidPublicKey, sendPushToUser, notifyUser } from "./push.js";
 import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage, textToSpeech } from "./openai.js";
@@ -1013,6 +1019,70 @@ export function startServer() {
     const { month, budget, goal } = req.body || {};
     const m = /^\d{4}-\d{2}$/.test(String(month || "")) ? month : localToday().slice(0, 7);
     res.json({ ok: true, budget: setFinanceBudget(user.id, m, { budget, goal }) });
+  });
+
+  /* ===== الأصول (دهب / كاش / أصول تانية) + أسعار حيّة ===== */
+  app.get("/api/assets", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ assets: listAssets(user.id), market: getAssetMarket() });
+  });
+  app.post("/api/assets", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const b = req.body || {};
+    if (!b.type) return res.status(400).json({ error: "اختار نوع الأصل" });
+    res.json({ ok: true, asset: addAsset({ userId: user.id, ...b }) });
+  });
+  // مسارات محددة قبل /:id عشان متتلخبطش مع :id
+  app.post("/api/assets/refresh-prices", async (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const prev = getAssetMarket();
+    let rates = {};
+    let goldG24Egp = null;
+    try {
+      const cr = await fetch("https://open.er-api.com/v6/latest/USD", { signal: AbortSignal.timeout(8000) }).then((r) => r.json());
+      const egpPerUsd = cr?.rates?.EGP;
+      if (egpPerUsd) {
+        rates.EGP = 1;
+        rates.USD = egpPerUsd;
+        for (const cur of ["EUR", "SAR", "AED", "GBP", "KWD"]) {
+          if (cr.rates[cur]) rates[cur] = egpPerUsd / cr.rates[cur]; // جنيه لكل وحدة عملة
+        }
+      }
+    } catch (e) { console.error("rates fetch failed:", e?.message); }
+    try {
+      const g = await fetch("https://api.gold-api.com/price/XAU", { signal: AbortSignal.timeout(8000) }).then((r) => r.json());
+      const usdPerOz = g?.price;
+      const usdEgp = rates.USD || prev.rates?.USD;
+      if (usdPerOz && usdEgp) goldG24Egp = (usdPerOz / 31.1035) * usdEgp; // جرام عيار ٢٤ بالجنيه
+    } catch (e) { console.error("gold fetch failed:", e?.message); }
+    const market = setAssetMarket({
+      goldG24Egp: goldG24Egp ?? prev.goldG24Egp,
+      rates: Object.keys(rates).length ? { ...prev.rates, ...rates } : prev.rates,
+    });
+    res.json(market);
+  });
+  app.put("/api/assets/market", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const prev = getAssetMarket();
+    const { goldG24Egp, rates } = req.body || {};
+    res.json(setAssetMarket({
+      goldG24Egp: goldG24Egp != null && goldG24Egp !== "" ? Number(goldG24Egp) : prev.goldG24Egp,
+      rates: { ...prev.rates, ...(rates || {}) },
+    }));
+  });
+  app.put("/api/assets/:id", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: updateAsset(user.id, Number(req.params.id), req.body || {}) });
+  });
+  app.delete("/api/assets/:id", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: deleteAsset(user.id, Number(req.params.id)) });
   });
   app.post("/api/finance", (req, res) => {
     const user = gate(req, res);

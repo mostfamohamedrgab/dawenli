@@ -13,6 +13,8 @@ const state = {
   ideas: [],
   problems: [],
   files: [],
+  assets: [],
+  market: { goldG24Egp: null, rates: {}, updatedAt: null },
   profile: [],
   categories: [],
   finFilter: { dir: "all", cat: "all", q: "", limit: 40 },
@@ -179,6 +181,15 @@ const EDIT_CONFIGS = {
     { key: "kind", label: "النوع", type: "select", options: [["do", "أعملها 🔁"], ["quit", "أبطّلها 🚭"]] },
     { key: "emoji", label: "إيموجي", type: "text" },
   ] },
+  assets: { title: "تعديل أصل", source: () => state.assets, fields: [
+    { key: "name", label: "الاسم/الوصف", type: "text" },
+    { key: "quantity", label: "الكمية (جرام دهب / مبلغ كاش)", type: "number" },
+    { key: "karat", label: "العيار (للدهب)", type: "number" },
+    { key: "currency", label: "العملة (للكاش)", type: "text" },
+    { key: "manual_value", label: "القيمة بالجنيه (للأصل العادي)", type: "number" },
+    { key: "goal", label: "هدف القيمة", type: "number" },
+    { key: "note", label: "ملاحظة", type: "text" },
+  ] },
 };
 let editState = null;
 function openEdit(type, id) {
@@ -241,6 +252,8 @@ function gotoTab(tab) {
   if (tab === "goals") renderGoalsPage();
   if (tab === "finances") renderFinancesPage();
   if (tab === "ideas") renderIdeasPage();
+  if (tab === "tasks") renderTasksPage();
+  if (tab === "assets") renderAssetsPage();
   if (tab === "problems") renderProblemsPage();
   if (tab === "ask") renderAskPage();
   if (tab === "files") renderFilesPage();
@@ -1785,8 +1798,132 @@ const IDEA_STATUS = {
 };
 function renderIdeasPage() {
   renderIdeas();
+}
+function renderTasksPage() {
   renderCalendar();
 }
+
+/* ===================== الأصول (دهب / كاش / أصول تانية) ===================== */
+const ASSET_ICON = { gold: "🪙", cash: "💵", other: "🏷️" };
+// قيمة الأصل بالجنيه حسب أسعار السوق
+function assetValueEgp(a, market) {
+  const rates = (market && market.rates) || {};
+  if (a.type === "gold") {
+    const g24 = market && market.goldG24Egp;
+    if (!g24 || !a.quantity) return null;
+    return a.quantity * g24 * ((a.karat || 24) / 24);
+  }
+  if (a.type === "cash") {
+    const amt = a.quantity || 0;
+    const cur = a.currency || "EGP";
+    if (cur === "EGP") return amt;
+    const rate = rates[cur];
+    return rate ? amt * rate : null;
+  }
+  return a.manual_value != null ? a.manual_value : null;
+}
+async function renderAssetsPage() {
+  try {
+    const d = await api("/api/assets").then((r) => r.json());
+    state.assets = d.assets || [];
+    state.market = d.market || state.market;
+  } catch {}
+  renderAssets();
+}
+function renderAssets() {
+  const market = state.market || {};
+  const mEl = $("assetsMarket");
+  if (mEl) {
+    const gold = market.goldG24Egp ? `${arNum(Math.round(market.goldG24Egp))} ج/جرام (ع٢٤)` : "—";
+    const usd = market.rates && market.rates.USD ? `${arNum(Number(market.rates.USD).toFixed(2))} ج/دولار` : "—";
+    const when = market.updatedAt ? fmtNotifTime(market.updatedAt) : "لسه ماتحدّثش";
+    mEl.innerHTML = `<span>🪙 الدهب: <b>${gold}</b></span><span>💵 الدولار: <b>${usd}</b></span><span class="muted">آخر تحديث: ${when}</span>`;
+  }
+  const withVal = (state.assets || []).map((a) => ({ ...a, _val: assetValueEgp(a, market) }));
+  const sumType = (t) => withVal.filter((a) => a.type === t).reduce((s, a) => s + (a._val || 0), 0);
+  const total = withVal.reduce((s, a) => s + (a._val || 0), 0);
+  const tEl = $("assetsTotal");
+  if (tEl) {
+    tEl.innerHTML = `
+      <div class="at-main"><span class="at-label">صافي ثروتك التقريبي</span><span class="at-value">${arNum(Math.round(total))} ${MONEY}</span></div>
+      <div class="at-breakdown">
+        <span>🪙 دهب: ${arNum(Math.round(sumType("gold")))}</span>
+        <span>💵 كاش: ${arNum(Math.round(sumType("cash")))}</span>
+        <span>🏷️ أصول: ${arNum(Math.round(sumType("other")))}</span>
+      </div>`;
+  }
+  const el = $("assetsList");
+  if (!el) return;
+  if (!withVal.length) {
+    el.innerHTML = emptyState("مفيش أصول بعد", "ضيف دهب/كاش/أصل من فوق، ودوّنلي يحسبلك قيمتها وإجمالي ثروتك.");
+    return;
+  }
+  el.innerHTML = withVal.map((a) => {
+    const detail = a.type === "gold" ? `${arNum(a.quantity)} جرام · عيار ${arNum(a.karat || 24)}`
+      : a.type === "cash" ? `${arNum(a.quantity)} ${a.currency || "جنيه"}`
+      : "أصل";
+    const valStr = a._val != null ? `${arNum(Math.round(a._val))} ${MONEY}` : `<span class="muted">محتاج سعر — حدّث الأسعار</span>`;
+    let goalBar = "";
+    if (a.goal && a._val != null) {
+      const pct = Math.min(100, Math.round((a._val / a.goal) * 100));
+      const left = Math.max(0, a.goal - a._val);
+      goalBar = `<div class="asset-goal"><div class="ag-track"><div class="ag-fill" style="width:${pct}%"></div></div><span>${arNum(pct)}٪ من هدف ${arNum(a.goal)} · ناقص ${arNum(Math.round(left))}</span></div>`;
+    }
+    return `<div class="asset-card asset-${a.type}">
+      <div class="asset-top">
+        <span class="asset-name">${ASSET_ICON[a.type]} ${escapeHtml(a.name || (a.type === "gold" ? "دهب" : a.type === "cash" ? "كاش" : "أصل"))}</span>
+        <span class="asset-val">${valStr}</span>
+      </div>
+      <div class="asset-mid">
+        <span class="asset-detail">${detail}${a.note ? " · " + escapeHtml(a.note) : ""}</span>
+        <span class="row-actions"><button class="icon-btn" onclick="openEdit('assets', ${a.id})" title="تعديل">✏️</button><button class="icon-btn" onclick="del('assets', ${a.id})" title="حذف">🗑️</button></span>
+      </div>
+      ${goalBar}
+    </div>`;
+  }).join("");
+}
+function updateAssetFields() {
+  const t = $("assetType")?.value || "gold";
+  const show = (id, on) => { const e = $(id); if (e) e.style.display = on ? "" : "none"; };
+  show("assetQty", t === "gold" || t === "cash");
+  show("assetKarat", t === "gold");
+  show("assetCurrency", t === "cash");
+  show("assetValue", t === "other");
+  if ($("assetQty")) $("assetQty").placeholder = t === "gold" ? "الكمية بالجرام" : "المبلغ";
+  if ($("assetFormHint")) $("assetFormHint").textContent =
+    t === "gold" ? "دوّنلي يحسب القيمة من سعر جرام الدهب × العيار."
+    : t === "cash" ? "لو عملة غير الجنيه، يحوّلها بسعر اليوم."
+    : "اكتب قيمة الأصل بالجنيه (زي العربية).";
+}
+$("assetType")?.addEventListener("change", updateAssetFields);
+$("assetForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const type = $("assetType").value;
+  const body = {
+    type,
+    name: $("assetName").value.trim(),
+    quantity: $("assetQty").value,
+    karat: $("assetKarat").value,
+    currency: $("assetCurrency").value,
+    manualValue: $("assetValue").value,
+    goal: $("assetGoal").value,
+  };
+  try { await api("/api/assets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); } catch {}
+  e.target.reset();
+  updateAssetFields();
+  await renderAssetsPage();
+});
+$("assetsRefresh")?.addEventListener("click", async () => {
+  const btn = $("assetsRefresh");
+  if (btn) { btn.disabled = true; btn.textContent = "بيحدّث…"; }
+  try {
+    const m = await api("/api/assets/refresh-prices", { method: "POST" }).then((r) => r.json());
+    if (m && !m.error) state.market = m;
+    renderAssets();
+  } catch {}
+  if (btn) { btn.disabled = false; btn.textContent = "🔄 حدّث الأسعار"; }
+});
+updateAssetFields();
 function renderIdeas() {
   const el = $("ideasList");
   if (!el) return;
@@ -2247,6 +2384,8 @@ async function loadAll(rerender = true) {
   if (active === "goals") renderGoalsPage();
   if (active === "finances") renderFinancesPage();
   if (active === "ideas") renderIdeasPage();
+  if (active === "tasks") renderTasksPage();
+  if (active === "assets") renderAssetsPage();
   if (active === "problems") renderProblemsPage();
   if (active === "files") renderFilesPage();
   if (active === "thoughts") renderThoughts();

@@ -43,6 +43,10 @@
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></span>
             <span>الفلوس</span>
           </button>
+          <button class="nav-btn finances" data-tab="assets">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 4 6 5 1-3.5 4 1 6L12 17l-5.5 2 1-6L4 9l5-1z"/></svg></span>
+            <span>الأصول</span>
+          </button>
 
           <div class="nav-group">دفترك</div>
           <button class="nav-btn" data-tab="thoughts">
@@ -56,6 +60,10 @@
           <button class="nav-btn ideas" data-tab="ideas">
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1h6c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2Z"/></svg></span>
             <span>الأفكار والخطط</span>
+          </button>
+          <button class="nav-btn goals" data-tab="tasks">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 9h18M9 15l2 2 4-4"/></svg></span>
+            <span>المهام والتقويم</span>
           </button>
           <button class="nav-btn problems" data-tab="problems">
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3.5a1.5 1.5 0 1 1 3 0H14v3.5a1.5 1.5 0 1 1 0 3V17H10.5a1.5 1.5 0 1 0-3 0H4v-3.5a1.5 1.5 0 1 1 0-3Z"/></svg></span>
@@ -426,9 +434,18 @@
               </form>
               <p class="muted" style="font-size:var(--text-sm);margin:10px 0 0">أو قل لدوّنلي «عندي فكرة…» وسيحطها هنا. وحوّل أي فكرة لمهمة بمعاد ✓</p>
             </div>
-            <div id="ideasList" class="ideas-grid" style="margin-bottom:26px"></div>
+            <div id="ideasList" class="ideas-grid"></div>
+            <p class="muted center" style="margin-top:16px;font-size:var(--text-sm)">المهام والتقويم بقوا في صفحة مستقلة 👈 «المهام والتقويم».</p>
+          </section>
 
-            <h2 class="section-title">التقويم والمهام</h2>
+          <!-- ========== المهام والتقويم (صفحة مستقلة) ========== -->
+          <section class="tab-panel hidden" data-panel="tasks">
+            <div class="page-head">
+              <div>
+                <span class="world-pill goals">دفترك</span>
+                <h1>المهام والتقويم</h1>
+              </div>
+            </div>
             <div class="grid-2-equal">
               <div class="card">
                 <div class="card-head">
@@ -455,6 +472,47 @@
               </div>
             </div>
             <p class="muted center" style="margin-top:18px;font-size:var(--text-sm)">قل لدوّنلي «عندي اجتماع غدًا الساعة ٥» وستجدها هنا، وسيذكّرك في موعدها ⏰</p>
+          </section>
+
+          <!-- ========== الأصول (دهب / كاش / أصول تانية) ========== -->
+          <section class="tab-panel hidden" data-panel="assets">
+            <div class="page-head">
+              <div>
+                <span class="world-pill finances">صافي ثروتك</span>
+                <h1>الأصول</h1>
+              </div>
+              <button id="assetsRefresh" class="btn finances sm" title="جيب أسعار الدهب والعملات النهاردة">🔄 حدّث الأسعار</button>
+            </div>
+
+            <div id="assetsTotal" class="assets-total"></div>
+            <div id="assetsMarket" class="assets-market"></div>
+
+            <div class="card sketch" style="margin:18px 0">
+              <div class="card-head"><h3>ضيف أصل</h3></div>
+              <form id="assetForm" class="asset-form">
+                <select id="assetType" class="field">
+                  <option value="gold">🪙 دهب</option>
+                  <option value="cash">💵 كاش / عملة</option>
+                  <option value="other">🏷️ أصل تاني</option>
+                </select>
+                <input id="assetName" class="field" placeholder="اسم/وصف (اختياري)" />
+                <input id="assetQty" class="field" type="number" step="any" placeholder="الكمية بالجرام" />
+                <select id="assetKarat" class="field">
+                  <option value="24">عيار ٢٤</option><option value="22">عيار ٢٢</option>
+                  <option value="21" selected>عيار ٢١</option><option value="18">عيار ١٨</option><option value="14">عيار ١٤</option>
+                </select>
+                <select id="assetCurrency" class="field">
+                  <option value="EGP">جنيه</option><option value="USD">دولار $</option><option value="EUR">يورو €</option>
+                  <option value="SAR">ريال</option><option value="AED">درهم</option><option value="GBP">إسترليني £</option>
+                </select>
+                <input id="assetValue" class="field" type="number" step="any" placeholder="القيمة بالجنيه" />
+                <input id="assetGoal" class="field" type="number" step="any" placeholder="هدف القيمة (اختياري)" />
+                <button type="submit" class="btn finances sm">＋ إضافة</button>
+              </form>
+              <div id="assetFormHint" class="muted" style="font-size:var(--text-sm);margin-top:8px"></div>
+            </div>
+
+            <div id="assetsList" class="assets-list"></div>
           </section>
 
           <!-- ========== المحادثات ========== -->
@@ -647,6 +705,8 @@
         <button class="more-item" data-tab="thoughts"><span class="mi-ico">💭</span><span>خواطر</span></button>
         <button class="more-item" data-tab="journal"><span class="mi-ico">📓</span><span>اليوميات</span></button>
         <button class="more-item ideas" data-tab="ideas"><span class="mi-ico">💡</span><span>الأفكار والخطط</span></button>
+        <button class="more-item" data-tab="tasks"><span class="mi-ico">📅</span><span>المهام والتقويم</span></button>
+        <button class="more-item" data-tab="assets"><span class="mi-ico">💎</span><span>الأصول</span></button>
         <button class="more-item problems" data-tab="problems"><span class="mi-ico">🧩</span><span>المشاكل والهموم</span></button>
         <button class="more-item" data-tab="ask"><span class="mi-ico">💬</span><span>اسأل دوّنلي</span></button>
         <button class="more-item" data-tab="files"><span class="mi-ico">📎</span><span>مركز الملفات</span></button>

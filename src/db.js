@@ -278,6 +278,30 @@ db.exec(`
     content     TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_ask_user ON ask_messages(user_id, id);
+
+  -- الأصول: دهب (بالجرام والعيار) + كاش (بعملة) + أصول تانية (قيمة يدوية). لكل أصل هدف اختياري.
+  CREATE TABLE IF NOT EXISTS assets (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    user_id      INTEGER NOT NULL,
+    type         TEXT NOT NULL,   -- gold | cash | other
+    name         TEXT,
+    quantity     REAL,            -- جرام (دهب) | مبلغ (كاش) | 1 (أصل عادي)
+    karat        INTEGER,         -- عيار الدهب (24/21/18/14)
+    currency     TEXT,            -- عملة الكاش (EGP/USD/EUR/SAR/AED/GBP)
+    manual_value REAL,            -- قيمة يدوية بالجنيه (للأصل العادي)
+    goal         REAL,            -- هدف القيمة بالجنيه (اختياري)
+    note         TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_assets_user ON assets(user_id, id);
+
+  -- أسعار السوق (صف واحد): سعر جرام الدهب عيار ٢٤ + أسعار العملات بالجنيه — JSON.
+  CREATE TABLE IF NOT EXISTS asset_market (
+    id          INTEGER PRIMARY KEY CHECK (id = 1),
+    data        TEXT,
+    updated_at  TEXT
+  );
 `);
 
 /* ===================== Migrations ===================== */
@@ -1453,6 +1477,66 @@ export function listAskMessages(userId, limit = 200) {
 }
 export function clearAskMessages(userId) {
   return db.prepare(`DELETE FROM ask_messages WHERE user_id = ?`).run(userId).changes;
+}
+
+/* ===================== الأصول (دهب / كاش / أصول تانية) ===================== */
+
+export const ASSET_TYPES = ["gold", "cash", "other"];
+
+const insertAssetStmt = db.prepare(`
+  INSERT INTO assets (created_at, updated_at, user_id, type, name, quantity, karat, currency, manual_value, goal, note)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+export function addAsset({ userId, type, name, quantity, karat, currency, manualValue, goal, note }) {
+  const t = ASSET_TYPES.includes(type) ? type : "other";
+  const info = insertAssetStmt.run(
+    now(), now(), userId, t, name || null,
+    quantity == null || quantity === "" ? null : Number(quantity),
+    karat == null || karat === "" ? null : Number(karat),
+    currency || null,
+    manualValue == null || manualValue === "" ? null : Number(manualValue),
+    goal == null || goal === "" ? null : Number(goal),
+    note || null
+  );
+  return db.prepare(`SELECT * FROM assets WHERE id = ?`).get(Number(info.lastInsertRowid));
+}
+export function listAssets(userId) {
+  return db.prepare(`SELECT * FROM assets WHERE user_id = ? ORDER BY type, id DESC`).all(userId);
+}
+export function updateAsset(userId, id, patch) {
+  const p = { ...patch, updated_at: now() };
+  for (const k of ["quantity", "karat", "manual_value", "goal"]) {
+    if (p[k] !== undefined) p[k] = p[k] === "" || p[k] == null ? null : Number(p[k]);
+  }
+  const cols = ["type", "name", "quantity", "karat", "currency", "manual_value", "goal", "note", "updated_at"];
+  const sets = [], vals = [];
+  for (const c of cols) if (p[c] !== undefined) { sets.push(`${c} = ?`); vals.push(p[c]); }
+  if (!sets.length) return false;
+  vals.push(Number(userId), Number(id));
+  return db.prepare(`UPDATE assets SET ${sets.join(", ")} WHERE user_id = ? AND id = ?`).run(...vals).changes > 0;
+}
+export function deleteAsset(userId, id) {
+  return db.prepare(`DELETE FROM assets WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+}
+
+/* أسعار السوق (دهب/جرام عيار ٢٤ + أسعار العملات) — صف واحد مشترك */
+export function getAssetMarket() {
+  const row = db.prepare(`SELECT data, updated_at FROM asset_market WHERE id = 1`).get();
+  if (!row) return { goldG24Egp: null, rates: {}, updatedAt: null };
+  try {
+    const d = JSON.parse(row.data || "{}");
+    return { goldG24Egp: d.goldG24Egp ?? null, rates: d.rates || {}, updatedAt: row.updated_at };
+  } catch {
+    return { goldG24Egp: null, rates: {}, updatedAt: row.updated_at };
+  }
+}
+export function setAssetMarket({ goldG24Egp, rates }) {
+  const data = JSON.stringify({ goldG24Egp: goldG24Egp ?? null, rates: rates || {} });
+  db.prepare(`
+    INSERT INTO asset_market (id, data, updated_at) VALUES (1, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
+  `).run(data, now());
+  return getAssetMarket();
 }
 
 /* ===================== تعديل عام لأي صف (مرونة التعديل) ===================== */
