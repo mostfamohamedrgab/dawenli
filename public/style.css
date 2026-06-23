@@ -1903,6 +1903,16 @@ select.field { cursor: pointer; }
   animation: tourFade .25s ease;
 }
 .pending-voice b { font-size: 1.05em; }
+.pending-voice.pv-busy { cursor: default; opacity: .92; }
+.pending-voice .spinner { width: 15px; height: 15px; border-width: 2px; border-color: rgba(255,255,255,.45); border-top-color: #fff; }
+.pending-voice .pv-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; margin-inline-start: 4px;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(255,255,255,.22); color: #fff; font-size: 13px; line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+.pending-voice .pv-x:hover { background: rgba(255,255,255,.34); }
 @media (max-width: 760px) { .pending-voice { bottom: calc(146px + env(safe-area-inset-bottom)); } }
 
 /* ===== خواطر / عصف ذهني ===== */

@@ -719,30 +719,62 @@ let _draining = false;
 async function drainPending(manual = false) {
   if (_draining || (!navigator.onLine && !manual)) return;
   _draining = true;
-  let sent = 0;
+  if (manual) await setPendingBanner("sending"); // مؤشر فوري إن في حاجة بتحصل
+  let sent = 0, failed = false;
   try {
     for (const it of await allPending()) {
       try {
-        const res = await api(it.endpoint || "/api/voice", { method: "POST", headers: { "Content-Type": it.type }, body: it.blob });
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 60000); // متعلقش للأبد
+        const res = await api(it.endpoint || "/api/voice", { method: "POST", headers: { "Content-Type": it.type }, body: it.blob, signal: ctrl.signal });
+        clearTimeout(t);
         const data = await res.json().catch(() => ({}));
         if (!data.error) { await removePending(it.id); sent++; }
-        else break;
-      } catch { break; } // النت لسه واقع — نسيبهم للمرة الجاية
+        else { failed = true; break; }
+      } catch { failed = true; break; } // النت واقع أو الطلب فشل — نسيبهم للمرة الجاية
     }
-    if (sent) await loadAll(false);
-  } finally { _draining = false; updatePendingBanner(); }
+    if (sent) { await setPendingBanner("sent"); await loadAll(false); }
+  } finally {
+    _draining = false;
+    if (manual && failed && (await allPending()).length) await setPendingBanner("error");
+    else if (!sent) await updatePendingBanner();
+  }
 }
-async function updatePendingBanner() {
-  const n = (await allPending()).length;
+function _pendingEl() {
   let el = $("pendingVoice");
-  if (!n) { el?.remove(); return; }
   if (!el) {
     el = document.createElement("div");
     el.id = "pendingVoice"; el.className = "pending-voice";
     document.body.appendChild(el);
-    el.addEventListener("click", () => drainPending(true));
+    el.addEventListener("click", (e) => {
+      if (el.classList.contains("pv-busy")) return;       // بيتبعت دلوقتي — استنى
+      if (e.target.closest(".pv-x")) { discardPending(); return; }
+      drainPending(true);
+    });
   }
-  el.innerHTML = `📡 <b>${arNum(n)}</b> تسجيل محفوظ — اضغط للإرسال`;
+  return el;
+}
+async function setPendingBanner(state = "idle") {
+  const n = (await allPending()).length;
+  if (!n && state !== "sent") { $("pendingVoice")?.remove(); return; }
+  const el = _pendingEl();
+  el.classList.toggle("pv-busy", state === "sending");
+  if (state === "sending") {
+    el.innerHTML = `<span class="spinner"></span> بيتبعت…`;
+  } else if (state === "sent") {
+    el.innerHTML = `✅ اتبعت`;
+    setTimeout(() => updatePendingBanner(), 1400); // يختفي بعد ما يطمّنك
+  } else if (state === "error") {
+    el.innerHTML = `⚠️ فشل الإرسال — دوس تجرّب تاني <button class="pv-x" title="احذف التسجيل">✕</button>`;
+  } else {
+    el.innerHTML = `📡 <b>${arNum(n)}</b> تسجيل محفوظ — اضغط للإرسال <button class="pv-x" title="احذف">✕</button>`;
+  }
+}
+async function updatePendingBanner() { return setPendingBanner("idle"); }
+async function discardPending() {
+  if (!confirm("تحذف التسجيل المحفوظ؟ مش هينفع ترجّعه تاني.")) return;
+  for (const it of await allPending()) await removePending(it.id);
+  await updatePendingBanner();
 }
 window.addEventListener("online", () => drainPending());
 
