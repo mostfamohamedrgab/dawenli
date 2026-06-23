@@ -109,6 +109,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
 const uploadsDir = join(__dirname, "..", "data", "uploads"); // ملفات المستخدمين المرفوعة
 
+// نحفظ الصوت الخام فور وصوله — لو التفريغ فشل ميضيعش (نقدر نسترجعه من data/uploads/<user>/voice)
+function persistAudio(userId, prefix, ext, buf) {
+  try {
+    const dir = join(uploadsDir, String(userId), "voice");
+    mkdirSync(dir, { recursive: true });
+    const p = join(dir, `${prefix}-${Date.now()}.${ext}`);
+    writeFileSync(p, buf);
+    return p;
+  } catch (e) { console.error("persistAudio error:", e); return null; }
+}
+function cleanupAudio(p) { if (p) { try { unlinkSync(p); } catch {} } }
+
 /* ===================== الجلسات ===================== */
 
 const SESSION_TTL = 30 * 86400 * 1000;
@@ -879,14 +891,16 @@ export function startServer() {
       const buf = req.body;
       if (!buf || !buf.length) return res.status(400).json({ error: "مفيش صوت" });
       const ext = (req.headers["content-type"] || "").includes("ogg") ? "ogg" : "webm";
+      const audioPath = persistAudio(user.id, "voice", ext, buf); // احفظ فورًا قبل أي معالجة
       try {
         const transcript = await transcribe(buf, `voice.${ext}`, user.id);
-        if (!transcript) return res.status(422).json({ error: "مقدرتش أفهم الصوت، جرّب تاني" });
+        if (!transcript) return res.status(422).json({ error: "مقدرتش أفهم الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
         const { reply, receipts } = await runAgent({ user, text: transcript, kind: "voice" });
+        cleanupAudio(audioPath); // نجح كله → الخام مبقاش محتاج
         res.json({ transcript, reply, receipts });
       } catch (err) {
-        console.error("dashboard voice error:", err);
-        res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني" });
+        console.error("dashboard voice error:", err, "| الصوت محفوظ في:", audioPath);
+        res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
       }
     }
   );
@@ -919,14 +933,16 @@ export function startServer() {
       const buf = req.body;
       if (!buf || !buf.length) return res.status(400).json({ error: "مفيش صوت" });
       const ext = (req.headers["content-type"] || "").includes("ogg") ? "ogg" : "webm";
+      const audioPath = persistAudio(user.id, "thought", ext, buf); // احفظ فورًا قبل أي معالجة
       try {
         const transcript = await transcribe(buf, `thought.${ext}`, user.id);
-        if (!transcript) return res.status(422).json({ error: "مقدرتش أفهم الصوت، جرّب تاني" });
+        if (!transcript) return res.status(422).json({ error: "مقدرتش أفهم الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
         const thought = addThought(user.id, transcript, "voice");
+        cleanupAudio(audioPath); // نجح → الخام مبقاش محتاج
         res.json({ transcript, thought });
       } catch (err) {
-        console.error("thought voice error:", err);
-        res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني" });
+        console.error("thought voice error:", err, "| الصوت محفوظ في:", audioPath);
+        res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
       }
     }
   );
