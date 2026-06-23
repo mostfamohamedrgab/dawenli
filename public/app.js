@@ -242,6 +242,11 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("edit
 
 /* ===================== Navigation ===================== */
 function gotoTab(tab) {
+  // الأقسام الأربعة بقت جوّه هَب «دفترك» — أي تنقّل ليها يفتح الهَب على نفس القسم
+  if (["journal", "thoughts", "ideas", "problems"].includes(tab)) {
+    dafterSub = tab; try { localStorage.setItem("dw_dafter_sub", tab); } catch {}
+    tab = "dafter";
+  }
   try { localStorage.setItem("dw_tab", tab); } catch {} // نفضل واقفين في نفس الصفحة بعد الـ reload
   document.querySelectorAll(".nav-btn[data-tab], .tabbar-btn[data-tab]").forEach((b) => b.dataset.active = String(b.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== tab));
@@ -260,6 +265,8 @@ function gotoTab(tab) {
   if (tab === "ask") renderAskPage();
   if (tab === "files") renderFilesPage();
   if (tab === "thoughts") renderThoughts();
+  if (tab === "dafter") openDafter();
+  if (tab === "aicost") renderAiCostPage();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 $("sideNav").addEventListener("click", (e) => {
@@ -271,6 +278,75 @@ $("tabBar")?.addEventListener("click", (e) => {
   if (btn) gotoTab(btn.dataset.tab);
 });
 document.querySelectorAll("[data-go]").forEach((c) => c.addEventListener("click", () => gotoTab(c.dataset.go)));
+
+/* ===================== هَب «دفترك» (يوميات/خواطر/أفكار/مشاكل في صفحة واحدة) ===================== */
+const DAFTER_SUBS = ["journal", "thoughts", "ideas", "problems"];
+let dafterSub = (() => { try { return localStorage.getItem("dw_dafter_sub") || "journal"; } catch { return "journal"; } })();
+let dafterInit = false;
+function dafterStashAll() {
+  const stash = $("dafterStash"); if (!stash) return;
+  DAFTER_SUBS.forEach((s) => {
+    const sec = document.querySelector(`section[data-panel="${s}"]`);
+    // نشيل كلاس tab-panel عشان منطق إخفاء التابات العام ميتحكمش فيها — بنتحكم احنا
+    if (sec) { sec.classList.remove("tab-panel"); stash.appendChild(sec); }
+  });
+}
+function showDafterSub(sub) {
+  if (!DAFTER_SUBS.includes(sub)) sub = "journal";
+  dafterSub = sub;
+  try { localStorage.setItem("dw_dafter_sub", sub); } catch {}
+  document.querySelectorAll("#dafterSeg .seg-btn").forEach((b) => b.dataset.active = String(b.dataset.sub === sub));
+  const mount = $("dafterMount"), stash = $("dafterStash");
+  DAFTER_SUBS.forEach((s) => {
+    const sec = document.querySelector(`section[data-panel="${s}"]`);
+    if (!sec) return;
+    if (s === sub) { sec.classList.remove("hidden"); mount.appendChild(sec); }
+    else { sec.classList.add("hidden"); stash.appendChild(sec); }
+  });
+  if (sub === "journal") renderJournal?.();
+  else if (sub === "thoughts") renderThoughts();
+  else if (sub === "ideas") renderIdeasPage();
+  else if (sub === "problems") renderProblemsPage();
+}
+function openDafter() {
+  if (!dafterInit) { dafterStashAll(); dafterInit = true; }
+  showDafterSub(dafterSub);
+}
+$("dafterSeg")?.addEventListener("click", (e) => {
+  const b = e.target.closest(".seg-btn"); if (b) { showDafterSub(b.dataset.sub); window.scrollTo({ top: 0, behavior: "smooth" }); }
+});
+
+/* ===================== تفاصيل تكلفة الـ AI (صفحة المستخدم) ===================== */
+const AICOST_LABEL = {
+  agent: "🧠 ترتيب وتنظيم اليوميات", ask: "💬 الأسئلة والمكالمات الصوتية",
+  transcribe: "🎙️ تفريغ الصوت لنص", analyze: "📊 تحليلات الفترات",
+  report: "📄 التقارير", classify: "🗂️ تصنيف الملفات المرفوعة",
+  doctor: "🩺 الملخص الطبي", reflect: "🪞 تأملات وملاحظات", other: "حاجات تانية",
+};
+async function renderAiCostPage() {
+  const totalEl = $("aicostTotal"), listEl = $("aicostList"), noteEl = $("aicostNote");
+  if (listEl) listEl.innerHTML = `<div class="muted">بحمّل التكلفة…</div>`;
+  let d;
+  try { d = await api("/api/my-usage/details").then((r) => r.json()); }
+  catch { if (listEl) listEl.innerHTML = `<div class="muted">معرفتش أجيب التكلفة، جرّب تاني.</div>`; return; }
+  const usd = Number(d.totals?.cost_usd || 0), month = Number(d.month?.cost_usd || 0);
+  const rate = Number(d.usdEgp) || 50;
+  const egp = (u) => arNum(Math.round(u * rate));
+  const dollars = (u) => "$" + Number(u).toFixed(u >= 1 ? 2 : 3);
+  if (totalEl) totalEl.innerHTML = `
+    <div class="at-main"><span class="at-label">إجمالي استهلاكك على الـ AI</span><span class="at-value">${dollars(usd)} <span style="font-size:15px;color:var(--ink-muted);font-weight:600">≈ ${egp(usd)} ${MONEY}</span></span></div>
+    <div class="at-sub-main"><span class="at-label">الشهر ده</span><span class="at-value2">${dollars(month)} ≈ ${egp(month)} ${MONEY}</span></div>
+    <div class="at-breakdown"><span>${arNum(d.totals?.calls || 0)} نداء</span><span>🎙️ ${arNum(Math.round((d.totals?.audio_seconds || 0) / 60))} دقيقة صوت</span><span class="muted">من ${d.totals?.since || "—"}</span></div>`;
+  const rows = (d.byKind || []).filter((r) => (r.cost_usd > 0) || (r.calls > 0));
+  if (listEl) listEl.innerHTML = rows.length ? rows.map((r) => {
+    const label = AICOST_LABEL[r.kind] || r.kind;
+    const sub = r.kind === "transcribe" ? `${arNum(Math.round((r.audio_seconds || 0) / 60))} دقيقة · ${arNum(r.calls)} مرة` : `${arNum(r.calls)} نداء`;
+    return `<div class="aicost-row"><div class="ac-left"><b>${label}</b><span class="muted">${sub}</span></div><div class="ac-right"><b>${dollars(Number(r.cost_usd))}</b><span class="muted">${egp(r.cost_usd)} ${MONEY}</span></div></div>`;
+  }).join("") : `<div class="muted">لسه مفيش استهلاك متسجّل.</div>`;
+  if (noteEl) noteEl.textContent = `الأسعار تقريبية حسب أسعار OpenAI، والتحويل للجنيه بسعر دولار ${arNum(rate.toFixed(2))}. المكالمة الصوتية بتستخدم موديل أوفر (gpt-4o-mini) والتعرّف على صوتك والرد بيحصلوا في المتصفح ببلاش.`;
+}
+$("costChip")?.addEventListener("click", () => gotoTab("aicost"));
+document.querySelector("[data-refresh-aicost]")?.addEventListener("click", renderAiCostPage);
 
 // زرار المايك العائم يختفي وقت ما يفتح أي شيت/قائمة عشان ميركبش فوق المحتوى
 function syncFab() {
@@ -2428,7 +2504,8 @@ async function handleCallTurn(text) {
   const date = $("askScope")?.value === "day" ? ($("askDate")?.value || null) : null;
   let reply = "";
   try {
-    const payload = { messages: askMessages.filter((m) => !m.pending).map((m) => ({ role: m.role, content: m.content })), scope, date };
+    // fast:true → السيرفر بيرد بموديل أسرع (gpt-4o-mini) وردّ مختصر مناسب للمكالمة
+    const payload = { messages: askMessages.filter((m) => !m.pending).map((m) => ({ role: m.role, content: m.content })).slice(-12), scope, date, fast: true };
     const res = await api("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const data = await res.json();
     reply = data.reply || data.error || "مقدرتش أرد، قول تاني؟";

@@ -171,16 +171,19 @@ export async function doctorReport(condition, healthItems = [], userId) {
 
 const ASK_PROMPT = `انت "دوّنلي" — رفيق بيعرف بيانات المستخدم. هتلاقي في السياق بيانات المستخدم في النطاق اللي اختاره — ممكن تكون تدويناته كلها، أو يوم معيّن، أو محور بعينه (فلوس، صحة، نفسية، أهداف، عادات، مهام، أكل، أفكار، مشاكل). جاوب على أسئلته أو اتأمّل معاه بالعامي المصري البسيط **بناءً على البيانات اللي في السياق بس**. متخترعش حاجة مش موجودة — لو السؤال عن حاجة مش في البيانات قول بصراحة إنها مش مذكورة في النطاق ده. خليك ودود ومختصر، وافتكر كلام المحادثة اللي فات (السياق مستمر).`;
 
-export async function chatAboutJournal({ messages, contextText, userId }) {
+export async function chatAboutJournal({ messages, contextText, userId, fast = false }) {
+  // المكالمة الصوتية بتستخدم gpt-4o-mini عشان الرد يطلع أسرع (latency أقل) وأرخص
+  const model = fast ? "gpt-4o-mini" : config.analysisModel;
   const res = await client.chat.completions.create({
-    model: config.analysisModel,
+    model,
     messages: [
       { role: "system", content: ASK_PROMPT },
+      ...(fast ? [{ role: "system", content: "ده وضع مكالمة صوتية — خلّي ردّك مختصر وطبيعي زي الكلام، جملتين تلاتة بالكتير، من غير قوايم أو رموز." }] : []),
       { role: "system", content: `# تدوينات المستخدم (السياق المتاح)\n${contextText || "(مفيش تدوينات في النطاق المختار)"}` },
       ...messages,
     ],
   });
-  logChatUsage("ask", config.analysisModel, res, userId);
+  logChatUsage("ask", model, res, userId);
   return (res.choices?.[0]?.message?.content || "معرفتش أرد على ده، جرّب تاني.").trim();
 }
 

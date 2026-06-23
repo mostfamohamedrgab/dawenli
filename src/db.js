@@ -1208,6 +1208,29 @@ export function aiUsageSummary(days = 30) {
   };
 }
 
+// تفاصيل تكلفة الـ AI لمستخدم واحد (للعرض في حسابه — مش admin)
+export function userUsageDetails(userId) {
+  const monthStart = today().slice(0, 8) + "01";
+  const totals = db.prepare(`
+    SELECT COUNT(*) calls,
+           COALESCE(SUM(input_tokens),0) input_tokens,
+           COALESCE(SUM(output_tokens),0) output_tokens,
+           COALESCE(SUM(audio_seconds),0) audio_seconds,
+           COALESCE(SUM(cost_usd),0) cost_usd,
+           MIN(usage_date) since
+    FROM ai_usage WHERE user_id = ?`).get(userId);
+  const month = db.prepare(`SELECT COALESCE(SUM(cost_usd),0) cost_usd, COUNT(*) calls FROM ai_usage WHERE user_id = ? AND usage_date >= ?`).get(userId, monthStart);
+  const byKind = db.prepare(`
+    SELECT kind,
+           COUNT(*) calls,
+           COALESCE(SUM(input_tokens),0) input_tokens,
+           COALESCE(SUM(output_tokens),0) output_tokens,
+           COALESCE(SUM(audio_seconds),0) audio_seconds,
+           COALESCE(SUM(cost_usd),0) cost_usd
+    FROM ai_usage WHERE user_id = ? GROUP BY kind ORDER BY cost_usd DESC`).all(userId);
+  return { totals, month, byKind };
+}
+
 /* ===================== Web Push subscriptions ===================== */
 
 const upsertPushStmt = db.prepare(`

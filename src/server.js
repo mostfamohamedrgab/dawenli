@@ -47,6 +47,7 @@ import {
   deleteTask,
   aiUsageSummary,
   userUsageCost,
+  userUsageDetails,
   listProfileFacts,
   upsertProfileFact,
   deleteProfileFact,
@@ -487,6 +488,12 @@ export function startServer() {
     if (!user) return;
     res.json(userUsageCost(user.id));
   });
+  // تفاصيل تكلفة الـ AI للمستخدم نفسه (مقسّمة بالنوع)
+  app.get("/api/my-usage/details", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ...userUsageDetails(user.id), pricing: PRICING, usdEgp: getAssetMarket()?.rates?.USD || null });
+  });
 
   /* ===== إشعارات PWA (Web Push) ===== */
   // مفتاح VAPID العام — العميل بيستخدمه عشان يعمل subscribe
@@ -673,7 +680,7 @@ export function startServer() {
   app.post("/api/ask", async (req, res) => {
     const user = gate(req, res);
     if (!user) return;
-    const { messages, scope, date, from, to } = req.body || {};
+    const { messages, scope, date, from, to, fast } = req.body || {};
     if (!Array.isArray(messages)) return res.status(400).json({ error: "اكتب رسالة" });
     // ناخد آخر ٢٠ رسالة بس (user/assistant) للحفاظ على التوكنز — الـ context مستمر
     const clean = messages
@@ -686,7 +693,7 @@ export function startServer() {
       return res.status(400).json({ error: "اختار تاريخ صحيح الأول" });
     const contextText = buildAskContext(user.id, scope, date, from, to);
     try {
-      const reply = await chatAboutJournal({ messages: clean, contextText, userId: user.id });
+      const reply = await chatAboutJournal({ messages: clean, contextText, userId: user.id, fast: !!fast });
       // نحفظ الرسالة الجديدة + الرد عشان المحادثة تفضل موجودة بعد الريلود
       const lastUser = [...clean].reverse().find((m) => m.role === "user");
       if (lastUser) addAskMessage(user.id, "user", lastUser.content);

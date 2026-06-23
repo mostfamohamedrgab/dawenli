@@ -628,6 +628,24 @@ a { color: inherit; }
 .more-item.problems { border-color: var(--problems-tint); }
 .more-sec { grid-column: 1 / -1; font: var(--type-label); color: var(--ink-muted); margin: 4px 2px -2px; }
 
+/* شريط مقسّم (هَب دفترك) */
+.seg-bar { display: flex; gap: 6px; background: var(--paper-deep, var(--surface-2, var(--surface-card))); padding: 5px; border-radius: 14px; margin-bottom: 18px; overflow-x: auto; border: 1px solid var(--hairline); }
+.seg-btn { flex: 1; white-space: nowrap; border: none; background: transparent; cursor: pointer; padding: 10px 12px; border-radius: 10px; font: 700 var(--text-sm)/1 var(--font-body); color: var(--ink-muted); transition: background .15s ease, color .15s ease; }
+.seg-btn[data-active="true"] { background: var(--surface-card); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.seg-btn:active { transform: scale(.97); }
+/* الأقسام جوّه الهَب: نشيل أي مسافة علوية زيادة */
+#dafterMount > section { display: block; }
+#dafterMount > section .page-head { margin-top: 0; }
+
+/* صفحة تفاصيل تكلفة الـ AI */
+.aicost-list { display: flex; flex-direction: column; gap: 8px; }
+.aicost-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; background: var(--surface-card); border: 1.5px solid var(--hairline); border-radius: var(--radius-md); }
+.ac-left { display: flex; flex-direction: column; gap: 2px; }
+.ac-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
+.ac-right b { color: var(--finances-deep); }
+#costChip { cursor: pointer; }
+#costChip:hover { filter: brightness(.96); }
+
 /* ===================== اسأل دوّنلي (شات سياقي) ===================== */
 .ask-scope { display: flex; gap: 8px; align-items: center; }
 .ask-thread {

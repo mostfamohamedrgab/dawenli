@@ -51,21 +51,9 @@
           </button>
 
           <div class="nav-group">دفترك (من وقت للتاني)</div>
-          <button class="nav-btn" data-tab="thoughts">
-            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A4.5 4.5 0 0 0 5 6.5c0 .6.1 1.1.3 1.6A3.5 3.5 0 0 0 6 15a3.5 3.5 0 0 0 6 .9A3.5 3.5 0 0 0 18 15a3.5 3.5 0 0 0 .7-6.9c.2-.5.3-1 .3-1.6A4.5 4.5 0 0 0 14.5 2a4 4 0 0 0-2.5.9A4 4 0 0 0 9.5 2Z"/><path d="M12 16v5"/></svg></span>
-            <span>خواطر</span>
-          </button>
-          <button class="nav-btn" data-tab="journal">
-            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c3-2 7-2 10 0v13c-3-2-7-2-10 0Z"/><path d="M12 6c3-2 7-2 10 0v13c-3-2-7-2-10 0"/></svg></span>
-            <span>اليوميات</span>
-          </button>
-          <button class="nav-btn ideas" data-tab="ideas">
-            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1h6c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2Z"/></svg></span>
-            <span>الأفكار والخطط</span>
-          </button>
-          <button class="nav-btn problems" data-tab="problems">
-            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3.5a1.5 1.5 0 1 1 3 0H14v3.5a1.5 1.5 0 1 1 0 3V17H10.5a1.5 1.5 0 1 0-3 0H4v-3.5a1.5 1.5 0 1 1 0-3Z"/></svg></span>
-            <span>المشاكل</span>
+          <button class="nav-btn" data-tab="dafter">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22.5Z"/><path d="M8 7h8M8 11h6"/></svg></span>
+            <span>دفترك <span class="muted" style="font-weight:500;font-size:11px">يوميات · خواطر · أفكار · مشاكل</span></span>
           </button>
           <button class="nav-btn finances" data-tab="assets">
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 4 6 5 1-3.5 4 1 6L12 17l-5.5 2 1-6L4 9l5-1z"/></svg></span>
@@ -398,6 +386,33 @@
                 </div>
               </div>
             </div>
+          </section>
+
+          <!-- ========== دفترك (هَب موحّد: يوميات/خواطر/أفكار/مشاكل) ========== -->
+          <section class="tab-panel hidden" data-panel="dafter">
+            <div class="page-head">
+              <div><span class="world-pill">دفترك</span><h1>دفترك</h1></div>
+            </div>
+            <div class="seg-bar" id="dafterSeg">
+              <button class="seg-btn" data-sub="journal">📓 اليوميات</button>
+              <button class="seg-btn" data-sub="thoughts">💭 خواطر</button>
+              <button class="seg-btn" data-sub="ideas">💡 أفكار وخطط</button>
+              <button class="seg-btn" data-sub="problems">🧩 مشاكل</button>
+            </div>
+            <div id="dafterMount"></div>
+            <div id="dafterStash" hidden></div>
+          </section>
+
+          <!-- ========== تفاصيل تكلفة الـ AI ========== -->
+          <section class="tab-panel hidden" data-panel="aicost">
+            <div class="page-head">
+              <div><span class="world-pill finances">💸 تكلفتك</span><h1>تفاصيل تكلفة الذكاء الاصطناعي</h1></div>
+              <button class="btn ghost sm" data-refresh-aicost type="button">🔄 تحديث</button>
+            </div>
+            <p class="muted" style="margin:0 0 14px">ده استهلاكك الفعلي على الـ AI — ترتيب اليوميات، تفريغ الصوت، الأسئلة والمكالمات، والتحليلات.</p>
+            <div id="aicostTotal" class="assets-total"></div>
+            <div id="aicostList" class="aicost-list" style="margin-top:16px"></div>
+            <p class="muted" id="aicostNote" style="font-size:var(--text-xs);margin-top:14px;line-height:1.9"></p>
           </section>
 
           <!-- ========== اليوميات ========== -->
@@ -747,15 +762,13 @@
       </div>
       <div class="more-grid">
         <div class="more-sec">دفترك</div>
-        <button class="more-item" data-tab="thoughts"><span class="mi-ico">💭</span><span>خواطر</span></button>
-        <button class="more-item" data-tab="journal"><span class="mi-ico">📓</span><span>اليوميات</span></button>
-        <button class="more-item ideas" data-tab="ideas"><span class="mi-ico">💡</span><span>الأفكار والخطط</span></button>
-        <button class="more-item problems" data-tab="problems"><span class="mi-ico">🧩</span><span>المشاكل والهموم</span></button>
+        <button class="more-item" data-tab="dafter"><span class="mi-ico">📔</span><span>دفترك (يوميات/خواطر/أفكار/مشاكل)</span></button>
         <button class="more-item" data-tab="assets"><span class="mi-ico">💎</span><span>الأصول</span></button>
         <div class="more-sec">أدوات</div>
         <button class="more-item" data-tab="ask"><span class="mi-ico">💬</span><span>اسأل دوّنلي</span></button>
         <button class="more-item" data-tab="files"><span class="mi-ico">📎</span><span>مركز الملفات</span></button>
         <button class="more-item" data-tab="chats"><span class="mi-ico">🗨️</span><span>المحادثات</span></button>
+        <button class="more-item" data-tab="aicost"><span class="mi-ico">💸</span><span>تكلفة الـ AI</span></button>
       </div>
     </div>
 
