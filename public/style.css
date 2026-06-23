@@ -1639,8 +1639,20 @@ select.field { cursor: pointer; }
 .chat-sheet-body { padding: 16px 18px 20px; overflow-y: auto; }
 .chat-sheet-body .composer { margin: 0 !important; }
 
+/* زرار «أدوات» الطاير — فوق زرار المايك، بلون مميّز عشان يتفرق عنه */
+.tools-fab {
+  bottom: 98px; /* فوق الـ voice-fab (24 + 60 + 14) */
+  background: var(--ink); color: var(--paper);
+  box-shadow: 0 10px 26px rgba(40,36,32,.4), var(--shadow-md);
+}
+.tools-fab::after { border-color: var(--ink); }
+/* الـ widget بياخد نفس شكل شيت الشات + ارتفاع مريح للمحادثة */
+.tools-sheet .ask-thread { min-height: 30vh; max-height: 52vh; }
+.tools-sheet #askBox { display: flex; flex-direction: column; }
+
 @media (max-width: 760px) {
   .voice-fab { bottom: calc(82px + env(safe-area-inset-bottom)); inset-inline-start: 16px; width: 56px; height: 56px; }
+  .tools-fab { bottom: calc(82px + 56px + 12px + env(safe-area-inset-bottom)); }
 }
 
 /* ===========================================================================

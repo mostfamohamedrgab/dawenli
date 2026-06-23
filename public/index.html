@@ -559,6 +559,9 @@
                 <span class="world-pill">دفترك</span>
                 <h1>اسأل دوّنلي</h1>
               </div>
+            </div>
+            <!-- المحتوى ده بيتنقل للـ widget العائم لما تفتحه -->
+            <div id="askBox">
               <div class="ask-scope">
                 <select id="askScope" class="field">
                   <option value="all">كل التدوينات</option>
@@ -576,14 +579,14 @@
                 <input type="date" id="askDate" class="field hidden" />
                 <button type="button" id="askClear" class="btn ghost sm" title="امسح المحادثة وابدأ جديدة">🗑️ جديدة</button>
               </div>
+              <p class="muted" style="margin:0 0 14px">اسأل أو اتأمّل يومياتك مع دوّنلي — بيرد من تدويناتك بس، وبيفتكر سياق الكلام.</p>
+              <div id="askThread" class="ask-thread"></div>
+              <form id="askForm" class="ask-input">
+                <input id="askInput" class="field grow" placeholder="اسأل دوّنلي… أو كلّمه بصوتك 🎙️" autocomplete="off" required />
+                <button type="button" class="btn secondary sm" id="askMic" title="اسأل بصوتك">🎙️</button>
+                <button type="submit" class="btn sm" id="askSend">إرسال</button>
+              </form>
             </div>
-            <p class="muted" style="margin:0 0 14px">اسأل أو اتأمّل يومياتك مع دوّنلي — بيرد من تدويناتك بس، وبيفتكر سياق الكلام.</p>
-            <div id="askThread" class="ask-thread"></div>
-            <form id="askForm" class="ask-input">
-              <input id="askInput" class="field grow" placeholder="اسأل دوّنلي… أو كلّمه بصوتك 🎙️" autocomplete="off" required />
-              <button type="button" class="btn secondary sm" id="askMic" title="اسأل بصوتك">🎙️</button>
-              <button type="submit" class="btn sm" id="askSend">إرسال</button>
-            </form>
           </section>
 
           <!-- ========== مركز الملفات (رفع + تصنيف) ========== -->
@@ -693,6 +696,23 @@
         <span class="chat-sub">اكتب أو سجّل صوتك وأنا أرتّبها لك — واسألني في أي وقت 🙂</span>
       </div>
       <div id="chatSheetBody" class="chat-sheet-body"><!-- الكومبوزر بيتنقل هنا --></div>
+    </div>
+
+    <!-- ===================== زرار «أدوات» العائم + شيت اسأل دوّنلي ===================== -->
+    <button class="voice-fab tools-fab" id="toolsFab" aria-label="اسأل دوّنلي">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.4c-1.4 0-2.8-.3-4-1L3 20.5l1.6-5A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg>
+    </button>
+    <div id="toolsScrim" class="chat-scrim"></div>
+    <div id="toolsSheet" class="chat-sheet tools-sheet" role="dialog" aria-modal="true" aria-label="اسأل دوّنلي">
+      <div class="chat-sheet-head">
+        <span class="chat-grip"></span>
+        <div class="chat-head-row">
+          <b>💬 اسأل دوّنلي</b>
+          <button id="toolsClose" class="icon-btn" aria-label="إغلاق">✕</button>
+        </div>
+        <span class="chat-sub">كلّمه بصوتك أو اكتب — بيشوف كل بياناتك (أو حدّد محور)، وبيرد عليك صوت 🎙️</span>
+      </div>
+      <div id="toolsSheetBody" class="chat-sheet-body"><!-- #askBox بيتنقل هنا --></div>
     </div>
 
     <!-- ===================== شيت «أقسام أكتر» (للموبايل) ===================== -->

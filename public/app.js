@@ -276,8 +276,10 @@ function syncFab() {
     $("sidebar")?.classList.contains("open") ||
     $("notifPanel")?.classList.contains("open") ||
     $("chatSheet")?.classList.contains("open") ||
+    $("toolsSheet")?.classList.contains("open") ||
     $("moreSheet")?.classList.contains("open");
   $("voiceFab")?.classList.toggle("hidden", !!hide);
+  $("toolsFab")?.classList.toggle("hidden", !!hide);
 }
 function openSidebar() { $("sidebar").classList.add("open"); $("sideScrim").classList.add("show"); syncFab(); }
 function closeSidebar() { $("sidebar").classList.remove("open"); $("sideScrim").classList.remove("show"); syncFab(); }
@@ -315,6 +317,35 @@ function closeChat() {
 $("voiceFab")?.addEventListener("click", openChat);
 $("chatClose")?.addEventListener("click", closeChat);
 $("chatScrim")?.addEventListener("click", closeChat);
+
+/* ===================== زرار «أدوات» العائم → اسأل دوّنلي طاير ===================== */
+// بننقل نفس صندوق «اسأل دوّنلي» (#askBox) للشيت العائم وبنرجّعه مكانه عند الإغلاق،
+// عشان نفس المحادثة والـ listeners تفضل شغّالة من أي مكان في الموقع.
+const askBoxEl = $("askBox");
+const askBoxParent = askBoxEl?.parentNode || null;
+const askBoxNext = askBoxEl?.nextSibling || null;
+function returnAskBoxHome() {
+  if (askBoxEl && askBoxParent && askBoxEl.parentNode !== askBoxParent) {
+    askBoxParent.insertBefore(askBoxEl, askBoxNext);
+  }
+}
+function openTools() {
+  if (askBoxEl) $("toolsSheetBody").appendChild(askBoxEl);
+  $("toolsSheet")?.classList.add("open");
+  $("toolsScrim")?.classList.add("show");
+  renderAskThread();
+  syncFab();
+  setTimeout(() => $("askInput")?.focus(), 280);
+}
+function closeTools() {
+  $("toolsSheet")?.classList.remove("open");
+  $("toolsScrim")?.classList.remove("show");
+  syncFab();
+  setTimeout(returnAskBoxHome, 320); // رجّع الصندوق مكانه بعد الأنيميشن
+}
+$("toolsFab")?.addEventListener("click", openTools);
+$("toolsClose")?.addEventListener("click", closeTools);
+$("toolsScrim")?.addEventListener("click", closeTools);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("chatSheet")?.classList.contains("open")) closeChat(); });
 
 /* ===================== جولة تعريفية لأول مرة ===================== */
@@ -2101,6 +2132,7 @@ function renderAskThread() {
   el.scrollTop = el.scrollHeight;
 }
 function renderAskPage() {
+  returnAskBoxHome(); // لو الصندوق كان مفتوح في الـ widget الطاير، رجّعه للصفحة
   $("askDate") && $("askDate").classList.toggle("hidden", $("askScope")?.value !== "day");
   renderAskThread();
 }
