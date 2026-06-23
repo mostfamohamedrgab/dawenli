@@ -247,7 +247,9 @@ function gotoTab(tab) {
     dafterSub = tab; try { localStorage.setItem("dw_dafter_sub", tab); } catch {}
     tab = "dafter";
   }
-  try { localStorage.setItem("dw_tab", tab); } catch {} // نفضل واقفين في نفس الصفحة بعد الـ reload
+  // نثبّت الصفحة الحالية في الـ hash + localStorage عشان الريلود يفضّل واقف فيها
+  try { localStorage.setItem("dw_tab", tab); } catch {}
+  try { if ((location.hash || "").replace(/^#/, "") !== tab) history.replaceState(null, "", "#" + tab); } catch {}
   document.querySelectorAll(".nav-btn[data-tab], .tabbar-btn[data-tab]").forEach((b) => b.dataset.active = String(b.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== tab));
   const panel = document.querySelector(`.tab-panel[data-panel="${tab}"]`);
@@ -1931,14 +1933,15 @@ function assetValueEgp(a, market) {
     if (!a.quantity) return null;
     return a.quantity * g24 * ((a.karat || 24) / 24);
   }
-  if (a.type === "cash") {
+  if (a.type === "cash" || a.type === "liability") {
+    // الكاش والالتزام: مبلغ بعملة (بنحوّله للجنيه بسعر اليوم — بيتحدّث مع تحديث الأسعار)
     const amt = a.quantity || 0;
     const cur = a.currency || "EGP";
     if (cur === "EGP") return amt;
     const rate = rates[cur];
     return rate ? amt * rate : null;
   }
-  // other / liability → قيمة يدوية
+  // other → قيمة يدوية بالجنيه
   return a.manual_value != null ? a.manual_value : null;
 }
 async function renderAssetsPage() {
@@ -1985,9 +1988,11 @@ function renderAssets() {
   const g24 = market.goldG24Egp;
   el.innerHTML = withVal.map((a) => {
     const isLiab = a.type === "liability";
+    const curName = (c) => ({ EGP: "جنيه", USD: "دولار", EUR: "يورو", SAR: "ريال", AED: "درهم", GBP: "إسترليني" }[c] || c || "جنيه");
     const detail = a.type === "gold" ? `إجمالي ${arNum(a.quantity || 0)} جرام`
-      : a.type === "cash" ? `${arNum(a.quantity || 0)} ${a.currency || "جنيه"}`
-      : isLiab ? "التزام عليك" : "أصل";
+      : a.type === "cash" ? `${arNum(a.quantity || 0)} ${curName(a.currency)}`
+      : isLiab ? `${arNum(a.quantity || 0)} ${curName(a.currency)} متبقّي عليك`
+      : "أصل";
     const valStr = a._val != null ? `${isLiab ? "−" : ""}${arNum(Math.round(a._val))} ${MONEY}` : `<span class="muted">محتاج سعر — حدّث الأسعار</span>`;
     // قايمة بنود الدهب (كل قطعة: عدد + قيمة تقريبية)
     let itemsList = "";
@@ -2045,18 +2050,18 @@ function collectGoldItems() {
 function updateAssetFields() {
   const t = $("assetType")?.value || "gold";
   const show = (id, on) => { $(id)?.classList.toggle("hidden", !on); };
-  show("assetGoldBox", t === "gold");   // تفصيل القطع للدهب بس
-  show("assetQty", t === "cash");        // مبلغ الكاش
-  show("assetKarat", false);             // العيار بقى لكل قطعة جوّه البنود
-  show("assetCurrency", t === "cash");
-  show("assetValue", t === "other" || t === "liability");
-  if ($("assetQty")) $("assetQty").placeholder = "المبلغ";
-  if ($("assetValue")) $("assetValue").placeholder = t === "liability" ? "المبلغ المتبقّي عليك بالجنيه" : "القيمة بالجنيه";
+  show("assetGoldBox", t === "gold");                 // تفصيل القطع للدهب بس
+  show("assetQty", t === "cash" || t === "liability"); // مبلغ الكاش/الالتزام
+  show("assetKarat", false);                           // العيار بقى لكل قطعة جوّه البنود
+  show("assetCurrency", t === "cash" || t === "liability"); // العملة للكاش والالتزام
+  show("assetValue", t === "other");                   // القيمة اليدوية للأصل التاني بس
+  if ($("assetQty")) $("assetQty").placeholder = t === "liability" ? "المبلغ المتبقّي عليك" : "المبلغ";
+  if ($("assetValue")) $("assetValue").placeholder = "القيمة بالجنيه";
   if (t === "gold" && $("assetGoldItems") && !$("assetGoldItems").children.length) setGoldItems(null);
   if ($("assetFormHint")) $("assetFormHint").textContent =
     t === "gold" ? "ضيف كل قطعة دهب لوحدها (جرام/عيار/عدد) ودوّنلي يحسب قيمتها من سعر اليوم."
     : t === "cash" ? "لو عملة غير الجنيه، يحوّلها بسعر اليوم."
-    : t === "liability" ? "التزام عليك (قسط/دين) — بيتخصم من صافي ثروتك."
+    : t === "liability" ? "التزام عليك (قسط/دين) بالجنيه أو الدولار — بيتحوّل بسعر اليوم وبيتخصم من صافي ثروتك."
     : "اكتب قيمة الأصل بالجنيه (زي العربية).";
 }
 function resetAssetForm() {
@@ -2712,9 +2717,12 @@ loadAll().then(() => {
   loadAskHistory();
   updatePendingBanner();   // لو فيه تسجيل محفوظ من مرة فاتت
   drainPending();          // وابعته لو النت موجود
-  // رجّع آخر صفحة كان واقف فيها قبل الـ reload (بدل ما يرجع للرئيسية)
+  // رجّع آخر صفحة كان واقف فيها قبل الـ reload (الـ hash الأول لأنه أضمن، وإلا localStorage)
   try {
-    const saved = localStorage.getItem("dw_tab");
+    const fromHash = (location.hash || "").replace(/^#/, "");
+    let saved = fromHash || localStorage.getItem("dw_tab");
+    // أي قسم اتدمج جوّه «دفترك» نفتح الهَب عليه
+    if (["journal", "thoughts", "ideas", "problems"].includes(saved)) saved = "dafter";
     if (saved && saved !== "overview" && document.querySelector(`.tab-panel[data-panel="${saved}"]`)) {
       gotoTab(saved);
     }
