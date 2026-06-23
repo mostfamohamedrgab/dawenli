@@ -193,6 +193,7 @@ const EDIT_CONFIGS = {
 };
 let editState = null;
 function openEdit(type, id) {
+  if (type === "assets") { window.openEditAsset?.(id); return; } // الأصول ليها فورم خاص بيخفي الحقول حسب النوع
   const cfg = EDIT_CONFIGS[type];
   if (!cfg) return;
   const item = (cfg.source() || []).find((x) => x.id === id);
@@ -241,6 +242,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("edit
 
 /* ===================== Navigation ===================== */
 function gotoTab(tab) {
+  try { localStorage.setItem("dw_tab", tab); } catch {} // نفضل واقفين في نفس الصفحة بعد الـ reload
   document.querySelectorAll(".nav-btn[data-tab], .tabbar-btn[data-tab]").forEach((b) => b.dataset.active = String(b.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== tab));
   const panel = document.querySelector(`.tab-panel[data-panel="${tab}"]`);
@@ -1835,13 +1837,22 @@ function renderTasksPage() {
 }
 
 /* ===================== الأصول (دهب / كاش / أصول تانية) ===================== */
-const ASSET_ICON = { gold: "🪙", cash: "💵", other: "🏷️" };
+const ASSET_ICON = { gold: "🪙", cash: "💵", other: "🏷️", liability: "📉" };
+const KARATS = [24, 22, 21, 18, 14];
+// قيمة قطعة دهب (جرام × عدد × سعر الجرام × العيار) بالجنيه
+function goldItemEgp(it, g24) {
+  if (!g24) return null;
+  return (Number(it.g) || 0) * (Number(it.n) || 0) * g24 * ((Number(it.k) || 24) / 24);
+}
 // قيمة الأصل بالجنيه حسب أسعار السوق
 function assetValueEgp(a, market) {
   const rates = (market && market.rates) || {};
   if (a.type === "gold") {
     const g24 = market && market.goldG24Egp;
-    if (!g24 || !a.quantity) return null;
+    if (!g24) return null;
+    if (Array.isArray(a.items) && a.items.length)
+      return a.items.reduce((s, it) => s + (goldItemEgp(it, g24) || 0), 0);
+    if (!a.quantity) return null;
     return a.quantity * g24 * ((a.karat || 24) / 24);
   }
   if (a.type === "cash") {
@@ -1851,6 +1862,7 @@ function assetValueEgp(a, market) {
     const rate = rates[cur];
     return rate ? amt * rate : null;
   }
+  // other / liability → قيمة يدوية
   return a.manual_value != null ? a.manual_value : null;
 }
 async function renderAssetsPage() {
@@ -1872,8 +1884,10 @@ function renderAssets() {
   }
   const withVal = (state.assets || []).map((a) => ({ ...a, _val: assetValueEgp(a, market) }));
   const sumType = (t) => withVal.filter((a) => a.type === t).reduce((s, a) => s + (a._val || 0), 0);
-  const total = withVal.reduce((s, a) => s + (a._val || 0), 0);
-  const liquid = sumType("gold") + sumType("cash"); // صافي الثروة من غير الأصول التانية (سائلة)
+  const liabilities = sumType("liability");
+  const assetsSum = sumType("gold") + sumType("cash") + sumType("other");
+  const total = assetsSum - liabilities;            // صافي الثروة (بعد خصم الالتزامات)
+  const liquid = sumType("gold") + sumType("cash"); // من غير الأصول التانية (سائل)
   const tEl = $("assetsTotal");
   if (tEl) {
     tEl.innerHTML = `
@@ -1883,69 +1897,149 @@ function renderAssets() {
         <span>🪙 دهب: ${arNum(Math.round(sumType("gold")))}</span>
         <span>💵 كاش: ${arNum(Math.round(sumType("cash")))}</span>
         <span>🏷️ أصول تانية: ${arNum(Math.round(sumType("other")))}</span>
+        ${liabilities ? `<span class="at-neg">📉 التزامات: −${arNum(Math.round(liabilities))}</span>` : ""}
       </div>`;
   }
   const el = $("assetsList");
   if (!el) return;
   if (!withVal.length) {
-    el.innerHTML = emptyState("مفيش أصول بعد", "ضيف دهب/كاش/أصل من فوق، ودوّنلي يحسبلك قيمتها وإجمالي ثروتك.");
+    el.innerHTML = emptyState("مفيش أصول بعد", "ضيف دهب/كاش/أصل/التزام من فوق، ودوّنلي يحسبلك قيمتها وإجمالي ثروتك.");
     return;
   }
+  const g24 = market.goldG24Egp;
   el.innerHTML = withVal.map((a) => {
-    const detail = a.type === "gold" ? `${arNum(a.quantity)} جرام · عيار ${arNum(a.karat || 24)}`
-      : a.type === "cash" ? `${arNum(a.quantity)} ${a.currency || "جنيه"}`
-      : "أصل";
-    const valStr = a._val != null ? `${arNum(Math.round(a._val))} ${MONEY}` : `<span class="muted">محتاج سعر — حدّث الأسعار</span>`;
+    const isLiab = a.type === "liability";
+    const detail = a.type === "gold" ? `إجمالي ${arNum(a.quantity || 0)} جرام`
+      : a.type === "cash" ? `${arNum(a.quantity || 0)} ${a.currency || "جنيه"}`
+      : isLiab ? "التزام عليك" : "أصل";
+    const valStr = a._val != null ? `${isLiab ? "−" : ""}${arNum(Math.round(a._val))} ${MONEY}` : `<span class="muted">محتاج سعر — حدّث الأسعار</span>`;
+    // قايمة بنود الدهب (كل قطعة: عدد + قيمة تقريبية)
+    let itemsList = "";
+    if (a.type === "gold" && Array.isArray(a.items) && a.items.length) {
+      itemsList = `<ul class="asset-items">` + a.items.map((it) => {
+        const grams = (Number(it.g) || 0) * (Number(it.n) || 0);
+        const v = goldItemEgp(it, g24);
+        return `<li><span>${arNum(it.g)}ج × عيار ${arNum(it.k || 24)} × ${arNum(it.n)} قطعة <span class="muted">= ${arNum(grams)}ج</span></span><b>${v != null ? arNum(Math.round(v)) + " " + MONEY : "—"}</b></li>`;
+      }).join("") + `</ul>`;
+    }
     let goalBar = "";
     if (a.goal && a._val != null) {
       const pct = Math.min(100, Math.round((a._val / a.goal) * 100));
       const left = Math.max(0, a.goal - a._val);
       goalBar = `<div class="asset-goal"><div class="ag-track"><div class="ag-fill" style="width:${pct}%"></div></div><span>${arNum(pct)}٪ من هدف ${arNum(a.goal)} · ناقص ${arNum(Math.round(left))}</span></div>`;
     }
+    const dn = a.type === "gold" ? "دهب" : a.type === "cash" ? "كاش" : isLiab ? "التزام" : "أصل";
     return `<div class="asset-card asset-${a.type}">
       <div class="asset-top">
-        <span class="asset-name">${ASSET_ICON[a.type]} ${escapeHtml(a.name || (a.type === "gold" ? "دهب" : a.type === "cash" ? "كاش" : "أصل"))}</span>
-        <span class="asset-val">${valStr}</span>
+        <span class="asset-name">${ASSET_ICON[a.type]} ${escapeHtml(a.name || dn)}</span>
+        <span class="asset-val${isLiab ? " neg" : ""}">${valStr}</span>
       </div>
       <div class="asset-mid">
         <span class="asset-detail">${detail}${a.note ? " · " + escapeHtml(a.note) : ""}</span>
-        <span class="row-actions"><button class="icon-btn" onclick="openEdit('assets', ${a.id})" title="تعديل">✏️</button><button class="icon-btn" onclick="del('assets', ${a.id})" title="حذف">🗑️</button></span>
+        <span class="row-actions"><button class="icon-btn" onclick="openEditAsset(${a.id})" title="تعديل">✏️</button><button class="icon-btn" onclick="del('assets', ${a.id})" title="حذف">🗑️</button></span>
       </div>
+      ${itemsList}
       ${goalBar}
     </div>`;
   }).join("");
 }
+/* ---- بنود الدهب (repeater) ---- */
+function goldItemRow(it) {
+  it = it || { g: "", k: 24, n: 1 };
+  const opts = KARATS.map((k) => `<option value="${k}"${Number(it.k) === k ? " selected" : ""}>عيار ${arNum(k)}</option>`).join("");
+  return `<div class="agb-row">
+    <input type="number" step="any" inputmode="decimal" class="field gi-g" placeholder="جرام" value="${it.g ?? ""}" />
+    <select class="field gi-k">${opts}</select>
+    <input type="number" step="1" min="1" inputmode="numeric" class="field gi-n" placeholder="عدد" value="${it.n ?? 1}" />
+    <button type="button" class="icon-btn gi-del" title="شيل القطعة">✕</button>
+  </div>`;
+}
+function setGoldItems(items) {
+  const box = $("assetGoldItems"); if (!box) return;
+  const arr = (Array.isArray(items) && items.length) ? items : [{ g: "", k: 24, n: 1 }];
+  box.innerHTML = arr.map(goldItemRow).join("");
+}
+function collectGoldItems() {
+  return [...document.querySelectorAll("#assetGoldItems .agb-row")].map((r) => ({
+    g: Number(r.querySelector(".gi-g")?.value) || 0,
+    k: Number(r.querySelector(".gi-k")?.value) || 24,
+    n: Number(r.querySelector(".gi-n")?.value) || 1,
+  })).filter((it) => it.g > 0 && it.n > 0);
+}
 function updateAssetFields() {
   const t = $("assetType")?.value || "gold";
-  const show = (id, on) => { const e = $(id); if (e) e.style.display = on ? "" : "none"; };
-  show("assetQty", t === "gold" || t === "cash");
-  show("assetKarat", t === "gold");
+  const show = (id, on) => { $(id)?.classList.toggle("hidden", !on); };
+  show("assetGoldBox", t === "gold");   // تفصيل القطع للدهب بس
+  show("assetQty", t === "cash");        // مبلغ الكاش
+  show("assetKarat", false);             // العيار بقى لكل قطعة جوّه البنود
   show("assetCurrency", t === "cash");
-  show("assetValue", t === "other");
-  if ($("assetQty")) $("assetQty").placeholder = t === "gold" ? "الكمية بالجرام" : "المبلغ";
+  show("assetValue", t === "other" || t === "liability");
+  if ($("assetQty")) $("assetQty").placeholder = "المبلغ";
+  if ($("assetValue")) $("assetValue").placeholder = t === "liability" ? "المبلغ المتبقّي عليك بالجنيه" : "القيمة بالجنيه";
+  if (t === "gold" && $("assetGoldItems") && !$("assetGoldItems").children.length) setGoldItems(null);
   if ($("assetFormHint")) $("assetFormHint").textContent =
-    t === "gold" ? "دوّنلي يحسب القيمة من سعر جرام الدهب × العيار."
+    t === "gold" ? "ضيف كل قطعة دهب لوحدها (جرام/عيار/عدد) ودوّنلي يحسب قيمتها من سعر اليوم."
     : t === "cash" ? "لو عملة غير الجنيه، يحوّلها بسعر اليوم."
+    : t === "liability" ? "التزام عليك (قسط/دين) — بيتخصم من صافي ثروتك."
     : "اكتب قيمة الأصل بالجنيه (زي العربية).";
 }
+function resetAssetForm() {
+  $("assetForm")?.reset();
+  if ($("assetEditId")) $("assetEditId").value = "";
+  if ($("assetFormTitle")) $("assetFormTitle").textContent = "ضيف أصل";
+  if ($("assetSubmit")) $("assetSubmit").textContent = "＋ إضافة";
+  $("assetCancelEdit")?.classList.add("hidden");
+  setGoldItems(null);
+  updateAssetFields();
+}
+function openEditAsset(id) {
+  const a = (state.assets || []).find((x) => x.id === id);
+  if (!a) return;
+  if ($("assetEditId")) $("assetEditId").value = a.id;
+  $("assetType").value = a.type;
+  $("assetName").value = a.name || "";
+  $("assetQty").value = a.type === "gold" ? "" : (a.quantity ?? "");
+  $("assetKarat").value = a.karat || 24;
+  $("assetCurrency").value = a.currency || "EGP";
+  $("assetValue").value = a.manual_value ?? "";
+  $("assetGoal").value = a.goal ?? "";
+  if (a.type === "gold")
+    setGoldItems(Array.isArray(a.items) && a.items.length ? a.items : (a.quantity ? [{ g: a.quantity, k: a.karat || 24, n: 1 }] : null));
+  if ($("assetFormTitle")) $("assetFormTitle").textContent = "تعديل أصل";
+  if ($("assetSubmit")) $("assetSubmit").textContent = "💾 حفظ";
+  $("assetCancelEdit")?.classList.remove("hidden");
+  updateAssetFields();
+  $("assetForm")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  setTimeout(() => $("assetName")?.focus(), 200);
+}
+window.openEditAsset = openEditAsset;
 $("assetType")?.addEventListener("change", updateAssetFields);
+$("assetAddItem")?.addEventListener("click", () => { $("assetGoldItems")?.insertAdjacentHTML("beforeend", goldItemRow()); });
+$("assetGoldItems")?.addEventListener("click", (e) => {
+  if (!e.target.closest(".gi-del")) return;
+  const rows = document.querySelectorAll("#assetGoldItems .agb-row");
+  if (rows.length > 1) e.target.closest(".agb-row").remove(); else setGoldItems(null);
+});
+$("assetCancelEdit")?.addEventListener("click", resetAssetForm);
 $("assetForm")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const type = $("assetType").value;
-  const body = {
-    type,
-    name: $("assetName").value.trim(),
-    quantity: $("assetQty").value,
-    karat: $("assetKarat").value,
-    currency: $("assetCurrency").value,
-    manualValue: $("assetValue").value,
-    goal: $("assetGoal").value,
-  };
-  try { await api("/api/assets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); } catch {}
-  e.target.reset();
-  updateAssetFields();
+  const editId = $("assetEditId")?.value || "";
+  const items = type === "gold" ? collectGoldItems() : null;
+  try {
+    if (editId) {
+      // التعديل بيستخدم أسماء أعمدة الـ DB (manual_value)
+      const patch = { type, name: $("assetName").value.trim(), quantity: $("assetQty").value, karat: $("assetKarat").value, currency: $("assetCurrency").value, manual_value: $("assetValue").value, goal: $("assetGoal").value, items };
+      await api(`/api/assets/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+    } else {
+      const body = { type, name: $("assetName").value.trim(), quantity: $("assetQty").value, karat: $("assetKarat").value, currency: $("assetCurrency").value, manualValue: $("assetValue").value, goal: $("assetGoal").value, items };
+      await api("/api/assets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    }
+  } catch {}
+  resetAssetForm();
   await renderAssetsPage();
 });
+updateAssetFields(); // ضبط ظهور الحقول من البداية
 $("assetsRefresh")?.addEventListener("click", async () => {
   const btn = $("assetsRefresh");
   if (btn) { btn.disabled = true; btn.textContent = "بيحدّث…"; }
@@ -2351,6 +2445,8 @@ function speakThenListen(text) {
   try { speechSynthesis.cancel(); } catch {}
   const u = new SpeechSynthesisUtterance(String(text || "").slice(0, 1200));
   u.lang = "ar-EG";
+  u.rate = 1.25; // أسرع شوية في المكالمة عشان الرد ميبقاش بطيء
+  u.pitch = 1.0;
   const ar = (speechSynthesis.getVoices() || []).find((v) => /^ar/i.test(v.lang));
   if (ar) u.voice = ar;
   u.onend = () => { if (callOn) listenTurn(); };
@@ -2539,6 +2635,13 @@ loadAll().then(() => {
   loadAskHistory();
   updatePendingBanner();   // لو فيه تسجيل محفوظ من مرة فاتت
   drainPending();          // وابعته لو النت موجود
+  // رجّع آخر صفحة كان واقف فيها قبل الـ reload (بدل ما يرجع للرئيسية)
+  try {
+    const saved = localStorage.getItem("dw_tab");
+    if (saved && saved !== "overview" && document.querySelector(`.tab-panel[data-panel="${saved}"]`)) {
+      gotoTab(saved);
+    }
+  } catch {}
   if (state.me && !localStorage.getItem("dawenli_tour_v1")) setTimeout(startTour, 800);
 });
 

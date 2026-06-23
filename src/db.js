@@ -326,6 +326,7 @@ addColumnIfMissing("users", "email", "TEXT");          // التسجيل بال�
 addColumnIfMissing("users", "password_hash", "TEXT");
 addColumnIfMissing("tasks", "completed_at", "TEXT");
 addColumnIfMissing("tasks", "reminded_at", "TEXT");
+addColumnIfMissing("assets", "items", "TEXT"); // تفصيل بنود الأصل (JSON) — مثلاً قطع الدهب
 db.prepare(`UPDATE tasks SET status = 'pending' WHERE status = 'open'`).run();
 
 const now = () => new Date().toISOString();
@@ -1481,34 +1482,65 @@ export function clearAskMessages(userId) {
 
 /* ===================== الأصول (دهب / كاش / أصول تانية) ===================== */
 
-export const ASSET_TYPES = ["gold", "cash", "other"];
+export const ASSET_TYPES = ["gold", "cash", "other", "liability"];
+
+// نحوّل بنود الدهب لنص JSON آمن (مصفوفة {g:جرام، k:عيار، n:عدد})
+function normItems(items) {
+  if (items == null || items === "") return null;
+  let arr = items;
+  if (typeof items === "string") { try { arr = JSON.parse(items); } catch { return null; } }
+  if (!Array.isArray(arr) || !arr.length) return null;
+  const clean = arr.map((it) => ({
+    g: Number(it.g) || 0, k: Number(it.k) || 24, n: Number(it.n) || 1,
+  })).filter((it) => it.g > 0 && it.n > 0);
+  return clean.length ? JSON.stringify(clean) : null;
+}
+// لو فيه بنود دهب، الكمية = مجموع (جرام × عدد) عشان تفضل متسقة
+function goldGramsFromItems(itemsJson) {
+  try { return JSON.parse(itemsJson).reduce((s, it) => s + (Number(it.g) || 0) * (Number(it.n) || 0), 0); }
+  catch { return null; }
+}
 
 const insertAssetStmt = db.prepare(`
-  INSERT INTO assets (created_at, updated_at, user_id, type, name, quantity, karat, currency, manual_value, goal, note)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO assets (created_at, updated_at, user_id, type, name, quantity, karat, currency, manual_value, goal, note, items)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
-export function addAsset({ userId, type, name, quantity, karat, currency, manualValue, goal, note }) {
+export function addAsset({ userId, type, name, quantity, karat, currency, manualValue, goal, note, items }) {
   const t = ASSET_TYPES.includes(type) ? type : "other";
+  const itemsJson = t === "gold" ? normItems(items) : null;
+  let qty = quantity == null || quantity === "" ? null : Number(quantity);
+  if (itemsJson) qty = goldGramsFromItems(itemsJson); // الكمية من البنود
   const info = insertAssetStmt.run(
     now(), now(), userId, t, name || null,
-    quantity == null || quantity === "" ? null : Number(quantity),
+    qty,
     karat == null || karat === "" ? null : Number(karat),
     currency || null,
     manualValue == null || manualValue === "" ? null : Number(manualValue),
     goal == null || goal === "" ? null : Number(goal),
-    note || null
+    note || null,
+    itemsJson
   );
-  return db.prepare(`SELECT * FROM assets WHERE id = ?`).get(Number(info.lastInsertRowid));
+  return getAsset(Number(info.lastInsertRowid));
+}
+function getAsset(id) {
+  const a = db.prepare(`SELECT * FROM assets WHERE id = ?`).get(id);
+  if (a && a.items) { try { a.items = JSON.parse(a.items); } catch { a.items = null; } }
+  return a;
 }
 export function listAssets(userId) {
-  return db.prepare(`SELECT * FROM assets WHERE user_id = ? ORDER BY type, id DESC`).all(userId);
+  return db.prepare(`SELECT * FROM assets WHERE user_id = ? ORDER BY type, id DESC`).all(userId)
+    .map((a) => { if (a.items) { try { a.items = JSON.parse(a.items); } catch { a.items = null; } } return a; });
 }
 export function updateAsset(userId, id, patch) {
   const p = { ...patch, updated_at: now() };
   for (const k of ["quantity", "karat", "manual_value", "goal"]) {
     if (p[k] !== undefined) p[k] = p[k] === "" || p[k] == null ? null : Number(p[k]);
   }
-  const cols = ["type", "name", "quantity", "karat", "currency", "manual_value", "goal", "note", "updated_at"];
+  if (p.items !== undefined) {
+    p.items = normItems(p.items);
+    if (p.items) p.quantity = goldGramsFromItems(p.items); // زامن الكمية مع البنود
+  }
+  const cols = ["type", "name", "quantity", "karat", "currency", "manual_value", "goal", "note", "items", "updated_at"];
   const sets = [], vals = [];
   for (const c of cols) if (p[c] !== undefined) { sets.push(`${c} = ?`); vals.push(p[c]); }
   if (!sets.length) return false;

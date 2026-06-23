@@ -492,12 +492,14 @@
             <div id="assetsMarket" class="assets-market"></div>
 
             <div class="card sketch" style="margin:18px 0">
-              <div class="card-head"><h3>ضيف أصل</h3></div>
+              <div class="card-head"><h3 id="assetFormTitle">ضيف أصل</h3></div>
               <form id="assetForm" class="asset-form">
+                <input type="hidden" id="assetEditId" value="" />
                 <select id="assetType" class="field">
                   <option value="gold">🪙 دهب</option>
                   <option value="cash">💵 كاش / عملة</option>
                   <option value="other">🏷️ أصل تاني</option>
+                  <option value="liability">📉 التزام (قسط/دين عليك)</option>
                 </select>
                 <input id="assetName" class="field" placeholder="اسم/وصف (اختياري)" />
                 <input id="assetQty" class="field" type="number" step="any" placeholder="الكمية بالجرام" />
@@ -511,8 +513,14 @@
                 </select>
                 <input id="assetValue" class="field" type="number" step="any" placeholder="القيمة بالجنيه" />
                 <input id="assetGoal" class="field" type="number" step="any" placeholder="هدف القيمة (اختياري)" />
-                <button type="submit" class="btn finances sm">＋ إضافة</button>
+                <button type="submit" id="assetSubmit" class="btn finances sm">＋ إضافة</button>
+                <button type="button" id="assetCancelEdit" class="btn ghost sm hidden">إلغاء</button>
               </form>
+              <!-- تفصيل قطع الدهب (بنود) — بيظهر لما النوع دهب -->
+              <div id="assetGoldBox" class="asset-gold-box hidden">
+                <div class="agb-head"><span>تفصيل الدهب — كل قطعة لوحدها</span><button type="button" id="assetAddItem" class="btn ghost sm">＋ قطعة</button></div>
+                <div id="assetGoldItems"></div>
+              </div>
               <div id="assetFormHint" class="muted" style="font-size:var(--text-sm);margin-top:8px"></div>
             </div>
 

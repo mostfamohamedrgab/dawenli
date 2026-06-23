@@ -770,11 +770,26 @@ a { color: inherit; }
 }
 .asset-card.asset-gold { border-right-color: var(--coin); }
 .asset-card.asset-other { border-right-color: var(--goals); }
+.asset-card.asset-liability { border-right-color: var(--danger); background: var(--health-wash, var(--surface-card)); }
 .asset-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .asset-name { font-weight: 800; }
 .asset-val { font-weight: 900; color: var(--finances-deep); white-space: nowrap; }
+.asset-val.neg { color: var(--danger-deep); }
 .asset-mid { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .asset-detail { font-size: var(--text-sm); color: var(--ink-muted); overflow-wrap: anywhere; }
+/* قايمة بنود الدهب تحت الكارت */
+.asset-items { list-style: none; margin: 4px 0 0; padding: 8px 0 0; border-top: 1px dashed var(--hairline); display: flex; flex-direction: column; gap: 6px; }
+.asset-items li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--text-sm); }
+.asset-items li b { color: var(--coin-deep, var(--finances-deep)); white-space: nowrap; }
+.at-neg { color: var(--danger-deep) !important; }
+/* repeater بنود الدهب في الفورم */
+.asset-gold-box { width: 100%; margin-top: 10px; padding: 10px 12px; border: 1.5px dashed var(--coin); border-radius: var(--radius-md); background: var(--paper); }
+.agb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: var(--text-sm); font-weight: 700; color: var(--ink-muted); }
+.agb-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.agb-row .gi-g { flex: 1.4; min-width: 70px; }
+.agb-row .gi-k { flex: 1.2; min-width: 80px; }
+.agb-row .gi-n { flex: 1; min-width: 60px; }
+.agb-row .gi-del { flex: none; color: var(--danger-deep); }
 .asset-goal { display: flex; flex-direction: column; gap: 4px; }
 .asset-goal .ag-track { height: 8px; background: var(--paper-deep); border-radius: var(--radius-pill); overflow: hidden; }
 .asset-goal .ag-fill { height: 100%; background: var(--finances); border-radius: var(--radius-pill); }
