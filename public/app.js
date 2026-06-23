@@ -1873,14 +1873,16 @@ function renderAssets() {
   const withVal = (state.assets || []).map((a) => ({ ...a, _val: assetValueEgp(a, market) }));
   const sumType = (t) => withVal.filter((a) => a.type === t).reduce((s, a) => s + (a._val || 0), 0);
   const total = withVal.reduce((s, a) => s + (a._val || 0), 0);
+  const liquid = sumType("gold") + sumType("cash"); // صافي الثروة من غير الأصول التانية (سائلة)
   const tEl = $("assetsTotal");
   if (tEl) {
     tEl.innerHTML = `
       <div class="at-main"><span class="at-label">صافي ثروتك التقريبي</span><span class="at-value">${arNum(Math.round(total))} ${MONEY}</span></div>
+      <div class="at-sub-main"><span class="at-label">صافي الثروة من غير الأصول التانية <span class="muted">(دهب + كاش)</span></span><span class="at-value2">${arNum(Math.round(liquid))} ${MONEY}</span></div>
       <div class="at-breakdown">
         <span>🪙 دهب: ${arNum(Math.round(sumType("gold")))}</span>
         <span>💵 كاش: ${arNum(Math.round(sumType("cash")))}</span>
-        <span>🏷️ أصول: ${arNum(Math.round(sumType("other")))}</span>
+        <span>🏷️ أصول تانية: ${arNum(Math.round(sumType("other")))}</span>
       </div>`;
   }
   const el = $("assetsList");
@@ -2264,6 +2266,115 @@ $("askThread")?.addEventListener("click", (e) => {
   if (!btn) return;
   const m = askMessages[Number(btn.dataset.i)];
   if (m && m.content) playTTS(m.content);
+});
+
+/* ---- مكالمة صوتية مباشرة (turn-taking): يسمعك → يرد بصوت → يسمع تاني ----
+   بنستخدم Web Speech API بتاع المتصفح (تعرّف صوت فوري + نطق) عشان تبقى محادثة
+   حقيقية من غير ما تبعت ملف كل مرة، ومن غير ما نحتاج موديل TTS من OpenAI. */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let callOn = false, recog = null, callTurnBusy = false;
+function callSupported() { return !!SR; }
+function setCallStatus(text, cls) {
+  const s = $("callStatus"); if (s) s.textContent = text;
+  const orb = $("callOrb"); if (orb) orb.className = "call-orb " + (cls || "");
+}
+async function startCall() {
+  if (callOn) return;
+  if (!callSupported()) {
+    askMessages.push({ role: "assistant", content: "متصفحك مايدعمش المكالمة المباشرة 🙏 افتح دوّنلي من Chrome، أو استخدم زرار المايك 🎙️ (سجّل وابعت)." });
+    renderAskThread();
+    return;
+  }
+  // نطلب إذن المايك مرة عشان المتصفح ميقطعش المكالمة
+  try { const st = await getMic(); st.getTracks().forEach((t) => t.stop()); }
+  catch { askMessages.push({ role: "assistant", content: "لازم تسمح للمايك عشان نبدأ المكالمة 🎙️" }); renderAskThread(); return; }
+  callOn = true;
+  $("askCall")?.classList.remove("hidden");
+  $("askForm")?.classList.add("hidden");
+  try { speechSynthesis?.getVoices(); } catch {}
+  listenTurn();
+}
+function listenTurn() {
+  if (!callOn) return;
+  recog = new SR();
+  recog.lang = "ar-EG";
+  recog.interimResults = true;
+  recog.continuous = false;
+  recog.maxAlternatives = 1;
+  let finalText = "";
+  setCallStatus("بسمعك… اتكلم 🎙️", "listening");
+  recog.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) finalText += r[0].transcript;
+      else interim += r[0].transcript;
+    }
+    const cap = $("callCaption"); if (cap) cap.textContent = (finalText + " " + interim).trim();
+  };
+  recog.onerror = (e) => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") endCall("اتقفل إذن المايك — المكالمة خلصت.");
+    // 'no-speech' / 'aborted' بيتعالجوا في onend
+  };
+  recog.onend = () => {
+    if (!callOn || callTurnBusy) return;
+    const text = finalText.trim();
+    if (!text) { listenTurn(); return; } // مسمعش حاجة، يسمع تاني
+    handleCallTurn(text);
+  };
+  try { recog.start(); } catch { setTimeout(() => { if (callOn) listenTurn(); }, 350); }
+}
+async function handleCallTurn(text) {
+  callTurnBusy = true;
+  askMessages.push({ role: "user", content: text });
+  renderAskThread();
+  setCallStatus("بفكّر… 🤔", "thinking");
+  const cap = $("callCaption"); if (cap) cap.textContent = "";
+  const scope = $("askScope")?.value || "all";
+  const date = $("askScope")?.value === "day" ? ($("askDate")?.value || null) : null;
+  let reply = "";
+  try {
+    const payload = { messages: askMessages.filter((m) => !m.pending).map((m) => ({ role: m.role, content: m.content })), scope, date };
+    const res = await api("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const data = await res.json();
+    reply = data.reply || data.error || "مقدرتش أرد، قول تاني؟";
+  } catch { reply = "حصل خطأ بسيط، تقول تاني؟"; }
+  askMessages.push({ role: "assistant", content: reply });
+  renderAskThread();
+  callTurnBusy = false;
+  if (callOn) speakThenListen(reply);
+}
+function speakThenListen(text) {
+  if (!callOn) return;
+  setCallStatus("بيتكلم… 🔊 (دوس الدايرة لو عايز تقاطعه)", "speaking");
+  if (!("speechSynthesis" in window)) { listenTurn(); return; }
+  try { speechSynthesis.cancel(); } catch {}
+  const u = new SpeechSynthesisUtterance(String(text || "").slice(0, 1200));
+  u.lang = "ar-EG";
+  const ar = (speechSynthesis.getVoices() || []).find((v) => /^ar/i.test(v.lang));
+  if (ar) u.voice = ar;
+  u.onend = () => { if (callOn) listenTurn(); };
+  u.onerror = () => { if (callOn) listenTurn(); };
+  speechSynthesis.speak(u);
+}
+function endCall(msg) {
+  callOn = false; callTurnBusy = false;
+  try { recog && recog.abort(); } catch {}
+  recog = null;
+  try { speechSynthesis.cancel(); } catch {}
+  $("askCall")?.classList.add("hidden");
+  $("askForm")?.classList.remove("hidden");
+  setCallStatus("", "");
+  const cap = $("callCaption"); if (cap) cap.textContent = "";
+  if (msg) { askMessages.push({ role: "assistant", content: msg }); renderAskThread(); }
+}
+$("askCallBtn")?.addEventListener("click", startCall);
+$("callEnd")?.addEventListener("click", () => endCall());
+// دوس الدايرة وهو بيتكلم = قاطعه واسمعني (barge-in)
+$("callOrb")?.addEventListener("click", () => {
+  if (!callOn) return;
+  try { speechSynthesis.cancel(); } catch {}
+  if (!callTurnBusy) { try { recog && recog.abort(); } catch {} listenTurn(); }
 });
 
 /* ===================== مركز الملفات (رفع + تصنيف) ===================== */

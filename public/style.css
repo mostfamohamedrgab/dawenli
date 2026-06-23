@@ -648,6 +648,37 @@ a { color: inherit; }
 @keyframes askPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(224, 112, 92, .5); } 50% { box-shadow: 0 0 0 8px rgba(224, 112, 92, 0); } }
 .tts-btn { background: none; border: 0; cursor: pointer; font-size: 14px; opacity: .55; padding: 0 2px; vertical-align: middle; line-height: 1; }
 .tts-btn:hover { opacity: 1; }
+#askCallBtn { flex: none; }
+
+/* وضع المكالمة الصوتية المباشرة */
+.ask-call {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: 22px 16px; text-align: center;
+  background: linear-gradient(160deg, var(--surface-card), var(--paper));
+  border: 1.5px solid var(--hairline); border-radius: var(--radius-md); margin-bottom: 12px;
+}
+.ask-call.hidden { display: none; }
+.call-orb {
+  width: 96px; height: 96px; border-radius: 50%; border: none; cursor: pointer;
+  background: radial-gradient(circle at 35% 30%, var(--brand), var(--finances-deep, #3c6b4f));
+  box-shadow: 0 8px 26px rgba(92,138,107,.5);
+  position: relative; -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-fast);
+}
+.call-orb:active { transform: scale(.95); }
+.call-orb::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  border: 2px solid var(--brand); opacity: 0;
+}
+.call-orb.listening { background: radial-gradient(circle at 35% 30%, #6db38a, var(--brand)); }
+.call-orb.listening::after { animation: callPulse 1.5s ease-out infinite; }
+.call-orb.thinking { background: radial-gradient(circle at 35% 30%, #d9b15a, #b5852f); animation: callThink 1s ease-in-out infinite; }
+.call-orb.speaking { background: radial-gradient(circle at 35% 30%, #6aa0d8, #3b6fb0); }
+.call-orb.speaking::after { animation: callPulse 1.1s ease-out infinite; border-color: #6aa0d8; }
+@keyframes callPulse { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(1.5); opacity: 0; } }
+@keyframes callThink { 0%, 100% { transform: scale(1); } 50% { transform: scale(.92); } }
+.call-status { font-weight: 700; font-size: var(--text-base); color: var(--ink); }
+.call-caption { min-height: 20px; font-size: var(--text-sm); color: var(--ink-muted); line-height: 1.6; max-width: 90%; }
 
 /* ===================== مركز الملفات ===================== */
 .file-drop {
@@ -724,7 +755,9 @@ a { color: inherit; }
 .at-main { display: flex; flex-direction: column; gap: 2px; }
 .at-label { font: var(--type-label); color: var(--ink-muted); }
 .at-value { font-family: var(--font-display); font-weight: 800; font-size: 28px; color: var(--finances-deep); }
-.at-breakdown { display: flex; gap: 14px; flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-muted); }
+.at-sub-main { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--finances-tint); }
+.at-value2 { font-family: var(--font-display); font-weight: 800; font-size: 20px; color: var(--ink); }
+.at-breakdown { display: flex; gap: 14px; flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-muted); margin-top: 8px; }
 .assets-market { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: var(--text-sm); color: var(--ink-muted); padding: 0 4px; }
 .assets-market b { color: var(--ink); }
 .asset-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
