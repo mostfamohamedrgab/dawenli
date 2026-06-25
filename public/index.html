@@ -166,6 +166,12 @@
             </div>
             <div class="world-grid" id="worldGrid" style="margin-bottom:30px"></div>
 
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px">
+              <h2 class="section-title" style="margin:0">📋 مهام النهاردة</h2>
+              <button class="btn ghost sm" data-go="tasks">كل المهام ←</button>
+            </div>
+            <div class="card" style="margin-bottom:30px"><div id="todayTasks" class="list"></div></div>
+
             <h2 class="section-title">آخر ما دوّنته</h2>
             <div class="list" id="recentFeed"></div>
           </section>
@@ -522,13 +528,20 @@
                 <div class="card-head"><h3 id="dayTasksTitle">مهام اليوم</h3></div>
                 <form id="taskForm" class="task-form">
                   <input id="taskTitle" class="field" placeholder="مهمة جديدة…" required />
+                  <textarea id="taskResources" class="field hidden" rows="3" placeholder="موارد (اختياري): وصف، مصادر، روابط… — هتظهر في «عرض المهمة»"></textarea>
                   <div class="task-form-row">
                     <input id="taskTime" class="field" type="time" />
+                    <label class="chk-inline"><input type="checkbox" id="taskGeneral" /> عامة (من غير يوم)</label>
+                    <button type="button" class="btn ghost sm" id="taskResToggle">📎 موارد</button>
                     <button type="submit" class="btn goals sm">＋ إضافة</button>
                   </div>
                 </form>
                 <div id="dayTasks" class="list"></div>
               </div>
+            </div>
+            <div class="card" style="margin-top:18px">
+              <div class="card-head"><h3>📌 مهام عامة <span class="muted" style="font-size:var(--text-sm);font-weight:400">— ملهاش يوم محدّد</span></h3></div>
+              <div id="generalTasks" class="list"></div>
             </div>
             <p class="muted center" style="margin-top:18px;font-size:var(--text-sm)">قل لدوّنلي «عندي اجتماع غدًا الساعة ٥» وستجدها هنا، وسيذكّرك في موعدها ⏰</p>
           </section>

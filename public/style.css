@@ -666,6 +666,16 @@ a { color: inherit; }
 .acc-label { font: var(--type-label); color: var(--ink-muted); }
 .acc-val { font-weight: 800; overflow-wrap: anywhere; }
 
+/* بوب-اب تفاصيل المهمة/الهدف + الموارد */
+.td-sec { margin-bottom: 14px; }
+.td-label { display: block; font: var(--type-label); color: var(--ink-muted); margin-bottom: 4px; }
+.td-sec p { margin: 0; line-height: 1.7; overflow-wrap: anywhere; }
+.td-res { white-space: pre-wrap; line-height: 1.8; overflow-wrap: anywhere; background: var(--paper); border: 1px solid var(--hairline); border-radius: var(--radius-sm, 10px); padding: 10px 12px; }
+.td-res a { color: var(--finances-deep); text-decoration: underline; word-break: break-all; }
+.res-dot { font-size: 12px; opacity: .7; }
+.chk-inline { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-sm); color: var(--ink-muted); white-space: nowrap; cursor: pointer; }
+.chk-inline input { width: 15px; height: 15px; }
+
 /* ===================== اسأل دوّنلي (شات سياقي) ===================== */
 .ask-scope { display: flex; gap: 8px; align-items: center; }
 .ask-thread {

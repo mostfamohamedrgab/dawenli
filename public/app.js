@@ -152,9 +152,10 @@ const EDIT_CONFIGS = {
   ] },
   tasks: { title: "تعديل مهمة", source: () => state.tasks, fields: [
     { key: "title", label: "المهمة", type: "text" },
-    { key: "due_date", label: "التاريخ", type: "date" },
+    { key: "due_date", label: "التاريخ (سيبه فاضي = مهمة عامة)", type: "date" },
     { key: "due_time", label: "الوقت", type: "time" },
     { key: "note", label: "ملاحظة", type: "text" },
+    { key: "resources", label: "موارد (وصف/مصادر/روابط)", type: "textarea" },
   ] },
   meals: { title: "تعديل وجبة", source: () => state.meals, fields: [
     { key: "items", label: "الأكل", type: "text" },
@@ -1066,6 +1067,12 @@ function renderOverview() {
   $("worldGrid").querySelectorAll(".world-card").forEach((c) =>
     c.addEventListener("click", () => gotoTab(c.dataset.nav)));
 
+  // مهام النهاردة (المؤرّخة بتاريخ النهاردة)
+  const todayTasks = state.tasks
+    .filter((t) => t.due_date === TODAY())
+    .sort((a, b) => ((a.due_time || "99") < (b.due_time || "99") ? -1 : 1));
+  renderTaskRows($("todayTasks"), todayTasks, "مفيش مهام النهاردة — يوم خفيف 🌤️");
+
   renderFeed();
 }
 
@@ -1496,12 +1503,35 @@ async function openGoalDetail(id) {
       <button class="icon-btn" onclick="closeGoalDetail()" aria-label="إغلاق">✕</button>
     </div>
     <div class="muted" style="font-size:var(--text-sm);margin-bottom:14px">${arNum(goal.current)}${goal.target ? ` / ${arNum(goal.target)}` : ""}${unit}${goal.target ? ` · ${arNum(pct)}٪` : ""}</div>
+    <div class="td-sec">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span class="td-label">📎 موارد الهدف</span>
+        <button class="icon-btn" onclick="editGoalResources(${id})" title="تعديل الموارد">✏️</button>
+      </div>
+      <div id="goalResView">${goal.resources ? `<div class="td-res">${linkify(goal.resources)}</div>` : `<span class="muted" style="font-size:var(--text-sm)">مفيش موارد — اضغط ✏️ وضيف وصف/مصادر/روابط.</span>`}</div>
+    </div>
     <div class="gl-list">${rows}</div>
   </div>`;
   document.body.appendChild(ov);
   ov.addEventListener("click", (e) => { if (e.target === ov) closeGoalDetail(); });
 }
 function closeGoalDetail() { $("goalDetailOv")?.remove(); }
+// تعديل موارد الهدف (وصف/روابط) inline جوّه الموديل
+function editGoalResources(id) {
+  const g = (state.goals || []).find((x) => x.id === id); if (!g) return;
+  const view = $("goalResView"); if (!view) return;
+  view.innerHTML = `<textarea id="goalResInput" class="field" rows="4" placeholder="وصف، مصادر، روابط…"></textarea>
+    <div style="display:flex;gap:8px;margin-top:6px"><button class="btn sm" onclick="saveGoalResources(${id})">💾 حفظ</button><button class="btn ghost sm" onclick="openGoalDetail(${id})">إلغاء</button></div>`;
+  const ta = $("goalResInput"); if (ta) { ta.value = g.resources || ""; ta.focus(); }
+}
+async function saveGoalResources(id) {
+  const val = $("goalResInput")?.value || "";
+  try { await api(`/api/goals/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resources: val }) }); } catch {}
+  await loadAll(false);
+  closeGoalDetail(); openGoalDetail(id);
+}
+window.editGoalResources = editGoalResources;
+window.saveGoalResources = saveGoalResources;
 // حذف بند غلط من سجل الهدف — بيطرح قيمته من رصيد الهدف ويحدّث العرض
 async function deleteGoalLogEntry(logId, goalId) {
   try { await api(`/api/goals/log/${logId}`, { method: "DELETE" }); } catch { return; }
@@ -1943,28 +1973,64 @@ function renderCalendar() {
   const isToday = state.selDate === TODAY();
   $("dayTasksTitle").textContent = isToday ? "مهام اليوم" : `مهام ${fmtDate(state.selDate)}`;
   const sel = (byDate[state.selDate] || []).slice().sort((a, b) => ((a.due_time || "99") < (b.due_time || "99") ? -1 : 1));
-  renderTaskRows($("dayTasks"), sel);
+  renderTaskRows($("dayTasks"), sel, "مفيش مهام في اليوم ده — ضيف واحدة فوق ✍️");
+  // المهام العامة (من غير يوم) — due_date فاضي
+  const general = state.tasks.filter((t) => !t.due_date).sort((a, b) => (a.status === b.status ? 0 : a.status === "done" ? 1 : -1));
+  renderTaskRows($("generalTasks"), general, "مفيش مهام عامة — فعّل «عامة» وانت بتضيف مهمة ملهاش يوم 📌");
 }
-function renderTaskRows(el, tasks) {
+// نحوّل الروابط في النص لروابط قابلة للضغط (آمنة)
+function linkify(text) {
+  return escapeHtml(String(text || "")).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+}
+function renderTaskRows(el, tasks, emptyMsg) {
   if (!el) return;
   if (!tasks.length) {
-    el.innerHTML = `<div class="empty sm">${DOODLE}<p>مفيش مهام في اليوم ده — ضيف واحدة فوق ✍️</p></div>`;
+    el.innerHTML = `<div class="empty sm">${DOODLE}<p>${emptyMsg || "مفيش مهام هنا — ضيف واحدة ✍️"}</p></div>`;
     return;
   }
   el.innerHTML = tasks.map((t) => `
     <div class="task-row ${t.status === "done" ? "done" : ""}">
       <button class="task-check" onclick="toggleTask(${t.id}, '${t.status}')" title="${t.status === "done" ? "رجّعها" : "خلصت"}">${t.status === "done" ? "✓" : ""}</button>
-      <div class="lm" style="flex:1">
-        <span class="task-title">${escapeHtml(t.title)}</span>
+      <div class="lm" style="flex:1;cursor:pointer" onclick="openTaskDetail(${t.id})" title="عرض التفاصيل">
+        <span class="task-title">${escapeHtml(t.title)}${t.resources ? ` <span class="res-dot" title="فيها موارد">📎</span>` : ""}</span>
         ${t.note ? `<span class="task-note">${escapeHtml(t.note)}</span>` : ""}
       </div>
       <div class="row-actions">
         ${t.due_time ? `<span class="time-chip">⏰ ${t.due_time}</span>` : ""}
+        <button class="icon-btn" onclick="openTaskDetail(${t.id})" title="عرض المهمة">👁</button>
         <button class="icon-btn" onclick="openEdit('tasks', ${t.id})" title="تعديل">✏️</button>
         <button class="icon-btn" onclick="delTask(${t.id})" title="حذف">🗑️</button>
       </div>
     </div>`).join("");
 }
+// بوب-اب عرض المهمة بالموارد (وصف/روابط)
+function openTaskDetail(id) {
+  const t = (state.tasks || []).find((x) => x.id === id);
+  if (!t) return;
+  closeTaskDetail();
+  const isGeneral = !t.due_date;
+  const when = isGeneral ? "📌 مهمة عامة (من غير يوم محدّد)" : `🗓 ${fmtDate(t.due_date)}${t.due_time ? " · ⏰ " + t.due_time : ""}`;
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay"; ov.id = "taskDetailOv";
+  ov.innerHTML = `<div class="modal" style="max-width:480px;text-align:right">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
+      <h3 class="modal-title" style="margin:0">${t.status === "done" ? "✅ " : "📋 "}${escapeHtml(t.title)}</h3>
+      <button class="icon-btn" onclick="closeTaskDetail()" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="muted" style="font-size:var(--text-sm);margin-bottom:14px">${when}</div>
+    ${t.note ? `<div class="td-sec"><span class="td-label">ملاحظة</span><p>${escapeHtml(t.note)}</p></div>` : ""}
+    <div class="td-sec"><span class="td-label">📎 الموارد</span>${t.resources ? `<div class="td-res">${linkify(t.resources)}</div>` : `<p class="muted" style="margin:0">مفيش موارد لسه — اضغط «تعديل» وضيف وصف/مصادر/روابط.</p>`}</div>
+    <div class="ef-actions" style="margin-top:16px">
+      <button class="btn secondary sm" onclick="closeTaskDetail(); openEdit('tasks', ${t.id})">✏️ تعديل</button>
+      <button class="btn sm" onclick="closeTaskDetail(); toggleTask(${t.id}, '${t.status}')">${t.status === "done" ? "↩️ رجّعها" : "✓ خلصت"}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeTaskDetail(); });
+}
+function closeTaskDetail() { $("taskDetailOv")?.remove(); }
+window.openTaskDetail = openTaskDetail;
+window.closeTaskDetail = closeTaskDetail;
 async function toggleTask(id, status) {
   await api(`/api/tasks/${id}/${status === "done" ? "reopen" : "done"}`, { method: "PUT" });
   await loadAll(false);
@@ -1978,17 +2044,21 @@ async function delTask(id) {
   renderCalendar();
 }
 window.delTask = delTask;
+$("taskResToggle")?.addEventListener("click", () => $("taskResources")?.classList.toggle("hidden"));
 $("taskForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const title = $("taskTitle").value.trim();
   const dueTime = $("taskTime").value || null;
+  const resources = $("taskResources")?.value.trim() || "";
+  const general = $("taskGeneral")?.checked;
   if (!title) return;
   await api("/api/tasks", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, dueDate: state.selDate || TODAY(), dueTime }),
+    body: JSON.stringify({ title, dueDate: general ? "" : (state.selDate || TODAY()), dueTime: general ? null : dueTime, resources }),
   });
   e.target.reset();
+  $("taskResources")?.classList.add("hidden");
   await loadAll(false);
   renderCalendar();
 });

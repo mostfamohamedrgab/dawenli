@@ -630,9 +630,10 @@ export function startServer() {
   app.post("/api/tasks", (req, res) => {
     const user = gate(req, res);
     if (!user) return;
-    const { title, dueDate, dueTime, note } = req.body || {};
-    if (!title || !dueDate) return res.status(400).json({ error: "العنوان والتاريخ مطلوبين" });
-    res.json({ ok: true, task: addTask({ userId: user.id, title, dueDate, dueTime, note }) });
+    const { title, dueDate, dueTime, note, resources } = req.body || {};
+    if (!title) return res.status(400).json({ error: "العنوان مطلوب" });
+    // dueDate = "" → مهمة عامة من غير يوم (مسموح)
+    res.json({ ok: true, task: addTask({ userId: user.id, title, dueDate, dueTime, note, resources }) });
   });
   app.put("/api/tasks/:id/done", (req, res) => {
     const user = gate(req, res);

@@ -327,6 +327,8 @@ addColumnIfMissing("users", "password_hash", "TEXT");
 addColumnIfMissing("tasks", "completed_at", "TEXT");
 addColumnIfMissing("tasks", "reminded_at", "TEXT");
 addColumnIfMissing("assets", "items", "TEXT"); // تفصيل بنود الأصل (JSON) — مثلاً قطع الدهب
+addColumnIfMissing("tasks", "resources", "TEXT"); // موارد المهمة: وصف/روابط/مصادر
+addColumnIfMissing("goals", "resources", "TEXT"); // موارد الهدف: وصف/روابط/مصادر
 db.prepare(`UPDATE tasks SET status = 'pending' WHERE status = 'open'`).run();
 
 const now = () => new Date().toISOString();
@@ -857,18 +859,21 @@ export function updateGoalLog(userId, logId, { delta, note } = {}) {
 /* ===================== Tasks (مهام + تقويم) ===================== */
 
 const insertTaskStmt = db.prepare(`
-  INSERT INTO tasks (created_at, user_id, title, due_date, due_time, note)
-  VALUES (?, ?, ?, ?, ?, ?)
+  INSERT INTO tasks (created_at, user_id, title, due_date, due_time, note, resources)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
 `);
-export function addTask({ userId, title, dueDate, dueTime, note }) {
+export function addTask({ userId, title, dueDate, dueTime, note, resources }) {
   if (!title) return null;
+  // due_date = "" معناها مهمة عامة (من غير يوم). undefined/null → النهاردة.
+  const dd = dueDate === "" ? "" : (dueDate || today());
   const info = insertTaskStmt.run(
     now(),
     userId,
     title.trim(),
-    dueDate || today(),
+    dd,
     dueTime || null,
-    note || null
+    note || null,
+    resources || null
   );
   return getTask(userId, Number(info.lastInsertRowid));
 }
@@ -1657,7 +1662,7 @@ export function updateEntry(userId, id, patch) {
 export function updateTaskFields(userId, id, patch) {
   const p = { ...patch };
   if (p.due_time === "") p.due_time = null;
-  return updateOwned("tasks", ["title", "due_date", "due_time", "note"], userId, id, p);
+  return updateOwned("tasks", ["title", "due_date", "due_time", "note", "resources"], userId, id, p);
 }
 export function updateMeal(userId, id, patch) {
   return updateOwned("meals", ["entry_date", "at_time", "items", "note"], userId, id, patch);
@@ -1665,7 +1670,7 @@ export function updateMeal(userId, id, patch) {
 export function updateGoalMeta(userId, id, patch) {
   const p = { ...patch, updated_at: now() };
   if (p.target !== undefined) p.target = p.target === "" || p.target == null ? null : Number(p.target);
-  return updateOwned("goals", ["title", "target", "unit", "updated_at"], userId, id, p);
+  return updateOwned("goals", ["title", "target", "unit", "resources", "updated_at"], userId, id, p);
 }
 export function updateIdeaFields(userId, id, patch) {
   return updateOwned("ideas", ["title", "detail"], userId, id, patch);
