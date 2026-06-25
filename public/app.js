@@ -1530,6 +1530,13 @@ $("goalForm").addEventListener("submit", async (e) => {
 });
 
 /* ===================== الفلوس ===================== */
+// تحويل أي عملية لقيمتها بالجنيه بسعر اليوم (للدخل/التجميع) — بيستخدم أسعار السوق المحمّلة
+const FIN_CUR_CODE = { "دولار": "USD", "يورو": "EUR", "ريال": "SAR", "درهم": "AED", "إسترليني": "GBP" };
+function finToEgp(f) {
+  if (!f.currency || f.currency === "جنيه" || f.currency === "EGP") return f.amount;
+  const rate = ((state.market || {}).rates || {})[FIN_CUR_CODE[f.currency] || f.currency];
+  return rate ? f.amount * rate : f.amount; // لو السعر مش متوفّر، نحسبه بقيمته (نادر)
+}
 function renderFinancesPage() {
   const data = state.finance;
   const isEGP = (f) => !f.currency || f.currency === "جنيه";
@@ -1540,8 +1547,22 @@ function renderFinancesPage() {
   const dayOfMonth = Math.max(1, Number(TODAY().slice(8, 10)));
   const avgDay = Math.round(mExpense / dayOfMonth);
 
-  // الفلوس مركّزة على المصاريف بس (الدخل في الأهداف، مش هنا — عشان نبسّط)
+  // ===== الدخل: محوّل للجنيه بسعر اليوم + تجميع شهري للمقارنة =====
+  const incomeByMonth = {};
+  for (const f of data.filter((f) => f.direction === "income")) {
+    const mk = (f.entry_date || "").slice(0, 7);
+    if (mk) incomeByMonth[mk] = (incomeByMonth[mk] || 0) + finToEgp(f);
+  }
+  const curMonthKey = TODAY().slice(0, 7);
+  const monthIncome = Math.round(incomeByMonth[curMonthKey] || 0);
+  const incCur = {};
+  for (const f of data.filter((f) => f.direction === "income" && (f.entry_date || "").slice(0, 7) === curMonthKey)) {
+    const cu = f.currency || "جنيه"; incCur[cu] = (incCur[cu] || 0) + f.amount;
+  }
+  const incCurStr = Object.entries(incCur).map(([cu, v]) => `${arNum(v)} ${cu}`).join(" · ");
+
   $("finStats").innerHTML = [
+    { label: "دخل الشهر", value: arNum(monthIncome), unit: MONEY, ico: "💰", delta: incCurStr || "مفيش دخل لسه", trend: "pos" },
     { label: "مصاريف الأسبوع", value: arNum(weekExpense), unit: MONEY, ico: "💸", delta: "آخر ٧ أيام", trend: "" },
     { label: "مصاريف الشهر", value: arNum(mExpense), unit: MONEY, ico: "🧾", delta: "من أول الشهر", trend: "" },
     { label: "متوسط اليوم", value: arNum(avgDay), unit: MONEY, ico: "📊", delta: "في المتوسط", trend: "" },
@@ -1551,6 +1572,7 @@ function renderFinancesPage() {
       <div class="sc-value"><b>${s.value}</b><span class="sc-unit">${s.unit}</span></div>
       <div class="sc-delta ${s.trend}">${s.delta}</div>
     </div>`).join("");
+  renderFinIncome(incomeByMonth, curMonthKey);
 
   // أعمدة الأسبوع — مرسومة باليد على canvas
   const weekData = week.map((d) => ({
@@ -1593,6 +1615,24 @@ function renderFinancesPage() {
   renderBudget();
   fillFinFilterCat();
   renderFinList();
+}
+const AR_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+const monthShortKey = (k) => AR_MONTHS[Number((k || "").split("-")[1]) - 1] || k;
+// مقارنة الدخل آخر ٦ شهور (بالجنيه)
+function renderFinIncome(incomeByMonth, curKey) {
+  const el = $("finIncome"); if (!el) return;
+  const keys = [];
+  let [y, m] = curKey.split("-").map(Number);
+  for (let i = 0; i < 6; i++) { keys.unshift(`${y}-${String(m).padStart(2, "0")}`); m--; if (m < 1) { m = 12; y--; } }
+  const vals = keys.map((k) => Math.round(incomeByMonth[k] || 0));
+  const max = Math.max(1, ...vals);
+  const last = keys.length - 1;
+  el.innerHTML = `
+    <div class="inc-now"><span class="inc-now-val">${arNum(vals[last])} ${MONEY}</span><span class="muted">دخل شهر ${monthShortKey(curKey)}</span></div>
+    <div class="inc-bars">${keys.map((k, i) => {
+      const h = Math.round((vals[i] / max) * 100);
+      return `<div class="inc-col"><span class="inc-col-val">${vals[i] ? arNum(vals[i]) : "—"}</span><div class="inc-bar-track"><div class="inc-bar-fill${i === last ? " now" : ""}" style="height:${Math.max(2, h)}%"></div></div><span class="inc-col-lbl">${monthShortKey(k)}</span></div>`;
+    }).join("")}</div>`;
 }
 
 /* ---- قائمة العمليات: فلاتر + تحميل المزيد ---- */
@@ -1656,7 +1696,9 @@ function renderBudget() {
   const isEGP = (f) => !f.currency || f.currency === "جنيه";
   const monthFin = state.finance.filter((f) => f.entry_date >= monthStart && isEGP(f));
   const spent = monthFin.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
-  const income = monthFin.filter((f) => f.direction === "income").reduce((a, f) => a + f.amount, 0);
+  // الدخل بيحسب كل العملات محوّلة للجنيه (عشان الدولار يسمع برضه)
+  const income = state.finance.filter((f) => f.direction === "income" && f.entry_date >= monthStart).reduce((a, f) => a + finToEgp(f), 0);
+  const incomeR = Math.round(income);
   if ($("budgetMonth")) $("budgetMonth").textContent = monthLabel(monthStr);
   const bar = (cur, target, kind) => {
     const pct = target > 0 ? Math.round((cur / target) * 100) : 0;
@@ -1670,7 +1712,7 @@ function renderBudget() {
   };
   let html = "";
   if (b.budget) html += `<div class="budget-row"><span class="br-label">💸 الصرف مقابل الميزانية</span>${bar(spent, b.budget, "spend")}</div>`;
-  if (b.goal) html += `<div class="budget-row"><span class="br-label">🎯 الدخل مقابل هدف الشهر</span>${bar(income, b.goal, "goal")}</div>`;
+  if (b.goal) html += `<div class="budget-row"><span class="br-label">🎯 الدخل مقابل هدف الشهر</span>${bar(incomeR, b.goal, "goal")}</div>`;
   if (!b.budget && !b.goal) html = `<p class="muted" style="font-size:var(--text-sm);margin:0">حدّد حد صرف شهري وهدف للشهر تحت — ودوّنلي يتابعهم وينبّهك لو قرّبت من الميزانية.</p>`;
   if ($("budgetView")) $("budgetView").innerHTML = html;
   if ($("budgetInput")) $("budgetInput").value = b.budget ?? "";
@@ -1691,9 +1733,10 @@ $("finForm").addEventListener("submit", async (e) => {
   const direction = $("finDir").value;
   const amount = $("finAmount").value;
   const category = $("finCategory").value;
+  const currency = $("finCurrency")?.value || "جنيه";
   const note = $("finNote").value.trim();
   if (amount === "") return;
-  await api("/api/finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ direction, amount, category, note }) });
+  await api("/api/finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ direction, amount, category, currency, note }) });
   e.target.reset();
   fillCategorySelect();
   await loadAll(false);
@@ -2694,7 +2737,7 @@ $("logoutBtn").addEventListener("click", logout);
 
 async function loadAll(rerender = true) {
   try {
-    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files, budget, th, mu] = await Promise.all([
+    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files, budget, th, mu, mk] = await Promise.all([
       api("/api/me").then((r) => r.json()),
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
@@ -2713,6 +2756,7 @@ async function loadAll(rerender = true) {
       api("/api/finance-budget").then((r) => r.json()),
       api("/api/thoughts").then((r) => r.json()),
       api("/api/my-usage").then((r) => r.json()),
+      api("/api/market").then((r) => r.json()).catch(() => null),
     ]);
     state.me = me;
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
@@ -2720,6 +2764,7 @@ async function loadAll(rerender = true) {
     state.tasks = tasks; state.categories = cats; state.profile = prof;
     state.ideas = idea; state.problems = prob; state.files = files; state.finBudget = budget;
     state.thoughts = th; state.myUsage = mu;
+    if (mk) state.market = mk; // أسعار السوق للتحويل في الفلوس
   } catch { return; }
 
   const first = (state.me?.name || "د").trim()[0] || "د";

@@ -1050,6 +1050,12 @@ export function startServer() {
     if (!user) return;
     res.json({ assets: listAssets(user.id), market: getAssetMarket() });
   });
+  // أسعار السوق لوحدها (للتحويل في صفحة الفلوس مثلاً)
+  app.get("/api/market", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(getAssetMarket());
+  });
   app.post("/api/assets", (req, res) => {
     const user = gate(req, res);
     if (!user) return;

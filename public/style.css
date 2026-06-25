@@ -646,6 +646,17 @@ a { color: inherit; }
 #costChip { cursor: pointer; }
 #costChip:hover { filter: brightness(.96); }
 
+/* دخلك شهريًا (مقارنة) */
+.inc-now { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+.inc-now-val { font-family: var(--font-display); font-weight: 800; font-size: 26px; color: var(--finances-deep); }
+.inc-bars { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; height: 130px; }
+.inc-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.inc-col-val { font-size: 10px; color: var(--ink-muted); white-space: nowrap; }
+.inc-bar-track { width: 100%; max-width: 34px; flex: 1; display: flex; align-items: flex-end; background: var(--paper-deep, var(--surface-card)); border-radius: 8px; overflow: hidden; }
+.inc-bar-fill { width: 100%; background: var(--finances-tint, var(--finances)); border-radius: 8px 8px 0 0; transition: height .4s var(--ease-soft, ease); }
+.inc-bar-fill.now { background: var(--finances); }
+.inc-col-lbl { font-size: var(--text-xs); color: var(--ink-muted); }
+
 /* ===================== اسأل دوّنلي (شات سياقي) ===================== */
 .ask-scope { display: flex; gap: 8px; align-items: center; }
 .ask-thread {

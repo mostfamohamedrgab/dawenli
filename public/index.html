@@ -326,6 +326,11 @@
 
             <div class="stat-grid" id="finStats" style="margin-bottom:20px"></div>
 
+            <div class="card" style="margin-bottom:20px">
+              <div class="card-head"><h3>💰 دخلك شهريًا</h3><span class="muted" style="font-size:var(--text-sm)">محوّل للجنيه بسعر اليوم — تقدر تقارن الشهور</span></div>
+              <div id="finIncome"></div>
+            </div>
+
             <div class="card budget-card" style="margin-bottom:20px">
               <div class="card-head"><h3>🎯 ميزانية وهدف الشهر</h3><span class="muted" id="budgetMonth" style="font-size:var(--text-sm)"></span></div>
               <div id="budgetView"></div>
@@ -353,7 +358,14 @@
                       <option value="expense">صرف ➖</option>
                       <option value="income">دخل ➕</option>
                     </select>
-                    <input id="finAmount" class="field" type="number" placeholder="المبلغ" required style="width:110px" />
+                    <input id="finAmount" class="field" type="number" placeholder="المبلغ" required style="width:100px" />
+                    <select id="finCurrency" class="field" title="العملة" style="width:92px">
+                      <option value="جنيه">جنيه</option>
+                      <option value="دولار">دولار $</option>
+                      <option value="يورو">يورو €</option>
+                      <option value="ريال">ريال</option>
+                      <option value="درهم">درهم</option>
+                    </select>
                     <select id="finCategory" class="field"></select>
                     <input id="finNote" class="field grow" placeholder="ملاحظة" />
                     <button type="submit" class="btn finances sm">＋ إضافة</button>
