@@ -73,6 +73,10 @@
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-3-.4-4.2-1L3 21l1.5-5.3a8.5 8.5 0 1 1 16.5-3.7Z"/></svg></span>
             <span>المحادثات</span>
           </button>
+          <button class="nav-btn" data-tab="about">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></span>
+            <span>دوّنلي يعرف عنك</span>
+          </button>
         </nav>
 
         <div class="side-tip">
@@ -413,6 +417,30 @@
             </div>
             <div id="dafterMount"></div>
             <div id="dafterStash" hidden></div>
+          </section>
+
+          <!-- ========== دوّنلي يعرف إيه عنك ========== -->
+          <section class="tab-panel hidden" data-panel="about">
+            <div class="page-head">
+              <div><span class="world-pill">دوّنلي وانت</span><h1>دوّنلي يعرف إيه عنك</h1></div>
+              <button class="btn ghost sm" id="profileAddBtn" type="button">＋ معلومة</button>
+            </div>
+            <p class="muted" style="margin:0 0 14px">دي المعلومات الثابتة اللي دوّنلي افتكرها عنك من كلامك — بيحفظ بس اللي متأكد منه ١٠٠٪. تقدر تضيف أو تمسح أي حاجة.</p>
+            <div id="aboutCore" class="about-core"></div>
+            <form id="profileForm" class="inline-form hidden" style="margin:0 0 16px">
+              <select id="profileCategory" class="field">
+                <option value="هوية">هوية</option>
+                <option value="دراسة_وشغل">دراسة وشغل</option>
+                <option value="صحة">صحة</option>
+                <option value="تفضيلات">تفضيلات</option>
+                <option value="علاقات">علاقات</option>
+                <option value="أخرى">أخرى</option>
+              </select>
+              <input id="profileKey" class="field" placeholder="المعلومة (مثلاً: الجنسية)" />
+              <input id="profileValue" class="field grow" placeholder="القيمة (مثلاً: مصري)" />
+              <button type="submit" class="btn sm">💾 حفظ</button>
+            </form>
+            <div id="profileFacts"></div>
           </section>
 
           <!-- ========== تفاصيل تكلفة الـ AI ========== -->
@@ -781,6 +809,7 @@
         <button class="more-item" data-tab="files"><span class="mi-ico">📎</span><span>مركز الملفات</span></button>
         <button class="more-item" data-tab="chats"><span class="mi-ico">🗨️</span><span>المحادثات</span></button>
         <button class="more-item" data-tab="aicost"><span class="mi-ico">💸</span><span>تكلفة الـ AI</span></button>
+        <button class="more-item" data-tab="about"><span class="mi-ico">🧠</span><span>دوّنلي يعرف عنك</span></button>
       </div>
     </div>
 

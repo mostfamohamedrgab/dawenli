@@ -610,28 +610,33 @@ export function addFinance({ userId, entryDate, direction, amount, currency, cat
     note || null
   );
   // ربط تلقائي: الدخل/الصرف بعملة معيّنة يزوّد/ينقّص أي هدف بنفس الوحدة (مثلاً هدف «دولار»)
-  try {
-    const normCur = (s) => {
-      const x = String(s || "").trim().toLowerCase();
-      if (["دولار", "usd", "$", "dollar", "dollars"].includes(x)) return "USD";
-      if (["جنيه", "egp", "ج.م", "جم", "le"].includes(x)) return "EGP";
-      if (["يورو", "eur", "€"].includes(x)) return "EUR";
-      if (["ريال", "sar"].includes(x)) return "SAR";
-      if (["درهم", "aed"].includes(x)) return "AED";
-      if (["إسترليني", "استرليني", "gbp", "£"].includes(x)) return "GBP";
-      return x;
-    };
-    const ck = normCur(currency || "جنيه");
-    const gs = db.prepare(`SELECT id, current, unit FROM goals WHERE user_id = ?`).all(userId)
-      .filter((g) => g.unit && normCur(g.unit) === ck);
-    const delta = dir === "income" ? amt : -amt;
-    for (const g of gs) {
-      const nc = Math.max(0, (Number(g.current) || 0) + delta);
-      db.prepare(`UPDATE goals SET current = ?, updated_at = ? WHERE id = ? AND user_id = ?`).run(nc, now(), g.id, userId);
-      logGoalChange(userId, g.id, nc - (Number(g.current) || 0), nc, (dir === "income" ? "دخل" : "صرف") + (note ? " · " + note : ""));
-    }
-  } catch {}
+  try { applyFinanceToGoals(userId, dir, amt, currency, note, 1); } catch {}
   return Number(info.lastInsertRowid);
+}
+// تطبيع اسم العملة لكود موحّد
+function normCurKey(s) {
+  const x = String(s || "").trim().toLowerCase();
+  if (["دولار", "usd", "$", "dollar", "dollars"].includes(x)) return "USD";
+  if (["جنيه", "egp", "ج.م", "جم", "le"].includes(x)) return "EGP";
+  if (["يورو", "eur", "€"].includes(x)) return "EUR";
+  if (["ريال", "sar"].includes(x)) return "SAR";
+  if (["درهم", "aed"].includes(x)) return "AED";
+  if (["إسترليني", "استرليني", "gbp", "£"].includes(x)) return "GBP";
+  return x;
+}
+// يزوّد/ينقّص أي هدف وحدته نفس عملة العملية (sign=1 إضافة، sign=-1 تراجع عند الحذف)
+function applyFinanceToGoals(userId, dir, amount, currency, note, sign) {
+  const amt = Number(amount) || 0;
+  if (!amt) return;
+  const ck = normCurKey(currency || "جنيه");
+  const gs = db.prepare(`SELECT id, current, unit FROM goals WHERE user_id = ?`).all(userId)
+    .filter((g) => g.unit && normCurKey(g.unit) === ck);
+  const delta = (dir === "income" ? amt : -amt) * (sign || 1);
+  for (const g of gs) {
+    const nc = Math.max(0, (Number(g.current) || 0) + delta);
+    db.prepare(`UPDATE goals SET current = ?, updated_at = ? WHERE id = ? AND user_id = ?`).run(nc, now(), g.id, userId);
+    logGoalChange(userId, g.id, nc - (Number(g.current) || 0), nc, (sign < 0 ? "تراجع · " : "") + (dir === "income" ? "دخل" : "صرف") + (note ? " · " + note : ""));
+  }
 }
 
 const listFinanceStmt = db.prepare(
@@ -656,7 +661,11 @@ export function financeBetween(userId, from, to) {
 }
 
 export function deleteFinance(userId, id) {
-  return db.prepare(`DELETE FROM finance WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+  const row = db.prepare(`SELECT direction, amount, currency, note FROM finance WHERE user_id = ? AND id = ?`).get(userId, id);
+  const ok = db.prepare(`DELETE FROM finance WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+  // رجّع تأثير العملية على الهدف اللي بنفس العملة (عشان الحذف وإعادة الإضافة ميكررش)
+  if (ok && row) { try { applyFinanceToGoals(userId, row.direction, row.amount, row.currency, row.note, -1); } catch {} }
+  return ok;
 }
 
 /* ===================== Health (صحة ونفسية) ===================== */

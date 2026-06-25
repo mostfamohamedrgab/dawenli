@@ -269,6 +269,7 @@ function gotoTab(tab) {
   if (tab === "thoughts") renderThoughts();
   if (tab === "dafter") openDafter();
   if (tab === "aicost") renderAiCostPage();
+  if (tab === "about") renderAboutPage();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 $("sideNav").addEventListener("click", (e) => {
@@ -982,7 +983,29 @@ $("profileForm")?.addEventListener("submit", async (e) => {
   $("profileForm").classList.add("hidden");
   await loadAll(false);
   renderProfile();
+  renderAboutCore();
 });
+// صفحة «دوّنلي يعرف عنك» — كل المعلومات + كروت الأساسيات (جنسية/عملات)
+function renderAboutPage() { renderProfile(); renderAboutCore(); }
+function findFact(keys) {
+  return (state.profile || []).find((f) => keys.some((k) => (f.fact_key || "").includes(k)));
+}
+function renderAboutCore() {
+  const el = $("aboutCore"); if (!el) return;
+  const nat = findFact(["جنسي", "بلد", "الوطن", "الجنسية"]);
+  const cur = findFact(["عملة", "عملات", "currenc"]); // عملة/العملات
+  const card = (ico, label, fact, hint) => `
+    <div class="ac-core-card${fact ? "" : " missing"}">
+      <span class="acc-ico">${ico}</span>
+      <div class="acc-body">
+        <span class="acc-label">${label}</span>
+        <b class="acc-val">${fact ? escapeHtml(fact.value) : `<span class="muted">${hint}</span>`}</b>
+      </div>
+    </div>`;
+  el.innerHTML =
+    card("🌍", "الجنسية / البلد", nat, "لسه دوّنلي ما يعرفهاش — قوله أو ضيفها") +
+    card("💱", "العملات اللي بتستخدمها", cur, "لسه ما اتحددتش — قوله أو ضيفها");
+}
 
 function renderOverview() {
   $("heroGreeting").textContent = greeting();

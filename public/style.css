@@ -657,6 +657,15 @@ a { color: inherit; }
 .inc-bar-fill.now { background: var(--finances); }
 .inc-col-lbl { font-size: var(--text-xs); color: var(--ink-muted); }
 
+/* صفحة «دوّنلي يعرف عنك» — كروت الأساسيات */
+.about-core { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.ac-core-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface-card); border: 1.5px solid var(--hairline); border-radius: var(--radius-md); }
+.ac-core-card.missing { border-style: dashed; background: var(--paper); }
+.acc-ico { font-size: 26px; }
+.acc-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.acc-label { font: var(--type-label); color: var(--ink-muted); }
+.acc-val { font-weight: 800; overflow-wrap: anywhere; }
+
 /* ===================== اسأل دوّنلي (شات سياقي) ===================== */
 .ask-scope { display: flex; gap: 8px; align-items: center; }
 .ask-thread {
