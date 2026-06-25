@@ -1578,9 +1578,10 @@ function renderFinancesPage() {
   }
   const curMonthKey = TODAY().slice(0, 7);
   const monthIncome = Math.round(incomeByMonth[curMonthKey] || 0);
+  const CUR_NAME = { USD: "دولار", "دولار": "دولار", EUR: "يورو", "يورو": "يورو", SAR: "ريال", AED: "درهم", GBP: "إسترليني", EGP: "جنيه", "جنيه": "جنيه" };
   const incCur = {};
   for (const f of data.filter((f) => f.direction === "income" && (f.entry_date || "").slice(0, 7) === curMonthKey)) {
-    const cu = f.currency || "جنيه"; incCur[cu] = (incCur[cu] || 0) + f.amount;
+    const cu = CUR_NAME[f.currency] || f.currency || "جنيه"; incCur[cu] = (incCur[cu] || 0) + f.amount;
   }
   const incCurStr = Object.entries(incCur).map(([cu, v]) => `${arNum(v)} ${cu}`).join(" · ");
 
