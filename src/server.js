@@ -1168,7 +1168,7 @@ export function startServer() {
   app.post("/api/goals", (req, res) => {
     const user = gate(req, res);
     if (!user) return;
-    const { title, target, unit, note } = req.body || {};
+    const { title, target, unit, note, period, deadline } = req.body || {};
     if (!title) return res.status(400).json({ error: "العنوان مطلوب" });
     const g = applyGoal({
       userId: user.id,
@@ -1176,6 +1176,8 @@ export function startServer() {
       target: target != null && target !== "" ? Number(target) : null,
       unit: unit || null,
       note: note || null,
+      period: period || null,
+      deadline: deadline || null,
     });
     res.json({ ok: true, goal: g });
   });

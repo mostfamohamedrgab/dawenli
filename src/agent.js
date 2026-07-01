@@ -27,6 +27,7 @@ import {
   mealsBetween,
   applyGoal,
   listGoals,
+  goalExpired,
   addHabit,
   findHabitByTitle,
   logHabit,
@@ -178,7 +179,7 @@ const TOOLS = [
     function: {
       name: "upsert_goal",
       description:
-        "أنشئ هدف جديد أو سجّل تقدّم في هدف موجود. لو الهدف موجود في السياق استخدم نفس عنوانه بالظبط. لو المستخدم حقق تقدّم جديد قول add_amount، ولو قال الإجمالي بقى كذا أو بيصحّح/بيمسح مبلغ غلط قول set_current (مش add_amount — عشان ماتكرّرش).",
+        "أنشئ هدف جديد أو سجّل تقدّم في هدف موجود. لو الهدف موجود في السياق استخدم نفس عنوانه بالظبط. لو المستخدم حقق تقدّم جديد قول add_amount، ولو قال الإجمالي بقى كذا أو بيصحّح/بيمسح مبلغ غلط قول set_current (مش add_amount — عشان ماتكرّرش). لو المستخدم حدّد للهدف مدة (زمنية) — «هدف الأسبوع ده»، «شهري»، «بحلول تاريخ كذا» — حُطّ period و/أو deadline. أول ما وقت الهدف يعدّي بيتوقف عن المتابعة تلقائيًا.",
       parameters: {
         type: "object",
         properties: {
@@ -188,6 +189,8 @@ const TOOLS = [
           set_current: { type: "number", description: "قيمة التقدّم الإجمالية الجديدة" },
           unit: { type: "string", description: "الوحدة (جنيه، كيلو، صفحة...)" },
           note: { type: "string", description: "تفاصيل/مصدر التقدّم (مثلاً «من التعاون مع aix») — حُطّها كل ما تزوّد هدف، بتظهر في سجل الهدف" },
+          period: { type: "string", enum: ["week", "month", "date"], description: "مدة الهدف: week = أسبوعي (٧ أيام)، month = شهري (٣٠ يوم)، date = بتاريخ محدد (لازم تبعت deadline معاها). سيبها فاضية لو الهدف مستمر بلا نهاية." },
+          deadline: { type: "string", description: "آخر يوم للهدف YYYY-MM-DD — لو المستخدم قال تاريخ صريح (زي «بحلول ٣٠ يوليو»). احسبه من next_days/التاريخ الحالي في السياق." },
         },
         required: ["title"],
       },
@@ -457,6 +460,8 @@ function executeTool(ctx, name, args) {
         setCurrent: args.set_current ?? null,
         unit: args.unit || null,
         note: args.note || null,
+        period: args.period !== undefined ? args.period : undefined,
+        deadline: args.deadline !== undefined ? args.deadline : undefined,
       });
       if (!applied) return { result: { ok: false, error: "title مطلوب" } };
       const pct = applied.target
@@ -464,9 +469,10 @@ function executeTool(ctx, name, args) {
         : null;
       const tgt = applied.target ? `/${fmtNum(applied.target)}` : "";
       const unit = applied.unit ? " " + applied.unit : "";
+      const when = args.deadline ? ` · لحد ${String(args.deadline).slice(0, 10)}` : args.period === "week" ? " · أسبوعي" : args.period === "month" ? " · شهري" : "";
       return {
         result: { ok: true, created: applied.created, current: applied.current, target: applied.target, percent: pct },
-        receipt: `🎯 ${applied.created ? "هدف جديد" : "تقدّم في هدف"}: ${applied.title} — ${fmtNum(applied.current)}${tgt}${unit}${pct != null ? ` (${pct}%)` : ""}`,
+        receipt: `🎯 ${applied.created ? "هدف جديد" : "تقدّم في هدف"}: ${applied.title} — ${fmtNum(applied.current)}${tgt}${unit}${pct != null ? ` (${pct}%)` : ""}${when}`,
       };
     }
     case "log_habit": {
@@ -692,7 +698,12 @@ function buildSnapshot(userId) {
     finance_today: todayFinance.map(
       (f) => `#${f.id} ${f.direction === "income" ? "دخل" : "صرف"} ${f.amount} ${f.currency || "جنيه"}${f.category ? " · " + f.category : ""}${f.note ? " · " + f.note : ""}`
     ),
-    goals: goals.map((g) => `${g.title}: ${g.current}${g.unit ? " " + g.unit : ""}${g.target ? ` من ${g.target}` : ""}`),
+    goals: goals.map((g) => {
+      const base = `${g.title}: ${g.current}${g.unit ? " " + g.unit : ""}${g.target ? ` من ${g.target}` : ""}`;
+      if (goalExpired(g, today)) return `${base} — ⌛ خلص وقته (${g.deadline}) فبطّلنا متابعته، ماتزوّدهوش إلا لو المستخدم طلب صراحةً`;
+      if (g.deadline) return `${base} — لحد ${g.deadline}`;
+      return base;
+    }),
     habits: habits.map((h) => `${h.title} (${h.kind === "quit" ? "بيبطّلها" : "بيعملها"})${h.doneToday ? " ✓ اتعملت النهاردة" : ""} — ستريك ${h.streak}`),
     pending_tasks: tasks.map((t) => `#${t.id} ${t.title} — ${t.due_date}${t.due_time ? " " + t.due_time : ""}`),
     active_conditions: conditions.map((c) => `${c.title} (متابعة لحد ${c.end_date})`),

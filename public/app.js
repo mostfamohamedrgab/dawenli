@@ -167,6 +167,8 @@ const EDIT_CONFIGS = {
     { key: "title", label: "الهدف", type: "text" },
     { key: "target", label: "المستهدف", type: "number" },
     { key: "unit", label: "الوحدة", type: "text" },
+    { key: "period", label: "المدة", type: "select", options: [["", "مستمر (بلا نهاية)"], ["week", "أسبوعي"], ["month", "شهري"], ["date", "بتاريخ محدد"]] },
+    { key: "deadline", label: "ينتهي في (للتاريخ المحدد)", type: "date" },
   ] },
   ideas: { title: "تعديل فكرة", source: () => state.ideas, fields: [
     { key: "title", label: "الفكرة", type: "text" },
@@ -1440,6 +1442,17 @@ function ringSVG(pct, size = 130, stroke = 12) {
       <div class="ring-center" style="font-size:${Math.round(size * 0.2)}px">${arNum(Math.round(pct))}٪</div>
     </div>`;
 }
+// حالة توقيت الهدف: فاضية لو مستمر، عدّاد لو لسه، أو «انتهى وقته» لو الـ deadline عدّى
+function goalTimeInfo(g) {
+  if (!g || !g.deadline) return { expired: false, label: "" };
+  const n = new Date(); // التاريخ المحلي بتاع المستخدم (مش UTC) عشان العدّاد يطابق يومه
+  const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  const diff = Math.round((new Date(`${g.deadline}T00:00:00Z`) - new Date(`${today}T00:00:00Z`)) / 86400000);
+  if (diff < 0) return { expired: true, label: `⌛ انتهى وقته — ${fmtShort(g.deadline)}` };
+  if (diff === 0) return { expired: false, label: `⏰ آخر يوم النهاردة` };
+  return { expired: false, label: `⏳ باقي ${arNum(diff)} يوم · لحد ${fmtShort(g.deadline)}` };
+}
+window.goalTimeInfo = goalTimeInfo;
 function renderGoalsPage() {
   const el = $("ringGrid");
   const data = state.goals;
@@ -1450,11 +1463,13 @@ function renderGoalsPage() {
   el.innerHTML = data.map((g) => {
     const pct = g.target ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
     const unit = g.unit ? " " + escapeHtml(g.unit) : "";
-    return `<div class="ring-card lift">
+    const ti = goalTimeInfo(g);
+    return `<div class="ring-card lift${ti.expired ? " goal-expired" : ""}">
       <div class="rc-tap" onclick="openGoalDetail(${g.id})">
         ${g.target ? ringSVG(pct) : `<div style="font-size:44px">🎯</div>`}
         <div class="rc-caption">${escapeHtml(g.title)}</div>
         <div class="rc-meta">${arNum(g.current)}${g.target ? ` / ${arNum(g.target)}` : ""}${unit}${g.target ? ` · باقي ${arNum(Math.max(0, g.target - g.current))}` : ""}</div>
+        ${ti.label ? `<div class="rc-deadline${ti.expired ? " exp" : ""}">${ti.label}</div>` : ""}
         <div class="rc-hint">اضغط تشوف السجل ›</div>
       </div>
       <div class="rc-update">
@@ -1503,6 +1518,7 @@ async function openGoalDetail(id) {
       <button class="icon-btn" onclick="closeGoalDetail()" aria-label="إغلاق">✕</button>
     </div>
     <div class="muted" style="font-size:var(--text-sm);margin-bottom:14px">${arNum(goal.current)}${goal.target ? ` / ${arNum(goal.target)}` : ""}${unit}${goal.target ? ` · ${arNum(pct)}٪` : ""}</div>
+    ${goalTimeInfo(goal).label ? `<div class="gd-deadline${goalTimeInfo(goal).expired ? " exp" : ""}">${goalTimeInfo(goal).label}</div>` : ""}
     <div class="td-sec">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
         <span class="td-label">📎 موارد الهدف</span>

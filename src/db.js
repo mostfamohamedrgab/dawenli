@@ -329,6 +329,8 @@ addColumnIfMissing("tasks", "reminded_at", "TEXT");
 addColumnIfMissing("assets", "items", "TEXT"); // تفصيل بنود الأصل (JSON) — مثلاً قطع الدهب
 addColumnIfMissing("tasks", "resources", "TEXT"); // موارد المهمة: وصف/روابط/مصادر
 addColumnIfMissing("goals", "resources", "TEXT"); // موارد الهدف: وصف/روابط/مصادر
+addColumnIfMissing("goals", "period", "TEXT");    // 'week' | 'month' | 'date' — null = مستمر بلا نهاية
+addColumnIfMissing("goals", "deadline", "TEXT");  // YYYY-MM-DD آخر يوم متابعة — null = مستمر
 db.prepare(`UPDATE tasks SET status = 'pending' WHERE status = 'open'`).run();
 
 const now = () => new Date().toISOString();
@@ -506,7 +508,10 @@ export function upsertJournalForDay({ userId, entryDate, mood, summary, tags, tr
   const existing = journalForDayStmt.get(userId, entryDate);
   if (existing) {
     const mergedTranscript = `${existing.transcript}\n\n${transcript}`.trim();
-    const mergedSummary = [existing.summary, summary].filter(Boolean).join(" — ");
+    // ماننفعش نلزق الملخصات ورا بعض (كان بيطلع بلوك مكرر ضخم لو اليوم فيه كذا تسجيل) —
+    // نمسك الملخص الأكمل (الأطول) وخلاص؛ التفاصيل كلها موجودة في النص الكامل.
+    const cand = [existing.summary, summary].filter(Boolean);
+    const mergedSummary = cand.sort((a, b) => b.length - a.length)[0] || null;
     const mergedTags = [...new Set([...parseJson(existing.tags, []), ...(tags ?? [])])];
     updateJournalStmt.run(
       mood ?? existing.mood ?? null,
@@ -735,22 +740,46 @@ const findGoalStmt = db.prepare(
   `SELECT * FROM goals WHERE user_id = ? AND title LIKE ? ORDER BY id DESC LIMIT 1`
 );
 const insertGoalStmt = db.prepare(`
-  INSERT INTO goals (created_at, updated_at, user_id, title, target, current, unit, note)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO goals (created_at, updated_at, user_id, title, target, current, unit, note, period, deadline)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const updateGoalStmt = db.prepare(`
-  UPDATE goals SET updated_at = ?, title = ?, target = ?, current = ?, unit = ?, note = ?
+  UPDATE goals SET updated_at = ?, title = ?, target = ?, current = ?, unit = ?, note = ?, period = ?, deadline = ?
   WHERE id = ?
 `);
 
+// يحسب آخر يوم متابعة من الفترة: أسبوعي = +٧ أيام، شهري = +٣٠، بتاريخ = التاريخ الصريح، مستمر = null
+function addDaysISO(isoDate, n) {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+export function computeDeadline(period, explicit, fromDate) {
+  if (explicit) return String(explicit).slice(0, 10);
+  const base = fromDate || localToday();
+  if (period === "week") return addDaysISO(base, 7);
+  if (period === "month") return addDaysISO(base, 30);
+  return null; // مستمر، أو date بلا تاريخ صريح
+}
+// الهدف "خلص وقته" لو ليه deadline والنهاردة عدّاه
+export function goalExpired(g, today = localToday()) {
+  return !!(g && g.deadline && today > g.deadline);
+}
+
 // منطق ذكي: لو الهدف موجود نحدّثه/نزوّد التقدّم، لو لأ ننشئه
-export function applyGoal({ userId, title, target, addAmount, setCurrent, unit, note }) {
+export function applyGoal({ userId, title, target, addAmount, setCurrent, unit, note, period, deadline }) {
   if (!title) return null;
   const existing = findGoalStmt.get(userId, `%${title.trim()}%`);
   if (existing) {
     let current = existing.current;
     if (setCurrent != null) current = Number(setCurrent);
     if (addAmount != null) current += Number(addAmount);
+    // لو المستخدم حدّد فترة/تاريخ جديد نحدّثهم، غير كده نسيب اللي موجود
+    const newPeriod = period !== undefined ? (period || null) : existing.period;
+    const newDeadline =
+      deadline !== undefined || period !== undefined
+        ? computeDeadline(period !== undefined ? period : existing.period, deadline, existing.created_at?.slice(0, 10))
+        : existing.deadline;
     updateGoalStmt.run(
       now(),
       existing.title,
@@ -758,6 +787,8 @@ export function applyGoal({ userId, title, target, addAmount, setCurrent, unit, 
       current,
       unit || existing.unit,
       note || existing.note,
+      newPeriod,
+      newDeadline,
       existing.id
     );
     logGoalChange(userId, existing.id, current - existing.current, current, note || null);
@@ -781,7 +812,9 @@ export function applyGoal({ userId, title, target, addAmount, setCurrent, unit, 
     target != null ? Number(target) : null,
     current,
     unit || null,
-    note || null
+    note || null,
+    period || null,
+    computeDeadline(period, deadline)
   );
   logGoalChange(userId, Number(info.lastInsertRowid), current, current, note || "هدف جديد");
   return {
@@ -1670,7 +1703,19 @@ export function updateMeal(userId, id, patch) {
 export function updateGoalMeta(userId, id, patch) {
   const p = { ...patch, updated_at: now() };
   if (p.target !== undefined) p.target = p.target === "" || p.target == null ? null : Number(p.target);
-  return updateOwned("goals", ["title", "target", "unit", "resources", "updated_at"], userId, id, p);
+  // ضبط الفترة/الـ deadline: أسبوعي/شهري = يتحسب لوحده، بتاريخ = زي ما اتبعت، مستمر = بلا نهاية
+  if (p.period !== undefined) {
+    p.period = p.period || null;
+    if (p.period === "week" || p.period === "month") {
+      const g = db.prepare(`SELECT created_at FROM goals WHERE user_id = ? AND id = ?`).get(userId, id);
+      p.deadline = computeDeadline(p.period, null, g?.created_at?.slice(0, 10));
+    } else if (p.period === null) {
+      p.deadline = null; // مستمر
+    }
+    // period === "date" → نسيب p.deadline اللي جه من الفورم
+  }
+  if (p.deadline !== undefined) p.deadline = p.deadline ? String(p.deadline).slice(0, 10) : null;
+  return updateOwned("goals", ["title", "target", "unit", "resources", "period", "deadline", "updated_at"], userId, id, p);
 }
 export function updateIdeaFields(userId, id, patch) {
   return updateOwned("ideas", ["title", "detail"], userId, id, patch);

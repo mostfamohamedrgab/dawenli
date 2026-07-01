@@ -1064,6 +1064,14 @@ a { color: inherit; }
 .ring-card .rc-caption { font: var(--type-body); color: var(--ink-muted); text-align: center; }
 .ring-card .rc-meta { font: var(--type-label); color: var(--ink); text-align: center; }
 .ring-card .rc-update { display: flex; gap: 8px; width: 100%; }
+.rc-deadline { font-size: var(--text-xs); font-weight: 700; color: var(--goals-deep); text-align: center; margin-top: 3px; }
+.rc-deadline.exp { color: var(--danger, #b3261e); }
+/* الهدف اللي خلص وقته — نعتّمه ونحط شريط علوي أحمر خفيف عشان يبان إنه مش بيتابع */
+.ring-card.goal-expired { opacity: .62; }
+.ring-card.goal-expired::before { content: "انتهى وقته"; position: absolute; top: 8px; inset-inline-start: 8px; font-size: 10px; font-weight: 800; color: #fff; background: var(--danger, #b3261e); padding: 2px 7px; border-radius: 999px; }
+.ring-card { position: relative; }
+.gd-deadline { font-size: var(--text-sm); font-weight: 700; color: var(--goals-deep); margin: -8px 0 12px; }
+.gd-deadline.exp { color: var(--danger, #b3261e); }
 
 /* ===========================================================================
    فلوس: أعمدة + بنود
