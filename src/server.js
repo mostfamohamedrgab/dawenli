@@ -93,6 +93,7 @@ import {
   addAskMessage,
   listAskMessages,
   clearAskMessages,
+  recentIdenticalConversation,
   addAsset,
   listAssets,
   updateAsset,
@@ -896,6 +897,12 @@ export function startServer() {
       try {
         const transcript = await transcribe(buf, `voice.${ext}`, user.id);
         if (!transcript) return res.status(422).json({ error: "مقدرتش أفهم الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
+        // منع تكرار: لو نفس التسجيل اتبعت واتعالج قبل كده بدقايق (ريتراي/دبل-سبمت) ماتعالجهوش تاني
+        const dup = recentIdenticalConversation(user.id, transcript, 15);
+        if (dup) {
+          cleanupAudio(audioPath);
+          return res.json({ transcript, reply: dup.ai_reply || "التسجيل ده اتسجّل قبل كده ✅", receipts: [], duplicate: true });
+        }
         const { reply, receipts } = await runAgent({ user, text: transcript, kind: "voice" });
         cleanupAudio(audioPath); // نجح كله → الخام مبقاش محتاج
         res.json({ transcript, reply, receipts });
@@ -938,8 +945,8 @@ export function startServer() {
       try {
         const transcript = await transcribe(buf, `thought.${ext}`, user.id);
         if (!transcript) return res.status(422).json({ error: "مقدرتش أفهم الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
-        const thought = addThought(user.id, transcript, "voice");
         cleanupAudio(audioPath); // نجح → الخام مبقاش محتاج
+        const thought = addThought(user.id, transcript, "voice");
         res.json({ transcript, thought });
       } catch (err) {
         console.error("thought voice error:", err, "| الصوت محفوظ في:", audioPath);

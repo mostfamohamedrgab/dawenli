@@ -1010,6 +1010,19 @@ export function recentConversations(userId, limit = 10) {
   return listConvStmt.all(userId, limit).reverse();
 }
 
+// هل نفس المستخدم بعت نفس النص بالظبط في آخر X دقيقة؟ (منع تكرار معالجة نفس التسجيل لو اتبعت أكتر من مرة)
+export function recentIdenticalConversation(userId, text, minutes = 10) {
+  if (!text || !String(text).trim()) return null;
+  const since = new Date(Date.now() - minutes * 60000).toISOString();
+  return db
+    .prepare(
+      `SELECT id, ai_reply FROM conversations
+       WHERE user_id = ? AND user_text = ? AND created_at >= ?
+       ORDER BY id DESC LIMIT 1`
+    )
+    .get(userId, String(text), since);
+}
+
 export function deleteConversation(userId, id) {
   return (
     db.prepare(`DELETE FROM conversations WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0
