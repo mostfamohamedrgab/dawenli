@@ -333,6 +333,30 @@ addColumnIfMissing("goals", "period", "TEXT");    // 'week' | 'month' | 'date' �
 addColumnIfMissing("goals", "deadline", "TEXT");  // YYYY-MM-DD آخر يوم متابعة — null = مستمر
 db.prepare(`UPDATE tasks SET status = 'pending' WHERE status = 'open'`).run();
 
+// ===== المتتبِّعات اليومية (أرقام بتتسجّل كل يوم: ساعات عمل، مياه، مذاكرة...) =====
+db.exec(`
+  CREATE TABLE IF NOT EXISTS metrics (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at    TEXT NOT NULL,
+    user_id       INTEGER NOT NULL,
+    title         TEXT NOT NULL,
+    unit          TEXT,
+    emoji         TEXT,
+    daily_target  REAL,
+    archived      INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS metric_logs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at  TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    metric_id   INTEGER NOT NULL,
+    entry_date  TEXT NOT NULL,
+    value       REAL NOT NULL,
+    note        TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_metric_logs ON metric_logs (user_id, metric_id, entry_date);
+`);
+
 const now = () => new Date().toISOString();
 
 // تاريخ "النهاردة" بتوقيت المستخدم (القاهرة) مش UTC — عشان التدوين بعد نص الليل
@@ -887,6 +911,82 @@ export function updateGoalLog(userId, logId, { delta, note } = {}) {
     db.prepare(`UPDATE goal_log SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`).run(...vals);
   }
   return true;
+}
+
+/* ===================== المتتبِّعات اليومية (أرقام يومية: ساعات عمل، مياه...) ===================== */
+const findMetricStmt = db.prepare(
+  `SELECT * FROM metrics WHERE user_id = ? AND title LIKE ? AND archived = 0 ORDER BY id DESC LIMIT 1`
+);
+// أنشئ متتبِّع أو حدّث بياناته (بالعنوان — زي الأهداف)
+export function upsertMetric({ userId, title, unit, emoji, dailyTarget }) {
+  if (!title) return null;
+  const existing = findMetricStmt.get(userId, `%${title.trim()}%`);
+  if (existing) {
+    const sets = [], vals = [];
+    if (unit) { sets.push("unit = ?"); vals.push(unit); }
+    if (emoji) { sets.push("emoji = ?"); vals.push(emoji); }
+    if (dailyTarget !== undefined) { sets.push("daily_target = ?"); vals.push(dailyTarget === "" || dailyTarget == null ? null : Number(dailyTarget)); }
+    if (sets.length) { vals.push(existing.id, userId); db.prepare(`UPDATE metrics SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`).run(...vals); }
+    return { ...existing, created: false };
+  }
+  const info = db.prepare(`INSERT INTO metrics (created_at, user_id, title, unit, emoji, daily_target) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(now(), userId, title.trim(), unit || null, emoji || null, dailyTarget === "" || dailyTarget == null ? null : Number(dailyTarget));
+  return { id: Number(info.lastInsertRowid), title: title.trim(), unit: unit || null, emoji: emoji || null, daily_target: dailyTarget ?? null, created: true };
+}
+// سجّل قيمة يوم (بيعمل replace لقيمة نفس اليوم لو موجودة — «النهاردة اشتغلت ٦ ساعات» = يوم النهاردة 6)
+export function logMetric({ userId, title, value, date, note, unit, emoji, dailyTarget }) {
+  if (!title || value == null || value === "") return null;
+  const m = upsertMetric({ userId, title, unit, emoji, dailyTarget });
+  if (!m) return null;
+  const d = date || localToday();
+  const ex = db.prepare(`SELECT id FROM metric_logs WHERE user_id = ? AND metric_id = ? AND entry_date = ?`).get(userId, m.id, d);
+  if (ex) db.prepare(`UPDATE metric_logs SET value = ?, note = ?, created_at = ? WHERE id = ?`).run(Number(value), note || null, now(), ex.id);
+  else db.prepare(`INSERT INTO metric_logs (created_at, user_id, metric_id, entry_date, value, note) VALUES (?, ?, ?, ?, ?, ?)`).run(now(), userId, m.id, d, Number(value), note || null);
+  return { metric: m.title, id: m.id, date: d, value: Number(value), unit: m.unit, created: m.created };
+}
+function metricStats(userId, metricId, today) {
+  const wk = addDaysISO(today, -6), mo = addDaysISO(today, -29);
+  const t = db.prepare(`SELECT value FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date=?`).get(userId, metricId, today);
+  const w = db.prepare(`SELECT SUM(value) s, AVG(value) a FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date>=?`).get(userId, metricId, wk);
+  const m = db.prepare(`SELECT SUM(value) s FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date>=?`).get(userId, metricId, mo);
+  const last7 = db.prepare(`SELECT entry_date, value FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date>=? ORDER BY entry_date`).all(userId, metricId, wk);
+  return { today: t ? t.value : null, week_total: w.s || 0, week_avg: w.a ? Math.round(w.a * 10) / 10 : 0, month_total: m.s || 0, last7 };
+}
+export function listMetricsWithStats(userId) {
+  const today = localToday();
+  return db.prepare(`SELECT * FROM metrics WHERE user_id=? AND archived=0 ORDER BY id DESC`).all(userId)
+    .map((m) => ({ ...m, stats: metricStats(userId, m.id, today) }));
+}
+export function metricHistory(userId, metricId, limit = 90) {
+  return db.prepare(`SELECT id, entry_date, value, note FROM metric_logs WHERE user_id=? AND metric_id=? ORDER BY entry_date DESC LIMIT ?`).all(userId, metricId, limit);
+}
+// حدّد/عدّل قيمة يوم من الواجهة (قيمة فاضية = امسح تسجيل اليوم)
+export function setMetricDay(userId, metricId, date, value, note) {
+  const m = db.prepare(`SELECT id FROM metrics WHERE user_id=? AND id=?`).get(userId, metricId);
+  if (!m) return false;
+  const d = date || localToday();
+  if (value === "" || value == null) { db.prepare(`DELETE FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date=?`).run(userId, metricId, d); return true; }
+  const ex = db.prepare(`SELECT id FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date=?`).get(userId, metricId, d);
+  if (ex) db.prepare(`UPDATE metric_logs SET value=?, note=?, created_at=? WHERE id=?`).run(Number(value), note || null, now(), ex.id);
+  else db.prepare(`INSERT INTO metric_logs (created_at,user_id,metric_id,entry_date,value,note) VALUES (?,?,?,?,?,?)`).run(now(), userId, metricId, d, Number(value), note || null);
+  return true;
+}
+export function updateMetricMeta(userId, id, patch) {
+  const sets = [], vals = [];
+  for (const c of ["title", "unit", "emoji", "daily_target"]) if (patch[c] !== undefined) {
+    sets.push(`${c} = ?`);
+    vals.push(c === "daily_target" ? (patch[c] === "" || patch[c] == null ? null : Number(patch[c])) : (patch[c] || null));
+  }
+  if (!sets.length) return false;
+  vals.push(id, userId);
+  return db.prepare(`UPDATE metrics SET ${sets.join(", ")} WHERE id=? AND user_id=?`).run(...vals).changes > 0;
+}
+export function deleteMetric(userId, id) {
+  db.prepare(`DELETE FROM metric_logs WHERE user_id=? AND metric_id=?`).run(userId, id);
+  return db.prepare(`DELETE FROM metrics WHERE user_id=? AND id=?`).run(userId, id).changes > 0;
+}
+export function deleteMetricLog(userId, logId) {
+  return db.prepare(`DELETE FROM metric_logs WHERE user_id=? AND id=?`).run(userId, logId).changes > 0;
 }
 
 /* ===================== Tasks (مهام + تقويم) ===================== */

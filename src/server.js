@@ -26,6 +26,13 @@ import {
   goalLog,
   deleteGoalLog,
   updateGoalLog,
+  logMetric,
+  listMetricsWithStats,
+  metricHistory,
+  setMetricDay,
+  updateMetricMeta,
+  deleteMetric,
+  deleteMetricLog,
   listConversations,
   deleteConversation,
   listConditions,
@@ -857,6 +864,7 @@ export function startServer() {
     ideas: updateIdeaFields,
     problems: updateProblemFields,
     habits: updateHabitFields,
+    metrics: updateMetricMeta,
   };
   for (const [kind, fn] of Object.entries(updaters)) {
     app.put(`/api/${kind}/:id`, (req, res) => {
@@ -1015,6 +1023,7 @@ export function startServer() {
     habits: deleteHabit,
     ideas: deleteIdea,
     problems: deleteProblem,
+    metrics: deleteMetric,
   };
   for (const [kind, fn] of Object.entries(deleters)) {
     app.delete(`/api/${kind}/:id`, (req, res) => {
@@ -1213,6 +1222,38 @@ export function startServer() {
     if (!user) return;
     const { delta, note } = req.body || {};
     res.json({ ok: updateGoalLog(user.id, Number(req.params.logId), { delta, note }) });
+  });
+
+  /* ===== المتتبِّعات اليومية (أرقام يومية) ===== */
+  app.get("/api/metrics", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listMetricsWithStats(user.id));
+  });
+  app.post("/api/metrics", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const { title, value, unit, emoji, daily_target, date, note } = req.body || {};
+    if (!title) return res.status(400).json({ error: "العنوان مطلوب" });
+    const m = logMetric({ userId: user.id, title, value: value === "" || value == null ? 0 : value, unit, emoji, dailyTarget: daily_target, date, note });
+    res.json({ ok: !!m, metric: m });
+  });
+  // تسجيل/تعديل قيمة يوم معيّن (من الواجهة) — قيمة فاضية = امسح تسجيل اليوم
+  app.post("/api/metrics/:id/day", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const { date, value, note } = req.body || {};
+    res.json({ ok: setMetricDay(user.id, Number(req.params.id), date || null, value, note || null) });
+  });
+  app.get("/api/metrics/:id/history", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(metricHistory(user.id, Number(req.params.id)));
+  });
+  app.delete("/api/metrics/log/:logId", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: deleteMetricLog(user.id, Number(req.params.logId)) });
   });
 
   // معالج أخطاء عام — يرجّع JSON نضيف بدل صفحة HTML أو سوكت معلّق (أخطاء body-parser

@@ -323,6 +323,22 @@
             </div>
 
             <div class="ring-grid" id="ringGrid"></div>
+
+            <!-- ===== المتتبِّعات اليومية (أرقام يومية) ===== -->
+            <div class="metrics-head">
+              <div><span class="world-pill goals">📊 أرقامك اليومية</span></div>
+            </div>
+            <div class="card sketch" style="margin-bottom:16px">
+              <div class="card-head"><h3>متتبِّع جديد</h3></div>
+              <form id="metricForm" class="inline-form">
+                <input id="metricTitle" class="field grow" placeholder="اسم المتتبِّع (ساعات العمل)" required />
+                <input id="metricValue" class="field" type="number" step="any" placeholder="النهاردة" style="width:110px" />
+                <input id="metricUnit" class="field" placeholder="الوحدة (ساعة)" style="width:110px" />
+                <button type="submit" class="btn goals sm">＋ إضافة</button>
+              </form>
+              <p class="muted" style="font-size:var(--text-sm);margin:10px 0 0">أو قل لدوّنلي «النهاردة اشتغلت ٦ ساعات» وهو يسجّلها ويتابعها ليك يوم بيوم.</p>
+            </div>
+            <div class="metric-grid" id="metricGrid"></div>
           </section>
 
           <!-- ========== الفلوس ========== -->

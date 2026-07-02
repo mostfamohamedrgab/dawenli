@@ -1073,6 +1073,24 @@ a { color: inherit; }
 .gd-deadline { font-size: var(--text-sm); font-weight: 700; color: var(--goals-deep); margin: -8px 0 12px; }
 .gd-deadline.exp { color: var(--danger, #b3261e); }
 
+/* ===== المتتبِّعات اليومية ===== */
+.metrics-head { margin: 22px 0 12px; }
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.metric-card { background: var(--surface-card); border: 1px solid var(--hairline); border-radius: var(--radius-lg, 16px); padding: 14px 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 8px; }
+.mc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mc-title { font: var(--type-body); font-weight: 800; color: var(--ink); }
+.mc-actions { display: flex; gap: 2px; flex: none; }
+.mc-today { font-size: var(--text-sm); color: var(--ink-muted); }
+.mc-today b { color: var(--goals-deep); font-size: 1.15em; }
+.mc-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--text-xs); color: var(--ink-muted); }
+.mc-stats b { color: var(--ink); }
+.mc-log { display: flex; gap: 8px; margin-top: 2px; }
+/* رسم آخر ٧ أيام (أعمدة صغيرة) */
+.mspark { display: flex; align-items: flex-end; gap: 5px; height: 36px; padding: 2px 0; }
+.msbar { flex: 1; min-width: 6px; border-radius: 3px 3px 0 0; background: var(--hairline-strong); transition: height var(--dur-base, .25s) var(--ease-soft, ease); }
+.msbar.on { background: var(--goals, #7a9b76); }
+.msbar.hit { background: var(--goals-deep, #4e6b49); }
+
 /* ===========================================================================
    فلوس: أعمدة + بنود
    =========================================================================== */

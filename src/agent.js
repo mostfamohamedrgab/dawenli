@@ -28,6 +28,8 @@ import {
   applyGoal,
   listGoals,
   goalExpired,
+  logMetric,
+  listMetricsWithStats,
   addHabit,
   findHabitByTitle,
   logHabit,
@@ -193,6 +195,27 @@ const TOOLS = [
           deadline: { type: "string", description: "آخر يوم للهدف YYYY-MM-DD — لو المستخدم قال تاريخ صريح (زي «بحلول ٣٠ يوليو»). احسبه من next_days/التاريخ الحالي في السياق." },
         },
         required: ["title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "log_metric",
+      description:
+        "سجّل رقم يومي المستخدم بيتابعه (متتبِّع): زي «اشتغلت ٦ ساعات النهاردة»، «شربت ٢ لتر مياه»، «ذاكرت ٣ ساعات». ده مختلف عن الهدف (اللي بيتجمّع لرقم مستهدف) وعن العادة (اللي نعم/لأ). استخدم نفس عنوان المتتبِّع الموجود في السياق (metrics) لو اتكلم عن نفس الحاجة. القيمة بتاعت اليوم بتتحدّث لو اتقالت تاني في نفس اليوم.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "اسم المتتبِّع — قصير وثابت (مثلاً «ساعات العمل»)" },
+          value: { type: "number", description: "قيمة اليوم — رقم" },
+          unit: { type: "string", description: "الوحدة (ساعة، لتر، صفحة...) — حطّها أول مرة بس" },
+          emoji: { type: "string", description: "إيموجي معبّر (اختياري، أول مرة بس)" },
+          daily_target: { type: "number", description: "هدف يومي اختياري لو المستخدم قاله (مثلاً عايز ٨ ساعات في اليوم)" },
+          date: { type: "string", description: "اليوم YYYY-MM-DD (من past_days لو بيتكلم عن يوم فات) — سيبها فاضية = النهاردة" },
+          note: { type: "string", description: "ملاحظة قصيرة اختيارية" },
+        },
+        required: ["title", "value"],
       },
     },
   },
@@ -475,6 +498,24 @@ function executeTool(ctx, name, args) {
         receipt: `🎯 ${applied.created ? "هدف جديد" : "تقدّم في هدف"}: ${applied.title} — ${fmtNum(applied.current)}${tgt}${unit}${pct != null ? ` (${pct}%)` : ""}${when}`,
       };
     }
+    case "log_metric": {
+      const m = logMetric({
+        userId,
+        title: args.title,
+        value: args.value,
+        date: isDate(args.date) ? args.date : null,
+        note: args.note || null,
+        unit: args.unit || null,
+        emoji: args.emoji || null,
+        dailyTarget: args.daily_target ?? undefined,
+      });
+      if (!m) return { result: { ok: false, error: "محتاج title و value" } };
+      const unit = m.unit ? " " + m.unit : "";
+      return {
+        result: { ok: true, metric: m.metric, value: m.value, date: m.date, created: m.created },
+        receipt: `📊 ${m.metric} (${m.date}): ${fmtNum(m.value)}${unit}`,
+      };
+    }
     case "log_habit": {
       const receipts = [];
       let habit = findHabitByTitle(userId, args.title);
@@ -666,6 +707,7 @@ function buildSnapshot(userId) {
   const todayFinance = financeSince(userId, today);
   const spentToday = todayFinance.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
   const goals = listGoals(userId).slice(0, 10);
+  const metrics = listMetricsWithStats(userId);
   const habits = listHabits(userId);
   const tasks = pendingTasks(userId, 12).filter((t) => t.due_date <= daysAhead(7));
   const conditions = activeConditions(userId);
@@ -704,6 +746,7 @@ function buildSnapshot(userId) {
       if (g.deadline) return `${base} — لحد ${g.deadline}`;
       return base;
     }),
+    metrics: metrics.map((m) => `${m.title}${m.unit ? ` (${m.unit})` : ""}: النهاردة ${m.stats.today ?? "لسه"}${m.daily_target ? ` / هدف يومي ${m.daily_target}` : ""} — متوسط الأسبوع ${m.stats.week_avg}`),
     habits: habits.map((h) => `${h.title} (${h.kind === "quit" ? "بيبطّلها" : "بيعملها"})${h.doneToday ? " ✓ اتعملت النهاردة" : ""} — ستريك ${h.streak}`),
     pending_tasks: tasks.map((t) => `#${t.id} ${t.title} — ${t.due_date}${t.due_time ? " " + t.due_time : ""}`),
     active_conditions: conditions.map((c) => `${c.title} (متابعة لحد ${c.end_date})`),
@@ -722,6 +765,7 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 - استخرج **كل** اللي في الكلام: مصاريف ودخل (بالبند)، صحة ونفسية، أكل، عادات، أهداف، مهام بمواعيدها، وتدوينة اليوميات.
 - **اليوم الصح لكل حاجة (مهم):** المستخدم ساعات بيحكي عن يوم فات — "امبارح عملت كذا"، "أول امبارح"، "يوم التلات اللي فات"، "من ٣ أيام"، أو حتى وسط الكلام. لو الحدث حصل في يوم فات → سجّله **بتاريخ اليوم ده مش النهاردة**: حِط \`date\` على أداة التسجيل (save_journal / log_finance / log_health / log_meal / log_habit) بالتاريخ المحسوب من **past_days** اللي في السياق (مثلاً لو النهاردة الجمعة و"امبارح" يبقى الخميس بتاريخه). لو ماذكرش يوم → النهاردة. الرسالة الواحدة ممكن تبقى فيها حاجات لأيام مختلفة — **كل واحدة بتاريخها هي**.
 - لما المستخدم يحكي عن يومه أو مشاعره → لازم تسجّل save_journal. لو بيسأل سؤال بس من غير حكي → ماتسجّلش يوميات.
+- **رقم يومي بيتابعه (متتبِّع) → log_metric:** أي رقم المستخدم بيقوله عن يومه وعايز يتابعه بمرور الوقت — «اشتغلت ٦ ساعات»، «مشيت ٨ آلاف خطوة»، «شربت ٢ لتر»، «ذاكرت ٣ ساعات» → استخدم log_metric (مش هدف ومش عادة). الهدف بيتجمّع لرقم مستهدف واحد، العادة نعم/لأ، أما المتتبِّع فرقم مختلف كل يوم. استخدم نفس اسم المتتبِّع من السياق (metrics) لو موجود.
 - **التسجيل الصوتي الطويل (مهم جدًا):** لو المستخدم بعت تسجيل صوتي بيسرد فيه يومه (أكل، شغل، مشاوير، مشاعر، أحداث) → **لازم save_journal دايمًا** بملخّص ومزاج وتاجز، **بالإضافة** لأي استخراج تاني (مالية/وجبات/مهام/مشاكل). ماينفعش تستخرج البنود المنظّمة وتسيب السرد من غير يومية — السرد هو الأهم وده اللي المستخدم بيرجعله.
 - **التعديل والتصحيح:** لو المستخدم طلب يعدّل/يصحّح حاجة في يوم فات («عدّل في يوم كذا الكلمة الفلانية»، «دي غلط خليها كذا») → استخدم correct_journal بتاريخ اليوم (من past_days) مع find = النص الحالي بالظبط و replace = البديل. لو مش متأكد من صيغة النص الحالي، اقرا اليوم بـ get_data الأول وبعدين عدّل.
 - **الدخل بيتسجّل في الفلوس بس — والهدف بيتزوّد منه تلقائيًا (مهم جدًا، ده كان بيتكرّر):** أي **دخل** سجّله بـ **log_finance** (direction=income) **وحط العملة الصح** (للدخل الدولاري حط العملة «دولار»، وحط مصدره/تفاصيله في note زي «من التعاون مع aix»). الدخل بأي عملة بيزوّد الهدف اللي وحدته نفس العملة **لوحده تلقائيًا** — فـ **ماتستخدمش upsert_goal add_amount لأي دخل أبدًا** (ده بيسجّله مرتين: مرة في الفلوس ومرة في الهدف). upsert_goal يبقى **بس** لأهداف مش مالية بدخل (وزن/قراءة/عادات) أو لو المستخدم طلب صراحةً يضبط رقم هدف بـ set_current.

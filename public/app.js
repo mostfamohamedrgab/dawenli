@@ -3,6 +3,7 @@ const state = {
   me: null,
   journal: [],
   goals: [],
+  metrics: [],
   health: [],
   conversations: [],
   conditions: [],
@@ -169,6 +170,12 @@ const EDIT_CONFIGS = {
     { key: "unit", label: "الوحدة", type: "text" },
     { key: "period", label: "المدة", type: "select", options: [["", "مستمر (بلا نهاية)"], ["week", "أسبوعي"], ["month", "شهري"], ["date", "بتاريخ محدد"]] },
     { key: "deadline", label: "ينتهي في (للتاريخ المحدد)", type: "date" },
+  ] },
+  metrics: { title: "تعديل متتبِّع", source: () => state.metrics, fields: [
+    { key: "title", label: "الاسم", type: "text" },
+    { key: "unit", label: "الوحدة", type: "text" },
+    { key: "emoji", label: "إيموجي", type: "text" },
+    { key: "daily_target", label: "هدف يومي (اختياري)", type: "number" },
   ] },
   ideas: { title: "تعديل فكرة", source: () => state.ideas, fields: [
     { key: "title", label: "الفكرة", type: "text" },
@@ -1454,6 +1461,7 @@ function goalTimeInfo(g) {
 }
 window.goalTimeInfo = goalTimeInfo;
 function renderGoalsPage() {
+  renderMetrics(); // المتتبِّعات اليومية تحت الأهداف
   const el = $("ringGrid");
   const data = state.goals;
   if (!data.length) {
@@ -1481,6 +1489,98 @@ function renderGoalsPage() {
     </div>`;
   }).join("");
 }
+// ===== المتتبِّعات اليومية (رسم آخر ٧ أيام + الكروت) =====
+function metricSparkline(last7, target) {
+  const days = lastNDays(7);
+  const byDate = Object.fromEntries((last7 || []).map((r) => [r.entry_date, r.value]));
+  const vals = days.map((d) => byDate[d] ?? 0);
+  const max = Math.max(Number(target) || 0, ...vals, 1);
+  return `<div class="mspark">${days.map((d, i) => {
+    const v = vals[i];
+    const h = Math.max(4, Math.round((v / max) * 32));
+    const cls = v > 0 ? (target && v >= target ? " hit" : " on") : "";
+    return `<span class="msbar${cls}" style="height:${h}px" title="${fmtShort(d)}: ${arNum(v)}"></span>`;
+  }).join("")}</div>`;
+}
+function renderMetrics() {
+  const el = $("metricGrid");
+  if (!el) return;
+  const data = state.metrics || [];
+  if (!data.length) {
+    el.innerHTML = emptyState("لا توجد متتبِّعات بعد", "أضف رقم فوق، أو قل «النهاردة اشتغلت ٦ ساعات».");
+    return;
+  }
+  el.innerHTML = data.map((m) => {
+    const s = m.stats || {};
+    const unit = m.unit ? " " + escapeHtml(m.unit) : "";
+    const todayTxt = s.today != null ? `${arNum(s.today)}${unit}` : "لسه";
+    const tgt = m.daily_target ? ` / هدف ${arNum(m.daily_target)}` : "";
+    return `<div class="metric-card lift">
+      <div class="mc-head">
+        <span class="mc-title">${m.emoji ? escapeHtml(m.emoji) + " " : "📊 "}${escapeHtml(m.title)}</span>
+        <span class="mc-actions">
+          <button class="icon-btn" onclick="openMetricHistory(${m.id})" title="السجل">📜</button>
+          <button class="icon-btn" onclick="openEdit('metrics', ${m.id})" title="تعديل">✏️</button>
+          <button class="icon-btn" onclick="del('metrics', ${m.id})" title="حذف">🗑️</button>
+        </span>
+      </div>
+      <div class="mc-today">النهاردة: <b>${todayTxt}</b>${tgt}</div>
+      ${metricSparkline(s.last7, m.daily_target)}
+      <div class="mc-stats">
+        <span>متوسط الأسبوع <b>${arNum(s.week_avg ?? 0)}</b></span>
+        <span>إجمالي الأسبوع <b>${arNum(s.week_total ?? 0)}</b></span>
+        <span>الشهر <b>${arNum(s.month_total ?? 0)}</b></span>
+      </div>
+      <div class="mc-log">
+        <input type="number" step="any" placeholder="قيمة النهاردة" id="mv-${m.id}" class="field" style="flex:1" />
+        <button class="btn goals sm" onclick="logMetricToday(${m.id})">سجّل</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+async function logMetricToday(id) {
+  const v = $(`mv-${id}`).value;
+  if (v === "") return;
+  await api(`/api/metrics/${id}/day`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ value: Number(v) }) });
+  await loadAll(false);
+  renderMetrics();
+}
+window.logMetricToday = logMetricToday;
+async function openMetricHistory(id) {
+  const m = (state.metrics || []).find((x) => x.id === id);
+  if (!m) return;
+  let hist = [];
+  try { hist = await api(`/api/metrics/${id}/history`).then((r) => r.json()); } catch {}
+  const unit = m.unit ? " " + escapeHtml(m.unit) : "";
+  const rows = hist.length
+    ? hist.map((h) => `<div class="gl-row">
+        <span class="gl-delta pos">${arNum(h.value)}${unit}</span>
+        <div class="gl-mid"><div class="gl-note">${h.note ? escapeHtml(h.note) : "—"}</div><div class="gl-date">${fmtShort(h.entry_date)}</div></div>
+        <button class="icon-btn gl-del" onclick="deleteMetricLogEntry(${h.id}, ${id})" title="امسح">🗑️</button>
+      </div>`).join("")
+    : `<div class="muted" style="text-align:center;padding:24px">لسه مفيش أرقام مسجّلة على المتتبِّع ده.</div>`;
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay"; ov.id = "metricHistOv";
+  ov.innerHTML = `<div class="modal" style="max-width:460px;text-align:right">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">
+      <h3 class="modal-title" style="margin:0">${m.emoji ? escapeHtml(m.emoji) + " " : "📊 "}${escapeHtml(m.title)}</h3>
+      <button class="icon-btn" onclick="closeMetricHistory()" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="gl-list">${rows}</div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeMetricHistory(); });
+}
+function closeMetricHistory() { $("metricHistOv")?.remove(); }
+async function deleteMetricLogEntry(logId, metricId) {
+  try { await api(`/api/metrics/log/${logId}`, { method: "DELETE" }); } catch { return; }
+  await loadAll(false);
+  closeMetricHistory();
+  openMetricHistory(metricId);
+}
+window.openMetricHistory = openMetricHistory;
+window.closeMetricHistory = closeMetricHistory;
+window.deleteMetricLogEntry = deleteMetricLogEntry;
 async function updateGoal(id) {
   const v = $(`gc-${id}`).value;
   if (v === "") return;
@@ -1596,6 +1696,18 @@ $("goalForm").addEventListener("submit", async (e) => {
   e.target.reset();
   await loadAll(false);
   renderGoalsPage();
+});
+
+$("metricForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("metricTitle").value.trim();
+  const value = $("metricValue").value;
+  const unit = $("metricUnit").value.trim();
+  if (!title) return;
+  await api("/api/metrics", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, value, unit }) });
+  e.target.reset();
+  await loadAll(false);
+  renderMetrics();
 });
 
 /* ===================== الفلوس ===================== */
@@ -2847,7 +2959,7 @@ $("logoutBtn").addEventListener("click", logout);
 
 async function loadAll(rerender = true) {
   try {
-    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files, budget, th, mu, mk] = await Promise.all([
+    const [me, j, g, h, c, cond, m, hab, fin, tasks, cats, prof, idea, prob, files, budget, th, mu, mk, met] = await Promise.all([
       api("/api/me").then((r) => r.json()),
       api("/api/entries").then((r) => r.json()),
       api("/api/goals").then((r) => r.json()),
@@ -2867,6 +2979,7 @@ async function loadAll(rerender = true) {
       api("/api/thoughts").then((r) => r.json()),
       api("/api/my-usage").then((r) => r.json()),
       api("/api/market").then((r) => r.json()).catch(() => null),
+      api("/api/metrics").then((r) => r.json()).catch(() => []),
     ]);
     state.me = me;
     state.journal = j; state.goals = g; state.health = h; state.conversations = c;
@@ -2874,6 +2987,7 @@ async function loadAll(rerender = true) {
     state.tasks = tasks; state.categories = cats; state.profile = prof;
     state.ideas = idea; state.problems = prob; state.files = files; state.finBudget = budget;
     state.thoughts = th; state.myUsage = mu;
+    state.metrics = Array.isArray(met) ? met : [];
     if (mk) state.market = mk; // أسعار السوق للتحويل في الفلوس
   } catch { return; }
 
