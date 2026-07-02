@@ -1490,8 +1490,8 @@ function renderGoalsPage() {
   }).join("");
 }
 // ===== المتتبِّعات اليومية (رسم آخر ٧ أيام + الكروت) =====
-function metricSparkline(last7, target) {
-  const days = lastNDays(7);
+function metricSparkline(last7, target, sparkDays) {
+  const days = sparkDays && sparkDays.length ? sparkDays : lastNDays(7); // مفاتيح الأيام من السيرفر (توقيت القاهرة)
   const byDate = Object.fromEntries((last7 || []).map((r) => [r.entry_date, r.value]));
   const vals = days.map((d) => byDate[d] ?? 0);
   const max = Math.max(Number(target) || 0, ...vals, 1);
@@ -1525,9 +1525,9 @@ function renderMetrics() {
         </span>
       </div>
       <div class="mc-today">النهاردة: <b>${todayTxt}</b>${tgt}</div>
-      ${metricSparkline(s.last7, m.daily_target)}
+      ${metricSparkline(s.last7, m.daily_target, s.spark_days)}
       <div class="mc-stats">
-        <span>متوسط الأسبوع <b>${arNum(s.week_avg ?? 0)}</b></span>
+        <span>المتوسط <b>${arNum(s.week_avg ?? 0)}</b></span>
         <span>إجمالي الأسبوع <b>${arNum(s.week_total ?? 0)}</b></span>
         <span>الشهر <b>${arNum(s.month_total ?? 0)}</b></span>
       </div>

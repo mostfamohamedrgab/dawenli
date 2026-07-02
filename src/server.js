@@ -27,6 +27,7 @@ import {
   deleteGoalLog,
   updateGoalLog,
   logMetric,
+  upsertMetric,
   listMetricsWithStats,
   metricHistory,
   setMetricDay,
@@ -1235,7 +1236,11 @@ export function startServer() {
     if (!user) return;
     const { title, value, unit, emoji, daily_target, date, note } = req.body || {};
     if (!title) return res.status(400).json({ error: "العنوان مطلوب" });
-    const m = logMetric({ userId: user.id, title, value: value === "" || value == null ? 0 : value, unit, emoji, dailyTarget: daily_target, date, note });
+    // لو مفيش قيمة → ننشئ المتتبِّع بس (من غير ما نسجّل صفر وهمي لليوم)
+    const hasValue = value !== "" && value != null;
+    const m = hasValue
+      ? logMetric({ userId: user.id, title, value, unit, emoji, dailyTarget: daily_target, date, note })
+      : upsertMetric({ userId: user.id, title, unit, emoji, dailyTarget: daily_target });
     res.json({ ok: !!m, metric: m });
   });
   // تسجيل/تعديل قيمة يوم معيّن (من الواجهة) — قيمة فاضية = امسح تسجيل اليوم

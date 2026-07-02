@@ -914,13 +914,22 @@ export function updateGoalLog(userId, logId, { delta, note } = {}) {
 }
 
 /* ===================== المتتبِّعات اليومية (أرقام يومية: ساعات عمل، مياه...) ===================== */
+// تحقّق من المدخلات: القيمة لازم رقم منطقي موجب، والتاريخ لازم YYYY-MM-DD
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const normMetricDate = (d) => (DATE_RE.test(String(d || "")) ? String(d).slice(0, 10) : localToday());
+function cleanMetricValue(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0 || n > 1e9) return null; // يرفض NaN/Infinity/سالب/ضخم
+  return n;
+}
+// مطابقة بالعنوان بالظبط (مش LIKE) — عشان «مياه» ماتصيبش «مياه غازية» ومايتأثرش بـ % أو _
 const findMetricStmt = db.prepare(
-  `SELECT * FROM metrics WHERE user_id = ? AND title LIKE ? AND archived = 0 ORDER BY id DESC LIMIT 1`
+  `SELECT * FROM metrics WHERE user_id = ? AND title = ? AND archived = 0 ORDER BY id DESC LIMIT 1`
 );
 // أنشئ متتبِّع أو حدّث بياناته (بالعنوان — زي الأهداف)
 export function upsertMetric({ userId, title, unit, emoji, dailyTarget }) {
   if (!title) return null;
-  const existing = findMetricStmt.get(userId, `%${title.trim()}%`);
+  const existing = findMetricStmt.get(userId, title.trim());
   if (existing) {
     const sets = [], vals = [];
     if (unit) { sets.push("unit = ?"); vals.push(unit); }
@@ -935,14 +944,16 @@ export function upsertMetric({ userId, title, unit, emoji, dailyTarget }) {
 }
 // سجّل قيمة يوم (بيعمل replace لقيمة نفس اليوم لو موجودة — «النهاردة اشتغلت ٦ ساعات» = يوم النهاردة 6)
 export function logMetric({ userId, title, value, date, note, unit, emoji, dailyTarget }) {
-  if (!title || value == null || value === "") return null;
+  if (!title) return null;
+  const v = cleanMetricValue(value);
+  if (v == null) return null; // قيمة غير صالحة (فاضية/NaN/سالب) — ماتسجّلش
   const m = upsertMetric({ userId, title, unit, emoji, dailyTarget });
   if (!m) return null;
-  const d = date || localToday();
+  const d = normMetricDate(date);
   const ex = db.prepare(`SELECT id FROM metric_logs WHERE user_id = ? AND metric_id = ? AND entry_date = ?`).get(userId, m.id, d);
-  if (ex) db.prepare(`UPDATE metric_logs SET value = ?, note = ?, created_at = ? WHERE id = ?`).run(Number(value), note || null, now(), ex.id);
-  else db.prepare(`INSERT INTO metric_logs (created_at, user_id, metric_id, entry_date, value, note) VALUES (?, ?, ?, ?, ?, ?)`).run(now(), userId, m.id, d, Number(value), note || null);
-  return { metric: m.title, id: m.id, date: d, value: Number(value), unit: m.unit, created: m.created };
+  if (ex) db.prepare(`UPDATE metric_logs SET value = ?, note = ?, created_at = ? WHERE id = ?`).run(v, note || null, now(), ex.id);
+  else db.prepare(`INSERT INTO metric_logs (created_at, user_id, metric_id, entry_date, value, note) VALUES (?, ?, ?, ?, ?, ?)`).run(now(), userId, m.id, d, v, note || null);
+  return { metric: m.title, id: m.id, date: d, value: v, unit: m.unit, created: m.created };
 }
 function metricStats(userId, metricId, today) {
   const wk = addDaysISO(today, -6), mo = addDaysISO(today, -29);
@@ -950,7 +961,11 @@ function metricStats(userId, metricId, today) {
   const w = db.prepare(`SELECT SUM(value) s, AVG(value) a FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date>=?`).get(userId, metricId, wk);
   const m = db.prepare(`SELECT SUM(value) s FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date>=?`).get(userId, metricId, mo);
   const last7 = db.prepare(`SELECT entry_date, value FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date>=? ORDER BY entry_date`).all(userId, metricId, wk);
-  return { today: t ? t.value : null, week_total: w.s || 0, week_avg: w.a ? Math.round(w.a * 10) / 10 : 0, month_total: m.s || 0, last7 };
+  // مفاتيح أيام الرسم بتوقيت السيرفر (القاهرة) — عشان العميل مايحسبش بـ UTC ويطلع مزحلق يوم
+  const spark_days = [];
+  for (let i = 6; i >= 0; i--) spark_days.push(addDaysISO(today, -i));
+  // avg = متوسط الأيام المسجّلة فعلاً (مش ÷٧) — والتسمية في الواجهة «المتوسط» عشان تطابق الحساب
+  return { today: t ? t.value : null, week_total: w.s || 0, week_avg: w.a ? Math.round(w.a * 10) / 10 : 0, month_total: m.s || 0, last7, spark_days };
 }
 export function listMetricsWithStats(userId) {
   const today = localToday();
@@ -964,16 +979,19 @@ export function metricHistory(userId, metricId, limit = 90) {
 export function setMetricDay(userId, metricId, date, value, note) {
   const m = db.prepare(`SELECT id FROM metrics WHERE user_id=? AND id=?`).get(userId, metricId);
   if (!m) return false;
-  const d = date || localToday();
+  const d = normMetricDate(date);
   if (value === "" || value == null) { db.prepare(`DELETE FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date=?`).run(userId, metricId, d); return true; }
+  const v = cleanMetricValue(value);
+  if (v == null) return false; // قيمة غير صالحة
   const ex = db.prepare(`SELECT id FROM metric_logs WHERE user_id=? AND metric_id=? AND entry_date=?`).get(userId, metricId, d);
-  if (ex) db.prepare(`UPDATE metric_logs SET value=?, note=?, created_at=? WHERE id=?`).run(Number(value), note || null, now(), ex.id);
-  else db.prepare(`INSERT INTO metric_logs (created_at,user_id,metric_id,entry_date,value,note) VALUES (?,?,?,?,?,?)`).run(now(), userId, metricId, d, Number(value), note || null);
+  if (ex) db.prepare(`UPDATE metric_logs SET value=?, note=?, created_at=? WHERE id=?`).run(v, note || null, now(), ex.id);
+  else db.prepare(`INSERT INTO metric_logs (created_at,user_id,metric_id,entry_date,value,note) VALUES (?,?,?,?,?,?)`).run(now(), userId, metricId, d, v, note || null);
   return true;
 }
 export function updateMetricMeta(userId, id, patch) {
   const sets = [], vals = [];
   for (const c of ["title", "unit", "emoji", "daily_target"]) if (patch[c] !== undefined) {
+    if (c === "title" && !String(patch[c] ?? "").trim()) continue; // title NOT NULL — متسيبش العنوان يتمسح
     sets.push(`${c} = ?`);
     vals.push(c === "daily_target" ? (patch[c] === "" || patch[c] == null ? null : Number(patch[c])) : (patch[c] || null));
   }
@@ -981,9 +999,13 @@ export function updateMetricMeta(userId, id, patch) {
   vals.push(id, userId);
   return db.prepare(`UPDATE metrics SET ${sets.join(", ")} WHERE id=? AND user_id=?`).run(...vals).changes > 0;
 }
-export function deleteMetric(userId, id) {
+// حذف المتتبِّع + كل تسجيلاته في معاملة واحدة (مايسيبش يتامى لو حصل انقطاع)
+const _deleteMetricTx = db.transaction((userId, id) => {
   db.prepare(`DELETE FROM metric_logs WHERE user_id=? AND metric_id=?`).run(userId, id);
   return db.prepare(`DELETE FROM metrics WHERE user_id=? AND id=?`).run(userId, id).changes > 0;
+});
+export function deleteMetric(userId, id) {
+  return _deleteMetricTx(userId, id);
 }
 export function deleteMetricLog(userId, logId) {
   return db.prepare(`DELETE FROM metric_logs WHERE user_id=? AND id=?`).run(userId, logId).changes > 0;
