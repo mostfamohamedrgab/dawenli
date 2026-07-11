@@ -87,6 +87,13 @@ function lastNDays(n) {
   for (let i = n - 1; i >= 0; i--) out.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
   return out;
 }
+// أول الأسبوع الحالي (السبت — بداية الأسبوع في مصر) كـ YYYY-MM-DD
+function weekStartISO() {
+  const d = new Date(TODAY() + "T00:00:00");
+  const back = (d.getDay() + 1) % 7; // السبت=0 رجوع، الأحد=1 ... الجمعة=6
+  d.setDate(d.getDate() - back);
+  return d.toISOString().slice(0, 10);
+}
 // عرض تقارير الموديل: عناوين ## وبولد **
 function renderRich(text) {
   const esc = escapeHtml(text || "");
@@ -1721,9 +1728,10 @@ function finToEgp(f) {
 function renderFinancesPage() {
   const data = state.finance;
   const isEGP = (f) => !f.currency || f.currency === "جنيه";
-  const week = lastNDays(7);
+  const week = lastNDays(7); // للأعمدة اليومية
   const monthStart = TODAY().slice(0, 8) + "01";
-  const weekExpense = data.filter((f) => f.direction === "expense" && week.includes(f.entry_date) && isEGP(f)).reduce((a, f) => a + f.amount, 0);
+  const weekStart = weekStartISO(); // من أول الأسبوع (السبت) مش آخر ٧ أيام
+  const weekExpense = data.filter((f) => f.direction === "expense" && f.entry_date >= weekStart && isEGP(f)).reduce((a, f) => a + f.amount, 0);
   const mExpense = data.filter((f) => f.direction === "expense" && f.entry_date >= monthStart && isEGP(f)).reduce((a, f) => a + f.amount, 0);
   const dayOfMonth = Math.max(1, Number(TODAY().slice(8, 10)));
   const avgDay = Math.round(mExpense / dayOfMonth);
@@ -1745,8 +1753,8 @@ function renderFinancesPage() {
 
   $("finStats").innerHTML = [
     { label: "دخل الشهر", value: arNum(monthIncome), unit: MONEY, ico: "💰", delta: incCurStr || "مفيش دخل لسه", trend: "pos" },
-    { label: "مصاريف الأسبوع", value: arNum(weekExpense), unit: MONEY, ico: "💸", delta: "آخر ٧ أيام", trend: "" },
-    { label: "مصاريف الشهر", value: arNum(mExpense), unit: MONEY, ico: "🧾", delta: "من أول الشهر", trend: "" },
+    { label: "مصاريف الأسبوع", value: arNum(weekExpense), unit: MONEY, ico: "💸", delta: "من أول الأسبوع (السبت)", trend: "" },
+    { label: "مصاريف الشهر", value: arNum(mExpense), unit: MONEY, ico: "🧾", delta: "من يوم ١ في الشهر", trend: "" },
     { label: "متوسط اليوم", value: arNum(avgDay), unit: MONEY, ico: "📊", delta: "في المتوسط", trend: "" },
   ].map((s) => `
     <div class="stat-card finances">
