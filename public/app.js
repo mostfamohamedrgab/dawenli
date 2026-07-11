@@ -18,7 +18,7 @@ const state = {
   market: { goldG24Egp: null, rates: {}, updatedAt: null },
   profile: [],
   categories: [],
-  finFilter: { dir: "all", cat: "all", q: "", limit: 40 },
+  finFilter: { dir: "all", cat: "all", q: "", range: "all", limit: 40 },
   finBudget: { month: "", budget: null, goal: null },
   fileFilter: "all",
   pageDate: null,
@@ -1777,7 +1777,7 @@ function renderFinancesPage() {
     $("finCatBoxes").innerHTML = catRows.length
       ? catRows.map(([c, v]) => {
           const pct = catTotal ? Math.round((v / catTotal) * 100) : 0;
-          return `<div class="cat-box"><span class="cb-ico">${CAT_ICONS[c] || "📦"}</span><span class="cb-cat">${escapeHtml(c)}</span><b class="cb-val">${arNum(v)} ${MONEY}</b><span class="cb-pct">${arNum(pct)}٪ من الصرف</span></div>`;
+          return `<div class="cat-box" data-cat="${escAttr(c)}" title="اضغط تفلتر على ${escAttr(c)}"><span class="cb-ico">${CAT_ICONS[c] || "📦"}</span><span class="cb-cat">${escapeHtml(c)}</span><b class="cb-val">${arNum(v)} ${MONEY}</b><span class="cb-pct">${arNum(pct)}٪ من الصرف</span></div>`;
         }).join("")
       : `<span class="muted" style="font-size:var(--text-sm)">مفيش مصاريف الشهر ده لسه.</span>`;
   }
@@ -1872,6 +1872,16 @@ function applyFinFilter() {
   if (f.cat !== "all") rows = rows.filter((r) => (r.category || "أخرى") === f.cat);
   const q = (f.q || "").trim();
   if (q) rows = rows.filter((r) => (r.note || "").includes(q) || (r.category || "").includes(q));
+  if (f.range && f.range !== "all") {
+    rows = rows.filter((r) => {
+      const a = Number(r.amount) || 0;
+      if (f.range === "lt1000") return a < 1000;
+      if (f.range === "1000-3000") return a >= 1000 && a < 3000;
+      if (f.range === "3000-5000") return a >= 3000 && a <= 5000;
+      if (f.range === "gt5000") return a > 5000;
+      return true;
+    });
+  }
   return rows;
 }
 function renderFinList() {
@@ -1890,7 +1900,19 @@ function renderFinList() {
 $("finFilterDir")?.addEventListener("change", (e) => { state.finFilter.dir = e.target.value; state.finFilter.limit = 40; renderFinList(); });
 $("finFilterCat")?.addEventListener("change", (e) => { state.finFilter.cat = e.target.value; state.finFilter.limit = 40; renderFinList(); });
 $("finFilterQ")?.addEventListener("input", (e) => { state.finFilter.q = e.target.value; state.finFilter.limit = 40; renderFinList(); });
+$("finFilterRange")?.addEventListener("change", (e) => { state.finFilter.range = e.target.value; state.finFilter.limit = 40; renderFinList(); });
 $("finLoadMore")?.addEventListener("click", (e) => { if (e.target.id === "finMoreBtn") { state.finFilter.limit += 40; renderFinList(); } });
+// الضغط على بوكس بند = فلتر القايمة على البند ده
+$("finCatBoxes")?.addEventListener("click", (e) => {
+  const box = e.target.closest(".cat-box"); if (!box) return;
+  state.finFilter.cat = box.dataset.cat || "all";
+  state.finFilter.dir = "expense";
+  state.finFilter.limit = 40;
+  if ($("finFilterCat")) $("finFilterCat").value = state.finFilter.cat;
+  if ($("finFilterDir")) $("finFilterDir").value = "expense";
+  renderFinList();
+  $("finList")?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
 
 /* ---- ميزانية وهدف الشهر ---- */
 function monthLabel(m) {

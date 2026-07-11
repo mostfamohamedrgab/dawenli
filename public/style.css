@@ -678,7 +678,9 @@ a { color: inherit; }
 
 /* بوكسات «الفلوس بتروح فين» */
 .cat-boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-.cat-box { display: flex; flex-direction: column; gap: 3px; padding: 14px; background: var(--finances-wash, var(--surface-card)); border: 1.5px solid var(--finances-tint, var(--hairline)); border-radius: var(--radius-md); }
+.cat-box { display: flex; flex-direction: column; gap: 3px; padding: 14px; background: var(--finances-wash, var(--surface-card)); border: 1.5px solid var(--finances-tint, var(--hairline)); border-radius: var(--radius-md); cursor: pointer; transition: transform var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast); }
+.cat-box:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.cat-box:active { transform: scale(.97); }
 .cat-box .cb-ico { font-size: 22px; }
 .cat-box .cb-cat { font-size: var(--text-sm); color: var(--ink-muted); font-weight: 700; }
 .cat-box .cb-val { font-family: var(--font-display); font-weight: 800; font-size: 20px; color: var(--finances-deep); }
