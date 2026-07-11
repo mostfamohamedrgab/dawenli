@@ -1764,6 +1764,24 @@ function renderFinancesPage() {
     </div>`).join("");
   renderFinIncome(incomeByMonth, curMonthKey);
 
+  // الفلوس بتروح فين — بنود مصاريف الشهر (من يوم ١) كـ boxes
+  const byCatMonth = {};
+  for (const f of data.filter((f) => f.direction === "expense" && f.entry_date >= monthStart && isEGP(f))) {
+    const c = f.category || "أخرى";
+    byCatMonth[c] = (byCatMonth[c] || 0) + f.amount;
+  }
+  const catRows = Object.entries(byCatMonth).sort((a, b) => b[1] - a[1]);
+  const catTotal = catRows.reduce((a, [, v]) => a + v, 0);
+  if ($("finCatMonth")) $("finCatMonth").textContent = `الشهر ده · إجمالي ${arNum(catTotal)} ${MONEY}`;
+  if ($("finCatBoxes")) {
+    $("finCatBoxes").innerHTML = catRows.length
+      ? catRows.map(([c, v]) => {
+          const pct = catTotal ? Math.round((v / catTotal) * 100) : 0;
+          return `<div class="cat-box"><span class="cb-ico">${CAT_ICONS[c] || "📦"}</span><span class="cb-cat">${escapeHtml(c)}</span><b class="cb-val">${arNum(v)} ${MONEY}</b><span class="cb-pct">${arNum(pct)}٪ من الصرف</span></div>`;
+        }).join("")
+      : `<span class="muted" style="font-size:var(--text-sm)">مفيش مصاريف الشهر ده لسه.</span>`;
+  }
+
   // أعمدة الأسبوع — مرسومة باليد على canvas
   const weekData = week.map((d) => ({
     label: DAY_LETTER[new Date(d + "T00:00:00").getDay()],

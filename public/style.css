@@ -676,6 +676,14 @@ a { color: inherit; }
 .chk-inline { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-sm); color: var(--ink-muted); white-space: nowrap; cursor: pointer; }
 .chk-inline input { width: 15px; height: 15px; }
 
+/* بوكسات «الفلوس بتروح فين» */
+.cat-boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.cat-box { display: flex; flex-direction: column; gap: 3px; padding: 14px; background: var(--finances-wash, var(--surface-card)); border: 1.5px solid var(--finances-tint, var(--hairline)); border-radius: var(--radius-md); }
+.cat-box .cb-ico { font-size: 22px; }
+.cat-box .cb-cat { font-size: var(--text-sm); color: var(--ink-muted); font-weight: 700; }
+.cat-box .cb-val { font-family: var(--font-display); font-weight: 800; font-size: 20px; color: var(--finances-deep); }
+.cat-box .cb-pct { font-size: var(--text-xs); color: var(--ink-muted); }
+
 /* ===================== اسأل دوّنلي (شات سياقي) ===================== */
 .ask-scope { display: flex; gap: 8px; align-items: center; }
 .ask-thread {
