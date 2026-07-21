@@ -608,8 +608,18 @@ export const FINANCE_CATEGORIES = [
 ];
 
 // تطبيع نص للمقارنة (شيل المسافات الزيادة + حروف صغيرة) — لكشف التكرار.
+// تطبيع الملاحظة للمقارنة: تشكيل/تطويل + صور الألف والياء والتاء المربوطة والهمزة
+// (عشان «دفعة أولى» و«دفعه اولي» يتحسبوا نفس الكلام ومايتسجلوش مرتين)
 export function normNote(s) {
-  return String(s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  return String(s ?? "")
+    .trim()
+    .replace(/[ً-ٰٟـ]/g, "")
+    .replace(/[إأآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/[ؤئ]/g, "ء")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }
 
 const insertFinanceStmt = db.prepare(`
