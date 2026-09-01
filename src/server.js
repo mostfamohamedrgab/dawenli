@@ -112,6 +112,7 @@ import {
 import { pushEnabled, vapidPublicKey, sendPushToUser, notifyUser } from "./push.js";
 import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage, textToSpeech, PROVIDERS, aiSettings, saveAiSettings, aiConfigured, aiErrorMessage, refreshAi, chatModel } from "./openai.js";
 import OpenAI from "openai";
+import { versionStatus, pullUpdate, scheduleRestart } from "./updater.js";
 import { buildReportData } from "./report.js";
 import { runAgent } from "./agent.js";
 
@@ -238,6 +239,7 @@ setInterval(() => {
 const loginLimiter = rateLimit({ bucket: "login", max: 8, windowMs: 10 * 60 * 1000 }); // 8 / 10د
 const voiceLimiter = rateLimit({ bucket: "voice", max: 40, windowMs: 10 * 60 * 1000 });
 const uploadLimiter = rateLimit({ bucket: "upload", max: 30, windowMs: 10 * 60 * 1000 });
+const reportLimiter = rateLimit({ bucket: "report", max: 5, windowMs: 15 * 60 * 1000 }); // بلاغات: ٥ كل ربع ساعة
 // أنواع مسموح برفعها — صور نقطية + PDF بس. **مرفوض SVG** (ممكن يحمل سكربت = XSS).
 const ALLOWED_UPLOAD = new Set([
   "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/heic", "image/heif", "application/pdf",
@@ -459,6 +461,34 @@ export function startServer() {
       pricing: PRICING,
     });
   });
+  /* ===== تحديثات التطبيق من الجيت ===== */
+  app.get("/api/admin/version", async (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    // check=0 → قراءة سريعة من غير ما نضرب على الريبو (للعرض الأولي)
+    res.json(await versionStatus({ checkRemote: req.query.check !== "0" }));
+  });
+  let _updating = false;
+  app.post("/api/admin/update", async (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    if (_updating) return res.status(409).json({ ok: false, error: "فيه تحديث شغّال دلوقتي — استنى شوية" });
+    _updating = true;
+    try {
+      const out = await pullUpdate();
+      if (out.ok && out.changed) {
+        res.json({ ...out, restarting: true, message: "التحديث نزل ✅ — التطبيق بيقوم تاني، استنى ثواني واعمل ريفريش" });
+        scheduleRestart(); // بعد ما الرد يوصل
+        return;
+      }
+      res.status(out.ok ? 200 : 500).json(out);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e?.message || e).slice(0, 200) });
+    } finally {
+      _updating = false;
+    }
+  });
+
   /* ===== إعدادات مزود الذكاء (OpenAI / Gemini / Grok / مخصص) ===== */
   app.get("/api/admin/ai-settings", (req, res) => {
     const admin = adminGate(req, res);
@@ -1326,6 +1356,48 @@ export function startServer() {
     const user = gate(req, res);
     if (!user) return;
     res.json({ ok: deleteMetricLog(user.id, Number(req.params.logId)) });
+  });
+
+  /* ===== بلّغ عن مشكلة → نظام البلاغات في سينتاكس أكاديمي =====
+     الإرسال من السيرفر (مش من المتصفح) عشان المفتاح السري مايتعرّضش،
+     والموضوع بيتحط «دوّنلي» + نسخة التطبيق تلقائيًا عشان نعرف نصلّح بسرعة. */
+  app.post("/api/report", reportLimiter, async (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const message = String(req.body?.message || "").trim();
+    if (message.length < 10) return res.status(400).json({ error: "اكتب المشكلة بتفصيل شوية (١٠ حروف على الأقل)" });
+    if (message.length > 4000) return res.status(400).json({ error: "البلاغ طويل أوي — اختصره شوية" });
+    if (!config.reportSecret) {
+      return res.status(503).json({ error: "الإبلاغ مش متظبط على السيرفر (مفيش REPORT_SECRET) — كلّم الدعم مباشرة" });
+    }
+    let version = "";
+    try { version = (await versionStatus({ checkRemote: false }))?.current?.sha || ""; } catch {}
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15000);
+      const r = await fetch(config.reportUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "X-Dawenli-Secret": config.reportSecret },
+        body: JSON.stringify({
+          message,
+          name: user.name || "مستخدم دوّنلي",
+          email: user.email || "",
+          version,
+          page_url: String(req.body?.page || "").slice(0, 300),
+        }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.success) {
+        console.error("report forward failed:", r.status, data);
+        return res.status(502).json({ error: "مقدرتش أبعت البلاغ دلوقتي — جرّب تاني بعد شوية" });
+      }
+      res.json({ ok: true, message: "وصلنا بلاغك ✅ — شكرًا، هنشوفه ونصلّحه" });
+    } catch (err) {
+      console.error("report error:", err);
+      res.status(502).json({ error: "مقدرتش أبعت البلاغ دلوقتي — جرّب تاني بعد شوية" });
+    }
   });
 
   // معالج أخطاء عام — يرجّع JSON نضيف بدل صفحة HTML أو سوكت معلّق (أخطاء body-parser

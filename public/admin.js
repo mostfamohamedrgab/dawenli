@@ -207,6 +207,94 @@ $("newUserForm").addEventListener("submit", async (e) => {
   }
 });
 
+/* ===== تحديثات التطبيق (من الجيت) ===== */
+function renderVersion(v) {
+  const st = $("verStatus"), cur = $("verCurrent"), ch = $("verChangelog"), btn = $("verUpdateBtn");
+  if (!v || !v.ok) {
+    st.style.color = "var(--ink-muted)";
+    st.textContent = "غير متاح";
+    cur.textContent = v?.error || "مقدرتش أقرا حالة النسخة";
+    btn.style.display = "none";
+    return;
+  }
+  cur.innerHTML =
+    `النسخة الحالية: <b>${escapeHtml(v.current.sha)}</b> — ${escapeHtml(v.current.subject)}<br>` +
+    `<span style="opacity:.75">${fmtDate(v.current.date)} · فرع ${escapeHtml(v.current.branch)}</span>` +
+    (v.dirty ? `<br><span style="color:var(--warning-deep,#a86a12)">⚠️ فيه تعديلات محلية على السيرفر — التحديث هيمسحها</span>` : "");
+  if (v.remoteError) {
+    st.style.color = "var(--warning-deep, #a86a12)";
+    st.textContent = "⚠️ مقدرتش أتشيّك";
+    ch.innerHTML = `<span class="muted" style="font-size:var(--text-sm)">${escapeHtml(v.remoteError)}</span>`;
+    btn.style.display = "none";
+    return;
+  }
+  if (v.updateAvailable) {
+    st.style.color = "var(--brand-deep)";
+    st.textContent = `🎉 فيه ${v.behind} تحديث جديد`;
+    ch.innerHTML =
+      `<div style="font-size:var(--text-sm);font-weight:700;margin-bottom:6px">الجديد:</div>` +
+      `<ul style="margin:0;padding-inline-start:18px;font-size:var(--text-sm);line-height:1.9">` +
+      v.commits.map((c) => `<li><code>${escapeHtml(c.sha)}</code> ${escapeHtml(c.subject)}</li>`).join("") +
+      `</ul>`;
+    btn.style.display = "";
+  } else {
+    st.style.color = "var(--brand-deep)";
+    st.textContent = "✅ إنت على آخر نسخة";
+    ch.innerHTML = "";
+    btn.style.display = "none";
+  }
+}
+async function loadVersion(check = true) {
+  const st = $("verStatus");
+  if (check) { st.style.color = "var(--ink-muted)"; st.textContent = "⏳ بنتشيّك…"; }
+  try {
+    renderVersion(await api(`/api/admin/version${check ? "" : "?check=0"}`).then((r) => r.json()));
+  } catch {
+    st.textContent = "حصل خطأ";
+  }
+}
+$("verCheckBtn").addEventListener("click", () => loadVersion(true));
+$("verUpdateBtn").addEventListener("click", async () => {
+  if (!confirm("هنسحب آخر نسخة من الجيت ونعيد تشغيل التطبيق. الداتا بتتاخد نسخة احتياطية الأول. نكمّل؟")) return;
+  const out = $("verResult"), btn = $("verUpdateBtn");
+  btn.disabled = true;
+  out.style.color = "var(--ink-muted)";
+  out.textContent = "⏳ بننزّل التحديث… متقفلش الصفحة";
+  try {
+    const data = await api("/api/admin/update", { method: "POST" }).then((r) => r.json());
+    const steps = (data.steps || []).map((s) => escapeHtml(s)).join("<br>");
+    if (data.ok) {
+      out.style.color = "var(--brand-deep)";
+      out.innerHTML = steps + (data.changed ? `<br><b>${escapeHtml(data.message || "")}</b>` : `<br><b>${escapeHtml(data.message || "مفيش جديد")}</b>`);
+      if (data.restarting) {
+        // نستنى السيرفر يقوم تاني وبعدين نحدّث الحالة
+        setTimeout(async () => {
+          out.innerHTML += "<br>🔄 بنتأكد إن التطبيق رجع…";
+          for (let i = 0; i < 10; i++) {
+            await new Promise((r) => setTimeout(r, 2000));
+            try {
+              const r = await fetch("/api/admin/version?check=0");
+              if (r.ok) { out.innerHTML += "<br>✅ التطبيق رجع شغّال بالنسخة الجديدة"; loadVersion(false); load(); return; }
+            } catch {}
+          }
+          out.innerHTML += "<br>⚠️ التطبيق أخد وقت — اعمل ريفريش للصفحة وشوف";
+        }, 2500);
+      } else {
+        loadVersion(false);
+      }
+    } else {
+      out.style.color = "var(--danger-deep, #b52b27)";
+      out.innerHTML = (steps ? steps + "<br>" : "") + escapeHtml(data.error || "حصل خطأ");
+    }
+  } catch {
+    out.style.color = "var(--danger-deep, #b52b27)";
+    out.textContent = "حصل خطأ في التحديث — راجع اللوج على السيرفر";
+  } finally {
+    btn.disabled = false;
+  }
+});
+loadVersion(true);
+
 /* ===== إعدادات مزود الذكاء ===== */
 let AI_PROVIDERS = {};
 function aiSyncFields() {

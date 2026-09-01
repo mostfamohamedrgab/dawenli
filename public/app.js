@@ -2603,8 +2603,75 @@ $("moreSheet")?.addEventListener("click", (e) => {
   const btn = e.target.closest(".more-item");
   if (!btn) return;
   closeMore();
+  if (btn.dataset.action === "report") { openReport(); return; } // عنصر مش تاب — بيفتح فورم البلاغ
   gotoTab(btn.dataset.tab);
 });
+
+/* ===================== بلّغ عن مشكلة =====================
+   البلاغ بيروح لنظام البلاغات في سينتاكس أكاديمي (السيرفر هو اللي بيبعته)،
+   وموضوعه بيتحط «دوّنلي» + نسخة التطبيق تلقائيًا. */
+function openReport() {
+  closeReport();
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay";
+  ov.id = "reportOv";
+  ov.innerHTML = `<div class="modal" style="max-width:460px;text-align:right">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
+      <h3 class="modal-title" style="margin:0">🐞 بلّغ عن مشكلة</h3>
+      <button class="icon-btn" onclick="closeReport()" aria-label="إغلاق">✕</button>
+    </div>
+    <p class="muted" style="font-size:var(--text-sm);margin:0 0 12px">
+      قولّي المشكلة بالتفصيل — إيه اللي عملته وإيه اللي حصل. البلاغ بيروح لفريق سينتاكس أكاديمي وهنصلّحه.
+    </p>
+    <textarea id="reportText" class="field" rows="5" placeholder="مثال: لما بسجّل صوت من الموبايل بيفضل بيلف ومابيتسجّلش…"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+      <button class="btn sm" id="reportSend">إرسال البلاغ</button>
+      <button class="btn ghost sm" onclick="closeReport()">إلغاء</button>
+      <span id="reportMsg" style="font-size:var(--text-sm);flex:1"></span>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeReport(); });
+  $("reportSend").addEventListener("click", sendReport);
+  $("reportText").focus();
+}
+function closeReport() { $("reportOv")?.remove(); }
+async function sendReport() {
+  const ta = $("reportText"), msg = $("reportMsg"), btn = $("reportSend");
+  const text = (ta.value || "").trim();
+  if (text.length < 10) {
+    msg.style.color = "var(--danger-deep, #b52b27)";
+    msg.textContent = "اكتب المشكلة بتفصيل شوية";
+    return;
+  }
+  btn.disabled = true;
+  msg.style.color = "var(--ink-muted)";
+  msg.textContent = "⏳ بنبعت…";
+  try {
+    const res = await api("/api/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, page: location.hash || "/" }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      msg.style.color = "var(--brand-deep)";
+      msg.textContent = data.message || "وصلنا بلاغك ✅";
+      ta.value = "";
+      setTimeout(closeReport, 1800);
+    } else {
+      msg.style.color = "var(--danger-deep, #b52b27)";
+      msg.textContent = data.error || "مقدرتش أبعت البلاغ";
+    }
+  } catch {
+    msg.style.color = "var(--danger-deep, #b52b27)";
+    msg.textContent = "مشكلة في الاتصال — جرّب تاني";
+  } finally {
+    btn.disabled = false;
+  }
+}
+window.openReport = openReport;
+window.closeReport = closeReport;
 
 /* ===================== تصدير التدوينات في ملف ===================== */
 function exportJournal() {

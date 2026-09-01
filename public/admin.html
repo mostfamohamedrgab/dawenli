@@ -55,6 +55,21 @@
 
       <div class="stat-grid" id="statCards" style="margin-bottom:28px"></div>
 
+      <!-- ===== تحديثات التطبيق (من الجيت) ===== -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-head">
+          <h3>⬆️ تحديثات التطبيق</h3>
+          <span id="verStatus" style="font-size:var(--text-sm)"></span>
+        </div>
+        <div id="verCurrent" class="muted" style="font-size:var(--text-sm);line-height:1.9"></div>
+        <div id="verChangelog" style="margin-top:12px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn secondary sm" id="verCheckBtn">🔄 اتشيّك على التحديثات</button>
+          <button class="btn sm" id="verUpdateBtn" style="display:none">⬇️ اسحب التحديث</button>
+        </div>
+        <p id="verResult" style="font-size:var(--text-sm);margin:12px 0 0;line-height:1.9"></p>
+      </div>
+
       <!-- ===== مزود الذكاء (OpenAI / Gemini / Grok / مخصص) ===== -->
       <div class="card" style="margin-bottom:24px">
         <div class="card-head">

@@ -27,4 +27,7 @@ export const config = {
   vapidPublic: process.env.VAPID_PUBLIC_KEY || "",
   vapidPrivate: process.env.VAPID_PRIVATE_KEY || "",
   vapidSubject: process.env.VAPID_SUBJECT || "mailto:admin@dawenli.app",
+  // بلاغات المستخدمين بتتبعت لنظام البلاغات في سينتاكس أكاديمي (موضوعها بيتحط «دوّنلي» تلقائيًا)
+  reportUrl: process.env.REPORT_URL || "https://syntax.academy/api/dawenli-report",
+  reportSecret: process.env.REPORT_SECRET || "",
 };
