@@ -81,6 +81,11 @@
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></span>
             <span>بلّغ عن مشكلة</span>
           </button>
+          <!-- لصاحب التطبيق بس — بيتعرض من app.js حسب isOwner -->
+          <button class="nav-btn owner-only" type="button" onclick="openAiSettings()" style="display:none">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.5.53.9 1.03 1.03H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></span>
+            <span>الإعدادات <span class="muted" style="font-weight:500;font-size:11px">الذكاء · التحديثات</span></span>
+          </button>
         </nav>
 
         <div class="side-tip">
@@ -856,6 +861,7 @@
         <button class="more-item" data-tab="aicost"><span class="mi-ico">💸</span><span>تكلفة الـ AI</span></button>
         <button class="more-item" data-tab="about"><span class="mi-ico">🧠</span><span>دوّنلي يعرف عنك</span></button>
         <button class="more-item" data-action="report"><span class="mi-ico">🐞</span><span>بلّغ عن مشكلة</span></button>
+        <button class="more-item owner-only" data-action="aisettings" style="display:none"><span class="mi-ico">⚙️</span><span>الإعدادات (الذكاء · التحديثات)</span></button>
       </div>
     </div>
 

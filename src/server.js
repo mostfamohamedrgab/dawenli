@@ -444,6 +444,16 @@ export function startServer() {
     }
     return admin;
   };
+  // ownerGate: الأدمن أو صاحب التطبيق (is_owner) — عشان صاحب التطبيق يظبّط مزود
+  // الذكاء والتحديثات من جوّه التطبيق من غير ما يسجّل دخول تاني في لوحة الأدمن.
+  // المستخدمين العاديين مايوصلوش (دي إعدادات بتأثر على التطبيق كله).
+  const ownerGate = (req, res) => {
+    if (sessionAdmin(req)) return { kind: "admin" };
+    const user = sessionUser(req);
+    if (user?.is_owner) return { kind: "owner", user };
+    res.status(403).json({ error: "الإعدادات دي لصاحب التطبيق بس" });
+    return null;
+  };
 
   /* ===== API الأدمن ===== */
   app.get("/api/admin/me", (req, res) => {
@@ -463,15 +473,13 @@ export function startServer() {
   });
   /* ===== تحديثات التطبيق من الجيت ===== */
   app.get("/api/admin/version", async (req, res) => {
-    const admin = adminGate(req, res);
-    if (!admin) return;
+    if (!ownerGate(req, res)) return;
     // check=0 → قراءة سريعة من غير ما نضرب على الريبو (للعرض الأولي)
     res.json(await versionStatus({ checkRemote: req.query.check !== "0" }));
   });
   let _updating = false;
   app.post("/api/admin/update", async (req, res) => {
-    const admin = adminGate(req, res);
-    if (!admin) return;
+    if (!ownerGate(req, res)) return;
     if (_updating) return res.status(409).json({ ok: false, error: "فيه تحديث شغّال دلوقتي — استنى شوية" });
     _updating = true;
     try {
@@ -491,8 +499,7 @@ export function startServer() {
 
   /* ===== إعدادات مزود الذكاء (OpenAI / Gemini / Grok / مخصص) ===== */
   app.get("/api/admin/ai-settings", (req, res) => {
-    const admin = adminGate(req, res);
-    if (!admin) return;
+    if (!ownerGate(req, res)) return;
     const s = aiSettings();
     res.json({
       configured: !!s.apiKey,
@@ -509,8 +516,7 @@ export function startServer() {
     });
   });
   app.put("/api/admin/ai-settings", (req, res) => {
-    const admin = adminGate(req, res);
-    if (!admin) return;
+    if (!ownerGate(req, res)) return;
     const { provider, api_key, model, base_url, voice_key } = req.body || {};
     if (!PROVIDERS[provider]) return res.status(400).json({ error: "اختار مزود صحيح" });
     const existing = aiSettings();
@@ -528,8 +534,7 @@ export function startServer() {
   });
   // اختبار حي: بيكلم المزود فعلاً بمفتاح/موديل الفورم (من غير حفظ) أو بالمحفوظ لو الفورم فاضي
   app.post("/api/admin/ai-settings/test", async (req, res) => {
-    const admin = adminGate(req, res);
-    if (!admin) return;
+    if (!ownerGate(req, res)) return;
     const { provider, api_key, model, base_url } = req.body || {};
     const saved = aiSettings();
     const p = PROVIDERS[provider || saved.provider] || PROVIDERS.openai;

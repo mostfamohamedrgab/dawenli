@@ -2603,9 +2603,179 @@ $("moreSheet")?.addEventListener("click", (e) => {
   const btn = e.target.closest(".more-item");
   if (!btn) return;
   closeMore();
-  if (btn.dataset.action === "report") { openReport(); return; } // عنصر مش تاب — بيفتح فورم البلاغ
+  // عناصر مش تابات — بتفتح موديل
+  if (btn.dataset.action === "report") { openReport(); return; }
+  if (btn.dataset.action === "aisettings") { openAiSettings(); return; }
   gotoTab(btn.dataset.tab);
 });
+
+/* ===================== إعدادات صاحب التطبيق (الذكاء + التحديثات) =====================
+   نفس الـ endpoints بتاعة لوحة الأدمن، بس بوابتها بقت «أدمن أو مالك» —
+   فصاحب التطبيق يظبّط المفتاح والمزود من جوّه التطبيق من غير دخول تاني. */
+const AI_PROVIDER_LABELS = { openai: "OpenAI", gemini: "Google Gemini", xai: "xAI (Grok)", custom: "مخصص (متوافق OpenAI)" };
+let _aiProviders = {};
+function openAiSettings() {
+  closeAiSettings();
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay";
+  ov.id = "aiSetOv";
+  ov.innerHTML = `<div class="modal" style="max-width:520px;text-align:right;max-height:88vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
+      <h3 class="modal-title" style="margin:0">⚙️ الإعدادات</h3>
+      <button class="icon-btn" onclick="closeAiSettings()" aria-label="إغلاق">✕</button>
+    </div>
+
+    <div class="td-sec" style="margin-top:10px">
+      <div class="td-label" style="margin-bottom:8px">🧠 مزود الذكاء <span id="aiSetStatus" style="font-size:var(--text-sm);font-weight:600"></span></div>
+      <label class="ef-row"><span>المزود</span>
+        <select id="aiSetProvider" class="field">
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="xai">xAI (Grok)</option>
+          <option value="custom">مخصص (متوافق OpenAI)</option>
+        </select>
+      </label>
+      <label class="ef-row"><span>مفتاح الـ API <span class="muted" id="aiSetHint" style="font-size:var(--text-xs)"></span></span>
+        <input id="aiSetKey" class="field" type="password" autocomplete="off" placeholder="حط المفتاح هنا" />
+      </label>
+      <label class="ef-row"><span>الموديل</span>
+        <input id="aiSetModel" class="field" placeholder="gpt-4o" />
+      </label>
+      <label class="ef-row" id="aiSetBaseWrap" style="display:none"><span>Base URL</span>
+        <input id="aiSetBase" class="field" placeholder="https://api.example.com/v1" />
+      </label>
+      <label class="ef-row" id="aiSetVoiceWrap" style="display:none"><span>مفتاح OpenAI للصوت <span class="muted" style="font-size:var(--text-xs)">(اختياري — التفريغ والنطق)</span></span>
+        <input id="aiSetVoice" class="field" type="password" autocomplete="off" placeholder="sk-…" />
+      </label>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn secondary sm" onclick="testAiSettings()">🧪 اختبار</button>
+        <button class="btn sm" onclick="saveAiSettingsUi()">💾 حفظ</button>
+      </div>
+      <p id="aiSetMsg" style="font-size:var(--text-sm);margin:10px 0 0;line-height:1.8"></p>
+    </div>
+
+    <div class="td-sec" style="margin-top:16px">
+      <div class="td-label" style="margin-bottom:8px">⬆️ تحديثات التطبيق</div>
+      <div id="aiSetVer" class="muted" style="font-size:var(--text-sm);line-height:1.9">⏳ بنتشيّك…</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn secondary sm" onclick="loadOwnerVersion(true)">🔄 اتشيّك</button>
+        <button class="btn sm" id="aiSetUpdBtn" style="display:none" onclick="doOwnerUpdate()">⬇️ اسحب التحديث</button>
+      </div>
+      <p id="aiSetUpdMsg" style="font-size:var(--text-sm);margin:10px 0 0;line-height:1.9"></p>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeAiSettings(); });
+  $("aiSetProvider").addEventListener("change", syncAiFields);
+  loadAiSettingsUi();
+  loadOwnerVersion(true);
+}
+function closeAiSettings() { $("aiSetOv")?.remove(); }
+function syncAiFields() {
+  const p = $("aiSetProvider").value;
+  $("aiSetBaseWrap").style.display = p === "custom" ? "" : "none";
+  $("aiSetVoiceWrap").style.display = p === "openai" ? "none" : "";
+  const def = _aiProviders[p]?.defaultModel || "";
+  $("aiSetModel").placeholder = def || "اسم الموديل";
+  const cur = $("aiSetModel").value;
+  // بدّل الافتراضي مع تغيير المزود — من غير ما نلمس موديل كتبه المستخدم بإيده
+  if (!cur || Object.values(_aiProviders).some((x) => x.defaultModel === cur)) $("aiSetModel").value = def;
+}
+async function loadAiSettingsUi() {
+  try {
+    const s = await api("/api/admin/ai-settings").then((r) => r.json());
+    _aiProviders = s.providers || {};
+    const st = $("aiSetStatus");
+    if (st) {
+      st.style.color = s.configured ? "var(--brand-deep)" : "var(--danger-deep, #b52b27)";
+      st.textContent = s.configured
+        ? `· ✅ ${AI_PROVIDER_LABELS[s.provider] || s.provider} (${s.model})`
+        : "· ⚠️ محتاج إعداد";
+    }
+    if (s.provider) $("aiSetProvider").value = s.provider;
+    if (s.model) $("aiSetModel").value = s.model;
+    if (s.baseUrl) $("aiSetBase").value = s.baseUrl;
+    $("aiSetHint").textContent = s.keyHint ? `(المحفوظ: ${s.keyHint} — سيبه فاضي للإبقاء عليه)` : "";
+    syncAiFields();
+  } catch {}
+}
+function aiSetBody() {
+  return {
+    provider: $("aiSetProvider").value,
+    api_key: $("aiSetKey").value.trim(),
+    model: $("aiSetModel").value.trim(),
+    base_url: $("aiSetBase").value.trim(),
+    voice_key: $("aiSetVoice").value.trim() || undefined,
+  };
+}
+async function testAiSettings() {
+  const m = $("aiSetMsg");
+  m.style.color = "var(--ink-muted)"; m.textContent = "⏳ بنكلم المزود…";
+  try {
+    const d = await api("/api/admin/ai-settings/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(aiSetBody()) }).then((r) => r.json());
+    m.style.color = d.ok ? "var(--brand-deep)" : "var(--danger-deep, #b52b27)";
+    m.textContent = d.ok ? `✅ شغّال (${d.model}) — رد: «${d.reply}»` : `❌ فشل (${d.model}): ${d.error}`;
+  } catch { m.style.color = "var(--danger-deep, #b52b27)"; m.textContent = "حصل خطأ في الاختبار"; }
+}
+async function saveAiSettingsUi() {
+  const m = $("aiSetMsg");
+  m.style.color = "var(--ink-muted)"; m.textContent = "⏳ بنحفظ…";
+  try {
+    const d = await api("/api/admin/ai-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(aiSetBody()) }).then((r) => r.json());
+    if (d.ok) {
+      m.style.color = "var(--brand-deep)"; m.textContent = "✅ اتحفظ واتفعّل فورًا";
+      $("aiSetKey").value = ""; $("aiSetVoice").value = "";
+      loadAiSettingsUi();
+    } else { m.style.color = "var(--danger-deep, #b52b27)"; m.textContent = d.error || "حصل خطأ"; }
+  } catch { m.style.color = "var(--danger-deep, #b52b27)"; m.textContent = "حصل خطأ، جرّب تاني"; }
+}
+async function loadOwnerVersion(check = true) {
+  const el = $("aiSetVer"), btn = $("aiSetUpdBtn");
+  if (!el) return;
+  if (check) el.textContent = "⏳ بنتشيّك…";
+  try {
+    const v = await api(`/api/admin/version${check ? "" : "?check=0"}`).then((r) => r.json());
+    if (!v.ok) { el.textContent = v.error || "مقدرتش أقرا النسخة"; btn.style.display = "none"; return; }
+    el.innerHTML =
+      `النسخة: <b>${escapeHtml(v.current.sha)}</b> — ${escapeHtml(v.current.subject)}` +
+      (v.remoteError ? `<br><span style="color:var(--danger-deep,#b52b27)">${escapeHtml(v.remoteError)}</span>` : "") +
+      (v.updateAvailable
+        ? `<br><span style="color:var(--brand-deep);font-weight:700">🎉 فيه ${arNum(v.behind)} تحديث جديد:</span><br>` +
+          v.commits.map((c) => `• ${escapeHtml(c.subject)}`).join("<br>")
+        : v.remoteError ? "" : `<br><span style="color:var(--brand-deep)">✅ إنت على آخر نسخة</span>`);
+    btn.style.display = v.updateAvailable ? "" : "none";
+  } catch { el.textContent = "حصل خطأ"; }
+}
+async function doOwnerUpdate() {
+  if (!(await askConfirm())) return;
+  const m = $("aiSetUpdMsg"), btn = $("aiSetUpdBtn");
+  btn.disabled = true;
+  m.style.color = "var(--ink-muted)"; m.textContent = "⏳ بننزّل التحديث… متقفلش الصفحة";
+  try {
+    const d = await api("/api/admin/update", { method: "POST" }).then((r) => r.json());
+    const steps = (d.steps || []).map((s) => escapeHtml(s)).join("<br>");
+    if (d.ok) {
+      m.style.color = "var(--brand-deep)";
+      m.innerHTML = steps + `<br><b>${escapeHtml(d.message || "")}</b>`;
+      if (d.restarting) {
+        setTimeout(async () => {
+          for (let i = 0; i < 10; i++) {
+            await new Promise((r) => setTimeout(r, 2000));
+            try { const r = await fetch("/api/admin/version?check=0"); if (r.ok) { m.innerHTML += "<br>✅ التطبيق رجع — اعمل ريفريش"; loadOwnerVersion(false); return; } } catch {}
+          }
+          m.innerHTML += "<br>⚠️ أخد وقت — اعمل ريفريش وشوف";
+        }, 2500);
+      } else loadOwnerVersion(false);
+    } else { m.style.color = "var(--danger-deep, #b52b27)"; m.innerHTML = (steps ? steps + "<br>" : "") + escapeHtml(d.error || "حصل خطأ"); }
+  } catch { m.style.color = "var(--danger-deep, #b52b27)"; m.textContent = "حصل خطأ في التحديث"; }
+  finally { btn.disabled = false; }
+}
+window.openAiSettings = openAiSettings;
+window.closeAiSettings = closeAiSettings;
+window.testAiSettings = testAiSettings;
+window.saveAiSettingsUi = saveAiSettingsUi;
+window.loadOwnerVersion = loadOwnerVersion;
+window.doOwnerUpdate = doOwnerUpdate;
 
 /* ===================== بلّغ عن مشكلة =====================
    البلاغ بيروح لنظام البلاغات في سينتاكس أكاديمي (السيرفر هو اللي بيبعته)،
@@ -3109,6 +3279,8 @@ async function loadAll(rerender = true) {
   const first = (state.me?.name || "د").trim()[0] || "د";
   $("userAvatar").textContent = first;
   $("userName").textContent = state.me?.name || "صاحب الدفتر";
+  // إعدادات التطبيق (الذكاء + التحديثات) لصاحب التطبيق بس
+  for (const el of document.querySelectorAll(".owner-only")) el.style.display = state.me?.isOwner ? "" : "none";
   fillCategorySelect();
 
   if (!rerender) return;
