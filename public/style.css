@@ -2054,11 +2054,12 @@ select.field { cursor: pointer; }
   letter-spacing: .2px;
   margin-bottom: 8px;
 }
-.sb-heart { font-size: 1.05em; animation: sbBeat 2.4s var(--ease-soft) infinite; }
-@keyframes sbBeat {
-  0%, 82%, 100% { transform: scale(1); }
-  88% { transform: scale(1.22); }
-  94% { transform: scale(1.08); }
+/* لوجو المخ بتاع سينتاكس — نفس رسمة الكانفس بتاعة الهوية */
+.sb-brain {
+  flex: none;
+  width: 27px;
+  height: 22px;
+  display: block;
 }
 .sb-title {
   font: var(--type-h3);
@@ -2087,7 +2088,7 @@ select.field { cursor: pointer; }
   .sb-cta { width: 100%; }
   .sb-cta .btn { width: 100%; padding: 12px 20px; font-size: var(--text-base); }
 }
-@media (prefers-reduced-motion: reduce) { .sb-heart { animation: none; } }
+/* الرسم نفسه بيوقف من الجافاسكربت لو المستخدم مبيحبش الحركة */
 
 /* ---------- شريط تقدّم تحديث التطبيق ---------- */
 .upd-progress {

@@ -3627,3 +3627,236 @@ async function initPWA() {
   };
 }
 initPWA();
+
+/* ===================== لوجو المخ بتاع سينتاكس أكاديمي =====================
+   منقول بالظبط من رسمة الكانفس بتاعة الهوية في سينتاكس أكاديمي
+   (layouts/base.blade.php — #brainCanvas): نفس الإحداثيات ونفس الألوان
+   (شمال برتقالي #fb923c / يمين أزرق #38bdf8) ونفس الحركة.
+   الفرق الوحيد: دعم شاشات الريتينا، ووقف الأنيميشن لما يبقى مش ظاهر أو
+   لما المستخدم يطلب تقليل الحركة — عشان البطارية. */
+function initSyntaxBrain() {
+  var c = document.getElementById("sbBrain");
+  if (!c || c.dataset.ready) return;
+  c.dataset.ready = "1";
+  var ctx = c.getContext("2d");
+
+  // الرسم متعمّل على 48×40 — بنكبّر الباك-بفر للريتينا ونسيب الإحداثيات زي ما هي
+  var W = 48, H = 40;
+  var dpr = Math.min(window.devicePixelRatio || 1, 3);
+  c.width = W * dpr; c.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  var cx = W / 2, cy = H / 2 + 2;
+  var t = 0;
+
+  var particles = [];
+  for (var i = 0; i < 18; i++) {
+    particles.push({
+      angle: Math.random() * Math.PI * 2,
+      radius: 10 + Math.random() * 10,
+      speed: 0.01 + Math.random() * 0.025,
+      size: 0.5 + Math.random() * 1.2,
+      side: Math.random() > 0.5 ? 1 : -1,
+      offset: Math.random() * Math.PI * 2,
+      life: Math.random()
+    });
+  }
+
+  var nodes = [
+    { x: -8, y: -6 }, { x: -14, y: 0 }, { x: -6, y: 4 }, { x: -12, y: 7 },
+    { x: -4, y: -10 }, { x: -10, y: -4 }, { x: -7, y: 10 },
+    { x: 8, y: -6 }, { x: 14, y: 0 }, { x: 6, y: 4 }, { x: 12, y: 7 },
+    { x: 4, y: -10 }, { x: 10, y: -4 }, { x: 7, y: 10 }
+  ];
+  var connections = [
+    [0,1],[1,2],[2,3],[0,4],[4,5],[5,1],[2,6],[5,2],
+    [7,8],[8,9],[9,10],[7,11],[11,12],[12,8],[9,13],[12,9]
+  ];
+  var sparks = [];
+  for (var i = 0; i < 6; i++) {
+    sparks.push({
+      conn: Math.floor(Math.random() * connections.length),
+      progress: Math.random(),
+      speed: 0.005 + Math.random() * 0.012,
+      size: 1.2 + Math.random() * 0.8
+    });
+  }
+
+  function drawBrainHalf(side, color1, color2, glowColor) {
+    var s = side;
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    var glow = ctx.createRadialGradient(s * 8, 0, 2, s * 8, 0, 22);
+    glow.addColorStop(0, glowColor);
+    glow.addColorStop(1, "transparent");
+    ctx.fillStyle = glow;
+    ctx.fillRect(s > 0 ? 0 : -24, -22, 24, 44);
+
+    ctx.beginPath();
+    if (s > 0) {
+      ctx.moveTo(0, -16);
+      ctx.bezierCurveTo(4, -18, 14, -18, 18, -12);
+      ctx.bezierCurveTo(22, -6, 22, 0, 20, 6);
+      ctx.bezierCurveTo(18, 12, 14, 16, 8, 16);
+      ctx.bezierCurveTo(4, 16, 2, 14, 0, 12);
+    } else {
+      ctx.moveTo(0, -16);
+      ctx.bezierCurveTo(-4, -18, -14, -18, -18, -12);
+      ctx.bezierCurveTo(-22, -6, -22, 0, -20, 6);
+      ctx.bezierCurveTo(-18, 12, -14, 16, -8, 16);
+      ctx.bezierCurveTo(-4, 16, -2, 14, 0, 12);
+    }
+    ctx.closePath();
+
+    var grad = ctx.createLinearGradient(s > 0 ? 0 : -20, -16, s > 0 ? 20 : 0, 16);
+    grad.addColorStop(0, color1);
+    grad.addColorStop(1, color2);
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = 0.25 + 0.08 * Math.sin(t * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.7 + 0.15 * Math.sin(t * 2);
+    ctx.strokeStyle = color1;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.3 + 0.1 * Math.sin(t * 1.5);
+    ctx.strokeStyle = color2;
+    ctx.lineWidth = 0.6;
+    if (s > 0) {
+      ctx.beginPath(); ctx.moveTo(4, -12); ctx.quadraticCurveTo(12, -10, 16, -4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(2, -4); ctx.quadraticCurveTo(10, -2, 18, 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(2, 4); ctx.quadraticCurveTo(8, 6, 14, 12); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(-4, -12); ctx.quadraticCurveTo(-12, -10, -16, -4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-2, -4); ctx.quadraticCurveTo(-10, -2, -18, 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-2, 4); ctx.quadraticCurveTo(-8, 6, -14, 12); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawCircuits() {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.globalAlpha = 0.2 + 0.08 * Math.sin(t * 3);
+    ctx.lineWidth = 0.5;
+    for (var i = 0; i < connections.length; i++) {
+      var a = nodes[connections[i][0]], b = nodes[connections[i][1]];
+      ctx.strokeStyle = a.x < 0 ? "rgba(251,146,60,0.5)" : "rgba(56,189,248,0.5)";
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      ctx.globalAlpha = 0.4 + 0.2 * Math.sin(t * 2 + i);
+      ctx.fillStyle = n.x < 0 ? "#fb923c" : "#38bdf8";
+      ctx.beginPath(); ctx.arc(n.x, n.y, 1, 0, Math.PI * 2); ctx.fill();
+    }
+    for (var i = 0; i < sparks.length; i++) {
+      var sp = sparks[i];
+      sp.progress += sp.speed;
+      if (sp.progress >= 1) { sp.progress = 0; sp.conn = Math.floor(Math.random() * connections.length); }
+      var a = nodes[connections[sp.conn][0]], b = nodes[connections[sp.conn][1]];
+      var sx = a.x + (b.x - a.x) * sp.progress;
+      var sy = a.y + (b.y - a.y) * sp.progress;
+      var isLeft = sx < 0;
+      ctx.globalAlpha = 0.9;
+      var sparkGlow = ctx.createRadialGradient(sx, sy, 0, sx, sy, sp.size * 3);
+      sparkGlow.addColorStop(0, isLeft ? "rgba(251,146,60,0.8)" : "rgba(56,189,248,0.8)");
+      sparkGlow.addColorStop(1, "transparent");
+      ctx.fillStyle = sparkGlow;
+      ctx.fillRect(sx - sp.size * 3, sy - sp.size * 3, sp.size * 6, sp.size * 6);
+      ctx.fillStyle = isLeft ? "#fff7ed" : "#f0f9ff";
+      ctx.beginPath(); ctx.arc(sx, sy, sp.size * 0.5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawParticles() {
+    ctx.save();
+    ctx.translate(cx, cy);
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      p.angle += p.speed;
+      p.life += 0.008;
+      if (p.life > 1) p.life = 0;
+      var wobble = Math.sin(t * 3 + p.offset) * 2;
+      var px = Math.cos(p.angle) * (p.radius + wobble) * p.side * 0.7;
+      var py = Math.sin(p.angle) * (p.radius + wobble) * 0.85;
+      var isLeft = px < 0;
+      ctx.globalAlpha = 0.3 + 0.5 * Math.sin(p.life * Math.PI);
+      ctx.fillStyle = isLeft ? "#fb923c" : "#38bdf8";
+      ctx.beginPath(); ctx.arc(px, py, p.size, 0, Math.PI * 2); ctx.fill();
+      if (p.size > 1) {
+        var pg = ctx.createRadialGradient(px, py, 0, px, py, p.size * 2.5);
+        pg.addColorStop(0, isLeft ? "rgba(251,146,60,0.3)" : "rgba(56,189,248,0.3)");
+        pg.addColorStop(1, "transparent");
+        ctx.fillStyle = pg;
+        ctx.fillRect(px - p.size * 2.5, py - p.size * 2.5, p.size * 5, p.size * 5);
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawCenter() {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.globalAlpha = 0.15 + 0.1 * Math.sin(t * 2);
+    var cg = ctx.createLinearGradient(-2, -16, 2, 16);
+    cg.addColorStop(0, "#fb923c");
+    cg.addColorStop(0.5, "#d946ef");
+    cg.addColorStop(1, "#38bdf8");
+    ctx.strokeStyle = cg;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -15);
+    ctx.lineTo(0, 13);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function frame() {
+    t += 0.016;
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.globalAlpha = 0.06 + 0.03 * Math.sin(t * 1.5);
+    var outerGlow = ctx.createRadialGradient(cx, cy, 5, cx, cy, 24);
+    outerGlow.addColorStop(0, "#a855f7");
+    outerGlow.addColorStop(0.5, "rgba(99,102,241,0.2)");
+    outerGlow.addColorStop(1, "transparent");
+    ctx.fillStyle = outerGlow;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
+    drawBrainHalf(-1, "#fb923c", "#f97316", "rgba(251,146,60,0.12)");
+    drawBrainHalf(1, "#38bdf8", "#0ea5e9", "rgba(56,189,248,0.12)");
+    drawCenter();
+    drawCircuits();
+    drawParticles();
+  }
+
+  // إطار أول فورًا: اللوجو يبان على طول حتى لو الأنيميشن لسه مبدأش
+  // (تاب في الخلفية أو البانر بره الشاشة — الـrAF مابيشتغلش ساعتها)
+  frame();
+
+  // حركة أقل؟ نسيب الإطار الثابت وخلاص
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  var running = false, rafId = 0;
+  function loop() { frame(); rafId = requestAnimationFrame(loop); }
+  function start() { if (!running) { running = true; loop(); } }
+  function stop() { if (running) { running = false; cancelAnimationFrame(rafId); } }
+
+  // نشتغل بس لما اللوجو يبقى ظاهر فعلاً والتاب مفتوح
+  var visible = true;
+  if (window.IntersectionObserver) {
+    new IntersectionObserver(function (es) {
+      visible = es[0].isIntersecting;
+      if (visible && !document.hidden) start(); else stop();
+    }, { threshold: 0 }).observe(c);
+  } else start();
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden || !visible) stop(); else start();
+  });
+}
+initSyntaxBrain();
