@@ -40,7 +40,8 @@ export async function versionStatus({ checkRemote = true } = {}) {
       await git(["log", "-1", "--format=%h%n%s%n%cI%n"])
     ).split("\n");
     const currentBranch = (await git(["rev-parse", "--abbrev-ref", "HEAD"])) || BRANCH;
-    const dirty = (await git(["status", "--porcelain"])).length > 0;
+    // الملفات المتتبّعة بس — reset --hard بيمسح تعديلاتها. الملفات غير المتتبّعة بتفضل زي ما هي.
+    const dirty = (await git(["status", "--porcelain", "--untracked-files=no"])).length > 0;
 
     let behind = 0, commits = [], remoteError = null;
     if (checkRemote) {
