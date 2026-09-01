@@ -1383,7 +1383,8 @@ export function startServer() {
           name: user.name || "مستخدم دوّنلي",
           email: user.email || "",
           version,
-          page_url: String(req.body?.page || "").slice(0, 300),
+          // مسار داخلي بس (hash أو path) — مانبعتش نص حر يتحوّل لينك في لوحة البلاغات
+          page_url: /^[#/][\w\-/#?=&%.]{0,200}$/.test(String(req.body?.page || "")) ? String(req.body.page) : "/",
         }),
         signal: ctrl.signal,
       });

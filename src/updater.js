@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { existsSync, copyFileSync, mkdirSync } from "node:fs";
 import { config } from "./config.js";
+import db from "./db.js";
 
 const execFileP = promisify(execFile);
 const REPO_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,9 +37,7 @@ export async function versionStatus({ checkRemote = true } = {}) {
     return { ok: false, error: "المشروع مش متسطّب من جيت — التحديث التلقائي مش متاح هنا" };
   }
   try {
-    const [sha, subject, date, branch] = (
-      await git(["log", "-1", "--format=%h%n%s%n%cI%n"])
-    ).split("\n");
+    const [sha, subject, date] = (await git(["log", "-1", "--format=%h%n%s%n%cI"])).split("\n");
     const currentBranch = (await git(["rev-parse", "--abbrev-ref", "HEAD"])) || BRANCH;
     // الملفات المتتبّعة بس — reset --hard بيمسح تعديلاتها. الملفات غير المتتبّعة بتفضل زي ما هي.
     const dirty = (await git(["status", "--porcelain", "--untracked-files=no"])).length > 0;
@@ -77,19 +76,28 @@ export async function versionStatus({ checkRemote = true } = {}) {
   }
 }
 
-/* نسخة احتياطية للداتا بيز قبل أي تحديث */
+/* نسخة احتياطية للداتا بيز قبل أي تحديث.
+   مهم: الداتا شغّالة بـ WAL والسيرفر لسه حي — فنسخ ملف الـ.db لوحده ممكن يفوّت
+   معاملات لسه في ملف الـ-wal. VACUUM INTO بيعمل نسخة متّسقة في ملف واحد. */
 function backupDb() {
+  const dir = join(REPO_DIR, "data", "backups");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const dest = join(dir, `pre-update-${stamp}.db`);
   try {
-    const dbPath = config.dbPath?.startsWith("/") ? config.dbPath : join(REPO_DIR, config.dbPath || "./data/dawenli.db");
-    if (!existsSync(dbPath)) return null;
-    const dir = join(REPO_DIR, "data", "backups");
     mkdirSync(dir, { recursive: true });
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const dest = join(dir, `pre-update-${stamp}.db`);
-    copyFileSync(dbPath, dest); // نسخ ملف الـ SQLite (WAL موجود جنبه — كفاية كـ safety net)
+    db.exec(`VACUUM INTO '${dest.replace(/'/g, "''")}'`);
     return dest;
   } catch {
-    return null;
+    // fallback: نسخ الملفات (الـ.db مع الـ-wal عشان النسخة تبقى كاملة)
+    try {
+      const dbPath = config.dbPath?.startsWith("/") ? config.dbPath : join(REPO_DIR, config.dbPath || "./data/dawenli.db");
+      if (!existsSync(dbPath)) return null;
+      copyFileSync(dbPath, dest);
+      if (existsSync(`${dbPath}-wal`)) copyFileSync(`${dbPath}-wal`, `${dest}-wal`);
+      return dest;
+    } catch {
+      return null;
+    }
   }
 }
 
