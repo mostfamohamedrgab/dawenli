@@ -2007,8 +2007,8 @@ select.field { cursor: pointer; }
 .syntax-banner {
   position: relative;
   overflow: hidden;
-  margin-top: 34px;
-  padding: 26px 30px;
+  margin-bottom: 26px;
+  padding: 22px 26px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2076,8 +2076,15 @@ select.field { cursor: pointer; }
 .sb-cta .btn { text-decoration: none; }
 
 @media (max-width: 640px) {
-  .syntax-banner { padding: 22px; flex-direction: column; align-items: flex-start; }
+  /* البانر فوق خالص — نخليه مضغوط عشان مايزقّش المحرّر تحت الشاشة */
+  .syntax-banner { padding: 16px 18px; gap: 14px; flex-direction: column; align-items: flex-start; }
+  /* في وضع العمود الـ flex-basis بيتحسب على الارتفاع — نلغيه عشان مايفضلش 300px فاضية */
+  .sb-text { flex: 0 0 auto; width: 100%; }
+  .syntax-banner::after { width: 140px; height: 140px; top: -70px; inset-inline-start: -50px; }
+  .sb-kicker { font-size: var(--text-xs); margin-bottom: 5px; }
+  .sb-title { font-size: var(--text-lg); margin-bottom: 4px; }
+  .sb-sub { font-size: var(--text-xs); line-height: 1.55; }
   .sb-cta { width: 100%; }
-  .sb-cta .btn { width: 100%; }
+  .sb-cta .btn { width: 100%; padding: 12px 20px; font-size: var(--text-base); }
 }
 @media (prefers-reduced-motion: reduce) { .sb-heart { animation: none; } }
