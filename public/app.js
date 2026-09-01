@@ -2795,41 +2795,99 @@ async function loadOwnerVersion(check = true) {
     btn.style.display = "none";
   }
 }
+/* شريط التقدّم بتاع التحديث */
+function updProgress() {
+  let bar = $("aiSetProg");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "aiSetProg";
+    bar.className = "upd-progress";
+    bar.innerHTML = "<i></i>";
+    $("aiSetUpdMsg").before(bar);
+  }
+  return bar;
+}
+function setUpd(pct, text, tone) {
+  const bar = updProgress(), m = $("aiSetUpdMsg");
+  bar.classList.toggle("busy", pct < 100 && tone !== "fail");
+  bar.classList.toggle("done", pct >= 100 && tone !== "fail");
+  bar.classList.toggle("failed", tone === "fail");
+  bar.firstChild.style.width = Math.min(100, pct) + "%";
+  if (text != null) {
+    m.style.color = tone === "fail" ? "var(--danger-deep, #b52b27)" : tone === "ok" ? "var(--brand-deep)" : "var(--ink-muted)";
+    m.innerHTML = text;
+  }
+}
+// نستنى السيرفر يرجع — بنضرب على ملف عام (مش API) لأن الجلسات بتتمسح مع
+// إعادة التشغيل، فأي endpoint محمي هيرد 401 وهنفتكر إن السيرفر لسه واقع.
+async function waitForServer(maxMs = 90000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < maxMs) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      const r = await fetch("/style.css?ping=" + Date.now(), { cache: "no-store" });
+      if (r.ok) return true;
+    } catch {}
+  }
+  return false;
+}
 async function doOwnerUpdate() {
   if (!(await askConfirm())) return;
-  const m = $("aiSetUpdMsg"), btn = $("aiSetUpdBtn");
+  const btn = $("aiSetUpdBtn");
   btn.disabled = true;
-  m.style.color = "var(--ink-muted)"; m.textContent = "⏳ بننزّل التحديث… متقفلش الصفحة";
+  setUpd(8, "📦 بناخد نسخة احتياطية للداتا…");
+  // السيرفر بيرد مرة واحدة في الآخر، فبنعرض المراحل بالتقدير عشان الناس تعرف
+  // إن فيه شغل ماشي بدل ما تبص على سبينر واقف.
+  const stages = [
+    [20, "⬇️ بنسحب الكود الجديد من الريبو…"],
+    [40, "🔀 بنطبّق التحديث على الملفات…"],
+    [58, "📚 بنشوف المكتبات اتغيّرت ولا لأ…"],
+  ];
+  let si = 0;
+  const tick = setInterval(() => { if (si < stages.length) { setUpd(stages[si][0], stages[si][1]); si++; } }, 2000);
   try {
     const res = await api("/api/admin/update", { method: "POST" });
-    if (res.status === 403) {
-      m.style.color = "var(--danger-deep, #b52b27)";
-      m.textContent = "التحديثات دي لصاحب التطبيق بس";
-      return;
-    }
+    clearInterval(tick);
+    if (res.status === 403) { setUpd(0, "التحديثات دي لصاحب التطبيق بس", "fail"); return; }
+    if (res.status === 409) { setUpd(0, "فيه تحديث شغّال دلوقتي — استنى شوية", "fail"); return; }
     const d = await res.json().catch(() => ({ ok: false, error: "رد السيرفر مش مفهوم" }));
     const steps = (d.steps || []).map((s) => escapeHtml(s)).join("<br>");
-    if (d.ok) {
-      m.style.color = "var(--brand-deep)";
-      m.innerHTML = steps + `<br><b>${escapeHtml(d.message || "")}</b>`;
-      if (d.restarting) {
-        setTimeout(async () => {
-          for (let i = 0; i < 10; i++) {
-            await new Promise((r) => setTimeout(r, 2000));
-            try { const r = await fetch("/api/admin/version?check=0"); if (r.ok) { m.innerHTML += "<br>✅ التطبيق رجع — اعمل ريفريش"; loadOwnerVersion(false); return; } } catch {}
-          }
-          m.innerHTML += "<br>⚠️ أخد وقت — اعمل ريفريش وشوف";
-        }, 2500);
-      } else loadOwnerVersion(false);
-    } else { m.style.color = "var(--danger-deep, #b52b27)"; m.innerHTML = (steps ? steps + "<br>" : "") + escapeHtml(d.error || "حصل خطأ"); }
+
+    if (!d.ok) { setUpd(0, (steps ? steps + "<br>" : "") + escapeHtml(d.error || "حصل خطأ"), "fail"); return; }
+
+    if (!d.changed) { setUpd(100, steps + "<br><b>" + escapeHtml(d.message || "") + "</b>", "ok"); loadOwnerVersion(false); return; }
+
+    if (!d.restarting) { setUpd(100, steps, "ok"); loadOwnerVersion(false); return; }
+
+    setUpd(70, steps + "<br>🔄 التطبيق بيقوم تاني… متقفلش الصفحة");
+    const back = await waitForServer();
+    if (!back) {
+      setUpd(70, steps + "<br>⚠️ التطبيق أخد وقت أطول من المتوقّع. اعمل ريفريش بعد شوية وشوف النسخة.", "fail");
+      return;
+    }
+    // الجداول والأعمدة الجديدة بتتظبط لوحدها أول ما التطبيق يقوم (db.js)
+    setUpd(90, steps + "<br>🗄️ الداتا بيز اتظبطت مع إعادة التشغيل");
+    await new Promise((r) => setTimeout(r, 700));
+    // الجلسات في الذاكرة، فإعادة التشغيل بتخرّج الكل — بنقوله وبنعمل ريلود
+    // عشان الكود الجديد يتحمّل، وصفحة الدخول هتوضّحله إن الجلسة خلصت.
+    setUpd(100, steps + `<br><b>✅ التحديث خلص — بقيت على ${escapeHtml(d.to || "")}</b>` +
+      "<br>🔐 هتحتاج تسجّل دخول تاني (التطبيق قام من جديد). بنعمل ريفريش…", "ok");
+    setTimeout(() => location.reload(), 2200);
   } catch (err) {
+    clearInterval(tick);
     if (err?.message === "unauth") return;
-    m.style.color = "var(--danger-deep, #b52b27)";
-    m.textContent = err?.message === "offline"
-      ? "السيرفر مش راد — يمكن بيعيد التشغيل. استنى شوية واعمل «اتشيّك»."
-      : "حصل خطأ في التحديث";
-  }
-  finally { btn.disabled = false; }
+    if (err?.message === "offline") {
+      // السيرفر وقع وهو بيعيد التشغيل — نستنّاه بدل ما نقول فشل
+      setUpd(70, "🔄 السيرفر بيعيد التشغيل… بنستنّاه");
+      const back = await waitForServer();
+      setUpd(back ? 100 : 70,
+        back ? "✅ التطبيق رجع — بنعمل ريفريش…" : "⚠️ السيرفر ماردّش. اعمل ريفريش وشوف النسخة.",
+        back ? "ok" : "fail");
+      if (back) setTimeout(() => location.reload(), 1800);
+      return;
+    }
+    setUpd(0, "حصل خطأ في التحديث", "fail");
+  } finally { btn.disabled = false; }
 }
 window.openAiSettings = openAiSettings;
 window.closeAiSettings = closeAiSettings;

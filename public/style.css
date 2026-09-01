@@ -2088,3 +2088,33 @@ select.field { cursor: pointer; }
   .sb-cta .btn { width: 100%; padding: 12px 20px; font-size: var(--text-base); }
 }
 @media (prefers-reduced-motion: reduce) { .sb-heart { animation: none; } }
+
+/* ---------- شريط تقدّم تحديث التطبيق ---------- */
+.upd-progress {
+  margin-top: 12px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-wash);
+  border: 1.5px solid var(--ink);
+  overflow: hidden;
+}
+.upd-progress > i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--brand);
+  border-radius: var(--radius-pill);
+  transition: width var(--dur-slow, .5s) var(--ease-soft);
+}
+.upd-progress.done > i { background: var(--brand-deep); }
+.upd-progress.failed > i { background: var(--danger, #d05a55); }
+/* خطوط متحركة تدّي إحساس إن فيه شغل شغّال */
+.upd-progress.busy > i {
+  background-image: linear-gradient(45deg,
+    rgba(255,255,255,.28) 25%, transparent 25%, transparent 50%,
+    rgba(255,255,255,.28) 50%, rgba(255,255,255,.28) 75%, transparent 75%);
+  background-size: 18px 18px;
+  animation: updStripes 1s linear infinite;
+}
+@keyframes updStripes { from { background-position: 0 0; } to { background-position: 18px 0; } }
+@media (prefers-reduced-motion: reduce) { .upd-progress.busy > i { animation: none; } }
