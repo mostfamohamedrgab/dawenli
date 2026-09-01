@@ -2000,3 +2000,84 @@ select.field { cursor: pointer; }
 .gl-row .gl-del:hover { opacity: 1; color: var(--danger-deep, #b52b27); }
 .gl-row .gl-edit { flex: none; width: 26px; height: 26px; opacity: .5; }
 .gl-row .gl-edit:hover { opacity: 1; }
+
+/* ===========================================================================
+   بانر «صُنع بالحب» — سينتاكس أكاديمي (آخر النظرة العامة)
+   =========================================================================== */
+.syntax-banner {
+  position: relative;
+  overflow: hidden;
+  margin-top: 34px;
+  padding: 26px 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  flex-wrap: wrap;
+  background:
+    linear-gradient(135deg, var(--brand-wash) 0%, var(--surface-card) 60%);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-sketch-2);
+  box-shadow: var(--shadow-md);
+}
+/* خربشة ورق خفيفة فوق التدرّج */
+.syntax-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--paper-grain);
+  opacity: .6;
+  pointer-events: none;
+}
+/* دايرة باهتة في الخلفية تدّي عمق */
+.syntax-banner::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: -70px;
+  top: -90px;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  background: var(--brand-tint);
+  opacity: .28;
+  pointer-events: none;
+}
+.syntax-banner > * { position: relative; z-index: 1; }
+
+.sb-text { flex: 1 1 300px; min-width: 0; }
+.sb-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: var(--type-label);
+  color: var(--brand-deep);
+  letter-spacing: .2px;
+  margin-bottom: 8px;
+}
+.sb-heart { font-size: 1.05em; animation: sbBeat 2.4s var(--ease-soft) infinite; }
+@keyframes sbBeat {
+  0%, 82%, 100% { transform: scale(1); }
+  88% { transform: scale(1.22); }
+  94% { transform: scale(1.08); }
+}
+.sb-title {
+  font: var(--type-h3);
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+.sb-sub {
+  font: var(--type-body);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  margin: 0;
+  max-width: 46ch;
+}
+.sb-cta { flex: none; }
+.sb-cta .btn { text-decoration: none; }
+
+@media (max-width: 640px) {
+  .syntax-banner { padding: 22px; flex-direction: column; align-items: flex-start; }
+  .sb-cta { width: 100%; }
+  .sb-cta .btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .sb-heart { animation: none; } }
