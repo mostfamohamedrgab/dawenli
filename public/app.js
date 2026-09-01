@@ -132,7 +132,23 @@ function emptyState(title, message) {
 /* ===================== Confirm Modal ===================== */
 const confirmOverlay = $("confirmOverlay");
 let confirmResolver = null;
-function askConfirm() {
+// الافتراضي هو تأكيد الحذف (أغلب الاستخدامات)، وأي حد يقدر يبعت نص مخصّص —
+// عشان مايبقاش زرار زي «اسحب التحديث» بيطلّع مودال مكتوب عليه «امسح».
+const CONFIRM_DEFAULTS = {
+  icon: "🗑️",
+  title: "متأكد أنك تريد حذفها؟",
+  text: "لن تستطيع استرجاعها بعد ذلك.",
+  ok: "امسح",
+  danger: true,
+};
+function askConfirm(opts) {
+  const o = { ...CONFIRM_DEFAULTS, ...(opts || {}) };
+  const q = (sel) => confirmOverlay.querySelector(sel);
+  if (q(".modal-icon")) q(".modal-icon").textContent = o.icon;
+  if (q(".modal-title")) q(".modal-title").textContent = o.title;
+  if (q(".modal-text")) q(".modal-text").textContent = o.text;
+  const ok = $("confirmOk");
+  if (ok) { ok.textContent = o.ok; ok.classList.toggle("danger", !!o.danger); }
   confirmOverlay.classList.remove("hidden");
   return new Promise((resolve) => { confirmResolver = resolve; });
 }
@@ -2840,7 +2856,13 @@ async function waitForServer(maxMs = 90000) {
   return false;
 }
 async function doOwnerUpdate() {
-  if (!(await askConfirm())) return;
+  if (!(await askConfirm({
+    icon: "⬆️",
+    title: "تسحب التحديث دلوقتي؟",
+    text: "هناخد نسخة احتياطية للداتا الأول. التطبيق هيقوم تاني، وهتحتاج تسجّل دخول بعدها.",
+    ok: "أيوه، اسحب",
+    danger: false,
+  }))) return;
   const btn = $("aiSetUpdBtn");
   btn.disabled = true;
   setUpd(8, "📦 بناخد نسخة احتياطية للداتا…");

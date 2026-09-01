@@ -2118,3 +2118,9 @@ select.field { cursor: pointer; }
 }
 @keyframes updStripes { from { background-position: 0 0; } to { background-position: 18px 0; } }
 @media (prefers-reduced-motion: reduce) { .upd-progress.busy > i { animation: none; } }
+
+/* مودال التأكيد لازم يبقى فوق أي مودال تاني.
+   الموديلات الديناميكية (الإعدادات/البلاغ) بتتضاف آخر الـ body وبنفس الـ
+   z-index، فترتيب الـDOM كان بيخلّيها تغطّي التأكيد → الشاشة تسوّد والزراير
+   مش شغّالة والوعد بتاع askConfirm مابيتحلّش (التطبيق يبان واقف). */
+#confirmOverlay { z-index: 300; }
