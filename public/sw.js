@@ -1,5 +1,5 @@
 /* دوّنلي — Service Worker (PWA: تثبيت + أوفلاين خفيف + إشعارات) */
-const CACHE = "dawenli-v44";
+const CACHE = "dawenli-v45";
 // أصول ثابتة آمنة للتخزين (مش بيانات مستخدم).
 const SHELL = [
   "/style.css",

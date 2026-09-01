@@ -2808,6 +2808,11 @@ async function loadOwnerVersion(check = true) {
     el.innerHTML =
       `النسخة: <b>${escapeHtml(v.current.sha)}</b>${when} — ${escapeHtml(v.current.subject)}` +
       (v.remoteError ? `<br><span style="color:var(--danger-deep,#b52b27)">${escapeHtml(v.remoteError)}</span>` : "") +
+      // السيرفر بيرجّع dirty من زمان بس الواجهة ماكانتش بتعرضه — والتحديث بيعمل
+      // reset --hard يعني أي تعديل يدوي على ملفات المشروع هيروح من غير سابق إنذار
+      (v.dirty
+        ? `<br><span style="color:var(--danger-deep,#b52b27)">⚠️ فيه تعديلات يدوية على ملفات المشروع — التحديث هيمسحها (بياناتك في data/ مش هتتأثر)</span>`
+        : "") +
       (v.updateAvailable
         ? `<br><span style="color:var(--brand-deep);font-weight:700">🎉 فيه ${arNum(v.behind)} تحديث جديد:</span><br>` +
           v.commits.map((c) => `• ${escapeHtml(c.subject)}`).join("<br>")
