@@ -207,4 +207,90 @@ $("newUserForm").addEventListener("submit", async (e) => {
   }
 });
 
+/* ===== إعدادات مزود الذكاء ===== */
+let AI_PROVIDERS = {};
+function aiSyncFields() {
+  const p = $("aiProvider").value;
+  $("aiBaseUrlWrap").style.display = p === "custom" ? "flex" : "none";
+  $("aiVoiceWrap").style.display = p === "openai" ? "none" : "flex";
+  const def = AI_PROVIDERS[p]?.defaultModel || "";
+  $("aiModel").placeholder = def || "اسم الموديل";
+  // بدّل الموديل الافتراضي مع تغيير المزود — من غير ما نلمس موديل كتبه المستخدم بإيده
+  if (!$("aiModel").value || Object.values(AI_PROVIDERS).some((x) => x.defaultModel === $("aiModel").value)) {
+    $("aiModel").value = def;
+  }
+}
+async function loadAiSettings() {
+  try {
+    const s = await api("/api/admin/ai-settings").then((r) => r.json());
+    AI_PROVIDERS = s.providers || {};
+    const st = $("aiStatus");
+    if (s.configured) {
+      st.style.color = "var(--brand-deep)";
+      st.textContent = `✅ شغّال: ${AI_PROVIDERS[s.provider]?.label || s.provider} · ${s.model}` + (s.source === "env" ? " (من ملف .env)" : "");
+    } else {
+      st.style.color = "var(--danger-deep, #b52b27)";
+      st.textContent = "⚠️ محتاج إعداد — اختار مزود وحط المفتاح عشان التطبيق يشتغل";
+    }
+    if (s.provider) $("aiProvider").value = s.provider;
+    if (s.model) $("aiModel").value = s.model;
+    if (s.baseUrl) $("aiBaseUrl").value = s.baseUrl;
+    $("aiKeyHint").textContent = s.keyHint ? `(المحفوظ: ${s.keyHint} — سيبه فاضي للإبقاء عليه)` : "";
+    aiSyncFields();
+  } catch {}
+}
+$("aiProvider").addEventListener("change", aiSyncFields);
+function aiBody() {
+  return {
+    provider: $("aiProvider").value,
+    api_key: $("aiKey").value.trim(),
+    model: $("aiModel").value.trim(),
+    base_url: $("aiBaseUrl").value.trim(),
+    voice_key: $("aiVoiceKey").value.trim() || undefined,
+  };
+}
+$("aiTestBtn").addEventListener("click", async () => {
+  const out = $("aiResult");
+  out.style.color = "var(--ink-muted)"; out.textContent = "⏳ بنكلم المزود…";
+  try {
+    const data = await api("/api/admin/ai-settings/test", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(aiBody()),
+    }).then((r) => r.json());
+    if (data.ok) {
+      out.style.color = "var(--brand-deep)";
+      out.textContent = `✅ الاتصال شغّال (${data.model}) — رد الموديل: «${data.reply}»`;
+    } else {
+      out.style.color = "var(--danger-deep, #b52b27)";
+      out.textContent = `❌ فشل (${data.model}): ${data.error}`;
+    }
+  } catch {
+    out.style.color = "var(--danger-deep, #b52b27)";
+    out.textContent = "حصل خطأ في الاختبار، جرّب تاني";
+  }
+});
+$("aiForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const out = $("aiResult");
+  out.style.color = "var(--ink-muted)"; out.textContent = "⏳ بنحفظ…";
+  try {
+    const res = await api("/api/admin/ai-settings", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(aiBody()),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      out.style.color = "var(--brand-deep)";
+      out.textContent = "✅ اتحفظ واتفعّل فورًا — دوس «اختبار الاتصال» للتأكيد";
+      $("aiKey").value = ""; $("aiVoiceKey").value = "";
+      loadAiSettings();
+    } else {
+      out.style.color = "var(--danger-deep, #b52b27)";
+      out.textContent = data.error || "حصل خطأ";
+    }
+  } catch {
+    out.style.color = "var(--danger-deep, #b52b27)";
+    out.textContent = "حصل خطأ، جرّب تاني";
+  }
+});
+loadAiSettings();
+
 load();

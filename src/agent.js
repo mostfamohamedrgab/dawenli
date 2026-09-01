@@ -5,7 +5,7 @@
    - عنده أدوات استعلام فيجاوب على "صرفت كام الشهر ده؟" من البيانات الحقيقية.
    - بيبادر يوميًا ويسأل عن اللي ناقص (مصاريف؟ عادات؟ يومك عدى إزاي؟). */
 
-import { client, logChatUsage } from "./openai.js";
+import { client, logChatUsage, chatModel } from "./openai.js";
 import { config } from "./config.js";
 import {
   localToday,
@@ -847,20 +847,21 @@ export async function runAgent({ user, text, kind = "text" }) {
   const toolLog = [];
   let reply = "";
 
+  const model = chatModel(); // موديل المزود المتظبط في الإعدادات (openai/gemini/grok...)
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     const res = await client.chat.completions.create({
-      model: config.agentModel,
+      model,
       messages,
       tools: TOOLS,
       // أول لفة الموديل لازم ينده أداة على الأقل (يسجّل أو يجيب بيانات) —
       // من غيرها الموديلات الصغيرة بترد كلام وخلاص ومفيش حاجة بتتسجل
       tool_choice: turn === 0 ? "required" : "auto",
     });
-    logChatUsage("agent", config.agentModel, res, userId);
+    logChatUsage("agent", model, res, userId);
     const msg = res.choices[0].message;
     messages.push(msg);
     console.log(
-      `🧠 agent[${config.agentModel}] لفة ${turn + 1}: ${msg.tool_calls?.length || 0} أداة` +
+      `🧠 agent[${model}] لفة ${turn + 1}: ${msg.tool_calls?.length || 0} أداة` +
         (msg.tool_calls?.length ? ` (${msg.tool_calls.map((t) => t.function.name).join("، ")})` : "")
     );
 
@@ -955,11 +956,12 @@ ${goals.length ? "\nأهدافه الحالية (لو حبيت تفكّره بو
 
 خليها دافية وشخصية ومش رسمية، وبسؤال واحد واضح يسهل يرد عليه. من غير مقدمات — الرسالة نفسها بس.`;
 
+  const checkinModel = chatModel();
   const res = await client.chat.completions.create({
-    model: config.agentModel,
+    model: checkinModel,
     messages: [{ role: "user", content: prompt }],
   });
-  logChatUsage("agent", config.agentModel, res, userId);
+  logChatUsage("agent", checkinModel, res, userId);
   const message = res.choices[0].message.content.trim();
 
   // بنسجّلها في المحادثة عشان لما يرد، الـ agent يبقى فاكر هو سأل إيه

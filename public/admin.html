@@ -55,6 +55,46 @@
 
       <div class="stat-grid" id="statCards" style="margin-bottom:28px"></div>
 
+      <!-- ===== مزود الذكاء (OpenAI / Gemini / Grok / مخصص) ===== -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-head">
+          <h3>🧠 مزود الذكاء</h3>
+          <span id="aiStatus" style="font-size:var(--text-sm)"></span>
+        </div>
+        <form id="aiForm" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:var(--text-sm)">
+            المزود
+            <select id="aiProvider" class="field" style="min-width:180px">
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="xai">xAI (Grok)</option>
+              <option value="custom">مخصص (متوافق OpenAI)</option>
+            </select>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:var(--text-sm);flex:1;min-width:220px">
+            مفتاح الـ API <span class="muted" id="aiKeyHint" style="font-size:var(--text-xs)"></span>
+            <input id="aiKey" class="field" type="password" autocomplete="off" placeholder="حط المفتاح هنا" />
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:var(--text-sm)">
+            الموديل
+            <input id="aiModel" class="field" style="min-width:170px" placeholder="gpt-4o" />
+          </label>
+          <label id="aiBaseUrlWrap" style="display:none;flex-direction:column;gap:4px;font-size:var(--text-sm);flex:1;min-width:240px">
+            Base URL (للمخصص)
+            <input id="aiBaseUrl" class="field" placeholder="https://api.example.com/v1" />
+          </label>
+          <label id="aiVoiceWrap" style="display:none;flex-direction:column;gap:4px;font-size:var(--text-sm);flex:1;min-width:220px">
+            مفتاح OpenAI للصوت (اختياري) <span class="muted" style="font-size:var(--text-xs)">التفريغ والنطق بيشتغلوا على OpenAI</span>
+            <input id="aiVoiceKey" class="field" type="password" autocomplete="off" placeholder="sk-... (سيبه فاضي لو مش عايز صوت)" />
+          </label>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="btn secondary sm" id="aiTestBtn">🧪 اختبار الاتصال</button>
+            <button type="submit" class="btn sm">💾 حفظ</button>
+          </div>
+        </form>
+        <p id="aiResult" style="font-size:var(--text-sm);margin:12px 0 0;line-height:1.8"></p>
+      </div>
+
       <div class="card" style="margin-bottom:24px">
         <div class="card-head">
           <h3>🤖 استهلاك الـAI (تفصيلي)</h3>

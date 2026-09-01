@@ -110,7 +110,8 @@ import {
   setAssetMarket,
 } from "./db.js";
 import { pushEnabled, vapidPublicKey, sendPushToUser, notifyUser } from "./push.js";
-import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage, textToSpeech } from "./openai.js";
+import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage, textToSpeech, PROVIDERS, aiSettings, saveAiSettings, aiConfigured, aiErrorMessage, refreshAi, chatModel } from "./openai.js";
+import OpenAI from "openai";
 import { buildReportData } from "./report.js";
 import { runAgent } from "./agent.js";
 
@@ -458,6 +459,68 @@ export function startServer() {
       pricing: PRICING,
     });
   });
+  /* ===== إعدادات مزود الذكاء (OpenAI / Gemini / Grok / مخصص) ===== */
+  app.get("/api/admin/ai-settings", (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    const s = aiSettings();
+    res.json({
+      configured: !!s.apiKey,
+      source: s.source, // db = من الإعدادات، env = من ملف .env القديم، none = محتاج إعداد
+      provider: s.provider,
+      model: s.model,
+      baseUrl: s.provider === "custom" ? s.baseURL : undefined,
+      // المفتاح مايتبعتش كامل أبدًا — آخر ٤ حروف للتأكيد بس
+      keyHint: s.apiKey ? `…${s.apiKey.slice(-4)}` : null,
+      hasVoiceKey: !!s.voiceKey,
+      providers: Object.fromEntries(
+        Object.entries(PROVIDERS).map(([k, p]) => [k, { label: p.label, defaultModel: p.defaultModel }])
+      ),
+    });
+  });
+  app.put("/api/admin/ai-settings", (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    const { provider, api_key, model, base_url, voice_key } = req.body || {};
+    if (!PROVIDERS[provider]) return res.status(400).json({ error: "اختار مزود صحيح" });
+    const existing = aiSettings();
+    if (!api_key && existing.source !== "db") return res.status(400).json({ error: "حط مفتاح الـ API" });
+    if (provider === "custom" && !String(base_url || "").startsWith("http"))
+      return res.status(400).json({ error: "المزود المخصص محتاج baseURL صحيح (يبدأ بـ https)" });
+    saveAiSettings({
+      provider,
+      apiKey: api_key || undefined,
+      model: model || PROVIDERS[provider].defaultModel,
+      baseUrl: provider === "custom" ? base_url : undefined,
+      voiceKey: voice_key !== undefined ? voice_key : undefined,
+    });
+    res.json({ ok: true });
+  });
+  // اختبار حي: بيكلم المزود فعلاً بمفتاح/موديل الفورم (من غير حفظ) أو بالمحفوظ لو الفورم فاضي
+  app.post("/api/admin/ai-settings/test", async (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    const { provider, api_key, model, base_url } = req.body || {};
+    const saved = aiSettings();
+    const p = PROVIDERS[provider || saved.provider] || PROVIDERS.openai;
+    const key = api_key || saved.apiKey;
+    const baseURL = (provider || saved.provider) === "custom" ? (base_url || saved.baseURL) : p.baseURL;
+    const testModel = model || (provider && provider !== saved.provider ? p.defaultModel : saved.model) || p.defaultModel;
+    if (!key) return res.status(400).json({ error: "مفيش مفتاح للاختبار" });
+    try {
+      const tc = new OpenAI({ apiKey: key, ...(baseURL ? { baseURL } : {}), timeout: 20000, maxRetries: 0 });
+      const r = await tc.chat.completions.create({
+        model: testModel,
+        messages: [{ role: "user", content: "رد بكلمة واحدة بس: تمام" }],
+        max_tokens: 10,
+      });
+      res.json({ ok: true, model: testModel, reply: (r.choices?.[0]?.message?.content || "").trim() });
+    } catch (err) {
+      const friendly = aiErrorMessage(err);
+      res.json({ ok: false, model: testModel, error: friendly || String(err?.message || err).slice(0, 300) });
+    }
+  });
+
   // إنشاء حساب مستخدم من الأدمن (التسجيل العام مقفول)
   app.post("/api/admin/users", (req, res) => {
     const admin = adminGate(req, res);
@@ -723,7 +786,8 @@ export function startServer() {
       res.json({ reply });
     } catch (err) {
       console.error("ask error:", err);
-      res.status(500).json({ error: "حصل خطأ، جرّب تاني" });
+      const friendly = aiErrorMessage(err);
+      res.status(friendly ? 503 : 500).json({ error: friendly || "حصل خطأ، جرّب تاني" });
     }
   });
   // تاريخ محادثة اسأل دوّنلي (محفوظ)
@@ -886,7 +950,8 @@ export function startServer() {
       res.json({ reply, receipts });
     } catch (err) {
       console.error("dashboard log error:", err);
-      res.status(500).json({ error: "حصل خطأ أثناء المعالجة، جرّب تاني" });
+      const friendly = aiErrorMessage(err);
+      res.status(friendly ? 503 : 500).json({ error: friendly || "حصل خطأ أثناء المعالجة، جرّب تاني" });
     }
   });
 
@@ -917,7 +982,8 @@ export function startServer() {
         res.json({ transcript, reply, receipts });
       } catch (err) {
         console.error("dashboard voice error:", err, "| الصوت محفوظ في:", audioPath);
-        res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
+        const friendly = aiErrorMessage(err);
+        res.status(friendly ? 503 : 500).json({ error: friendly || "حصل خطأ أثناء معالجة الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
       }
     }
   );
@@ -959,7 +1025,8 @@ export function startServer() {
         res.json({ transcript, thought });
       } catch (err) {
         console.error("thought voice error:", err, "| الصوت محفوظ في:", audioPath);
-        res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
+        const friendly = aiErrorMessage(err);
+        res.status(friendly ? 503 : 500).json({ error: friendly || "حصل خطأ أثناء معالجة الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
       }
     }
   );

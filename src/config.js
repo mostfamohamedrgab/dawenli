@@ -1,16 +1,8 @@
 import "dotenv/config";
 
-function required(name) {
-  const v = process.env[name];
-  if (!v) {
-    console.error(`❌ متغيّر مطلوب ناقص: ${name} — راجع ملف .env`);
-    process.exit(1);
-  }
-  return v;
-}
-
 export const config = {
-  openaiKey: required("OPENAI_API_KEY"),
+  // مش إجباري: لو مش موجود، التطبيق بيشتغل عادي ويطلب إعداد مزود الذكاء من لوحة الأدمن
+  openaiKey: process.env.OPENAI_API_KEY || "",
   // موديل كويس للصوت العربي + موديل قوي للـ agent (tool calling)
   transcribeModel: process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-transcribe",
   // مهم: مفيش fallback على OPENAI_CHAT_MODEL القديم — كان بيخلي الـ agent يشتغل

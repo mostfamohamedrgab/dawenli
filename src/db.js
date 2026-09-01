@@ -333,6 +333,28 @@ addColumnIfMissing("goals", "period", "TEXT");    // 'week' | 'month' | 'date' �
 addColumnIfMissing("goals", "deadline", "TEXT");  // YYYY-MM-DD آخر يوم متابعة — null = مستمر
 db.prepare(`UPDATE tasks SET status = 'pending' WHERE status = 'open'`).run();
 
+// ===== إعدادات التطبيق (key/value) — بتتقدّم على الـ env (مثلاً مزود الذكاء ومفاتيحه) =====
+db.exec(`
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TEXT NOT NULL
+  );
+`);
+export function getSetting(key) {
+  return db.prepare(`SELECT value FROM app_settings WHERE key = ?`).get(key)?.value ?? null;
+}
+export function setSetting(key, value) {
+  if (value == null || value === "") {
+    db.prepare(`DELETE FROM app_settings WHERE key = ?`).run(key);
+    return;
+  }
+  db.prepare(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+  ).run(key, String(value), new Date().toISOString());
+}
+
 // ===== المتتبِّعات اليومية (أرقام بتتسجّل كل يوم: ساعات عمل، مياه، مذاكرة...) =====
 db.exec(`
   CREATE TABLE IF NOT EXISTS metrics (
