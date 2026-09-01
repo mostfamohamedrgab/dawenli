@@ -75,9 +75,25 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 async function api(path, opts) {
-  const res = await fetch(path, opts);
-  if (res.status === 401) { window.location.href = "/login"; throw new Error("unauth"); }
+  let res;
+  try {
+    res = await fetch(path, opts);
+  } catch {
+    // النت قاطع أو السيرفر بيعيد التشغيل — منرميش المستخدم برّه
+    throw new Error("offline");
+  }
+  // الجلسة خلصت: نوديه على صفحة الدخول ومعاها سبب يتعرض له بدل ما يتنقل فجأة
+  if (res.status === 401) {
+    window.location.href = "/login?reason=expired";
+    throw new Error("unauth");
+  }
   return res;
+}
+// رسالة مفهومة بدل «حصل خطأ» على طول
+function apiErrText(err, res) {
+  if (err?.message === "offline") return "مفيش اتصال بالسيرفر — اتأكد من النت وجرّب تاني";
+  if (res?.status === 403) return "الصفحة دي لصاحب التطبيق بس";
+  return "حصل خطأ، جرّب تاني";
 }
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -259,11 +275,17 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("edit
 
 /* ===================== Navigation ===================== */
 function gotoTab(tab) {
+  // حارس: أزرار زي «بلّغ عن مشكلة» و«الإعدادات» بتفتح موديل ومالهاش data-tab،
+  // فكانت بتوصل هنا بـ undefined → الهاش يبقى #undefined وكل الـ panels تتخفي
+  // (الصفحة تفضى تمامًا). أي تاب مش معروف بنتجاهله بدل ما نكسر الصفحة.
+  if (!tab || typeof tab !== "string") return;
   // الأقسام الأربعة بقت جوّه هَب «دفترك» — أي تنقّل ليها يفتح الهَب على نفس القسم
   if (["journal", "thoughts", "ideas", "problems"].includes(tab)) {
     dafterSub = tab; try { localStorage.setItem("dw_dafter_sub", tab); } catch {}
     tab = "dafter";
   }
+  // تاب مش موجود أصلاً (هاش قديم أو اسم غلط) — منخفّيش أي حاجة ومنكتبش هاش خربان
+  if (!document.querySelector(`.tab-panel[data-panel="${CSS.escape(tab)}"]`)) return;
   // نثبّت الصفحة الحالية في الـ hash + localStorage عشان الريلود يفضّل واقف فيها
   try { localStorage.setItem("dw_tab", tab); } catch {}
   try { if ((location.hash || "").replace(/^#/, "") !== tab) history.replaceState(null, "", "#" + tab); } catch {}
@@ -289,12 +311,14 @@ function gotoTab(tab) {
   if (tab === "about") renderAboutPage();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
+// ملاحظة: فيه أزرار .nav-btn بتفتح موديل (بلّغ عن مشكلة / الإعدادات) ومالهاش
+// data-tab — بنتأكد من وجودها قبل التنقّل عشان مانمسحش الصفحة.
 $("sideNav").addEventListener("click", (e) => {
-  const btn = e.target.closest(".nav-btn");
+  const btn = e.target.closest(".nav-btn[data-tab]");
   if (btn) gotoTab(btn.dataset.tab);
 });
 $("tabBar")?.addEventListener("click", (e) => {
-  const btn = e.target.closest(".tabbar-btn");
+  const btn = e.target.closest(".tabbar-btn[data-tab]");
   if (btn) gotoTab(btn.dataset.tab);
 });
 document.querySelectorAll("[data-go]").forEach((c) => c.addEventListener("click", () => gotoTab(c.dataset.go)));
@@ -2606,7 +2630,7 @@ $("moreSheet")?.addEventListener("click", (e) => {
   // عناصر مش تابات — بتفتح موديل
   if (btn.dataset.action === "report") { openReport(); return; }
   if (btn.dataset.action === "aisettings") { openAiSettings(); return; }
-  gotoTab(btn.dataset.tab);
+  if (btn.dataset.tab) gotoTab(btn.dataset.tab);
 });
 
 /* ===================== إعدادات صاحب التطبيق (الذكاء + التحديثات) =====================
@@ -2683,7 +2707,16 @@ function syncAiFields() {
 }
 async function loadAiSettingsUi() {
   try {
-    const s = await api("/api/admin/ai-settings").then((r) => r.json());
+    const res = await api("/api/admin/ai-settings");
+    if (!res.ok) {
+      const st = $("aiSetStatus");
+      if (st) {
+        st.style.color = "var(--danger-deep, #b52b27)";
+        st.textContent = res.status === 403 ? "· الإعدادات دي لصاحب التطبيق بس" : "· مقدرتش أقرا الإعدادات";
+      }
+      return;
+    }
+    const s = await res.json();
     _aiProviders = s.providers || {};
     const st = $("aiSetStatus");
     if (st) {
@@ -2697,7 +2730,11 @@ async function loadAiSettingsUi() {
     if (s.baseUrl) $("aiSetBase").value = s.baseUrl;
     $("aiSetHint").textContent = s.keyHint ? `(المحفوظ: ${s.keyHint} — سيبه فاضي للإبقاء عليه)` : "";
     syncAiFields();
-  } catch {}
+  } catch (err) {
+    if (err?.message === "unauth") return;
+    const st = $("aiSetStatus");
+    if (st) { st.style.color = "var(--danger-deep, #b52b27)"; st.textContent = "· " + apiErrText(err); }
+  }
 }
 function aiSetBody() {
   return {
@@ -2734,7 +2771,15 @@ async function loadOwnerVersion(check = true) {
   if (!el) return;
   if (check) el.textContent = "⏳ بنتشيّك…";
   try {
-    const v = await api(`/api/admin/version${check ? "" : "?check=0"}`).then((r) => r.json());
+    const res = await api(`/api/admin/version${check ? "" : "?check=0"}`);
+    if (!res.ok) {
+      el.textContent = res.status === 403
+        ? "التحديثات دي لصاحب التطبيق بس"
+        : "مقدرتش أقرا النسخة من السيرفر";
+      btn.style.display = "none";
+      return;
+    }
+    const v = await res.json();
     if (!v.ok) { el.textContent = v.error || "مقدرتش أقرا النسخة"; btn.style.display = "none"; return; }
     el.innerHTML =
       `النسخة: <b>${escapeHtml(v.current.sha)}</b> — ${escapeHtml(v.current.subject)}` +
@@ -2744,7 +2789,11 @@ async function loadOwnerVersion(check = true) {
           v.commits.map((c) => `• ${escapeHtml(c.subject)}`).join("<br>")
         : v.remoteError ? "" : `<br><span style="color:var(--brand-deep)">✅ إنت على آخر نسخة</span>`);
     btn.style.display = v.updateAvailable ? "" : "none";
-  } catch { el.textContent = "حصل خطأ"; }
+  } catch (err) {
+    if (err?.message === "unauth") return; // بيتنقل لصفحة الدخول أصلاً
+    el.textContent = apiErrText(err);
+    btn.style.display = "none";
+  }
 }
 async function doOwnerUpdate() {
   if (!(await askConfirm())) return;
@@ -2752,7 +2801,13 @@ async function doOwnerUpdate() {
   btn.disabled = true;
   m.style.color = "var(--ink-muted)"; m.textContent = "⏳ بننزّل التحديث… متقفلش الصفحة";
   try {
-    const d = await api("/api/admin/update", { method: "POST" }).then((r) => r.json());
+    const res = await api("/api/admin/update", { method: "POST" });
+    if (res.status === 403) {
+      m.style.color = "var(--danger-deep, #b52b27)";
+      m.textContent = "التحديثات دي لصاحب التطبيق بس";
+      return;
+    }
+    const d = await res.json().catch(() => ({ ok: false, error: "رد السيرفر مش مفهوم" }));
     const steps = (d.steps || []).map((s) => escapeHtml(s)).join("<br>");
     if (d.ok) {
       m.style.color = "var(--brand-deep)";
@@ -2767,7 +2822,13 @@ async function doOwnerUpdate() {
         }, 2500);
       } else loadOwnerVersion(false);
     } else { m.style.color = "var(--danger-deep, #b52b27)"; m.innerHTML = (steps ? steps + "<br>" : "") + escapeHtml(d.error || "حصل خطأ"); }
-  } catch { m.style.color = "var(--danger-deep, #b52b27)"; m.textContent = "حصل خطأ في التحديث"; }
+  } catch (err) {
+    if (err?.message === "unauth") return;
+    m.style.color = "var(--danger-deep, #b52b27)";
+    m.textContent = err?.message === "offline"
+      ? "السيرفر مش راد — يمكن بيعيد التشغيل. استنى شوية واعمل «اتشيّك»."
+      : "حصل خطأ في التحديث";
+  }
   finally { btn.disabled = false; }
 }
 window.openAiSettings = openAiSettings;
@@ -3307,7 +3368,13 @@ loadAll().then(() => {
   drainPending();          // وابعته لو النت موجود
   // رجّع آخر صفحة كان واقف فيها قبل الـ reload (الـ hash الأول لأنه أضمن، وإلا localStorage)
   try {
-    const fromHash = (location.hash || "").replace(/^#/, "");
+    let fromHash = (location.hash || "").replace(/^#/, "");
+    // تنضيف أثر الباج القديم: #undefined في اللينك أو "undefined" متخزّنة
+    if (fromHash === "undefined") {
+      fromHash = "";
+      try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+    }
+    if (localStorage.getItem("dw_tab") === "undefined") localStorage.removeItem("dw_tab");
     let saved = fromHash || localStorage.getItem("dw_tab");
     // أي قسم اتدمج جوّه «دفترك» نفتح الهَب عليه
     if (["journal", "thoughts", "ideas", "problems"].includes(saved)) saved = "dafter";
