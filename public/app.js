@@ -2781,8 +2781,16 @@ async function loadOwnerVersion(check = true) {
     }
     const v = await res.json();
     if (!v.ok) { el.textContent = v.error || "مقدرتش أقرا النسخة"; btn.style.display = "none"; return; }
+    // تاريخ النسخة يوريك بناها إمتى — مفيد تعرف إنت متأخر بقالك قد إيه
+    let when = "";
+    try {
+      if (v.current.date) {
+        when = ` <span class="muted" style="font-size:var(--text-xs)">(${new Date(v.current.date)
+          .toLocaleDateString("ar-EG", { day: "numeric", month: "long", year: "numeric" })})</span>`;
+      }
+    } catch {}
     el.innerHTML =
-      `النسخة: <b>${escapeHtml(v.current.sha)}</b> — ${escapeHtml(v.current.subject)}` +
+      `النسخة: <b>${escapeHtml(v.current.sha)}</b>${when} — ${escapeHtml(v.current.subject)}` +
       (v.remoteError ? `<br><span style="color:var(--danger-deep,#b52b27)">${escapeHtml(v.remoteError)}</span>` : "") +
       (v.updateAvailable
         ? `<br><span style="color:var(--brand-deep);font-weight:700">🎉 فيه ${arNum(v.behind)} تحديث جديد:</span><br>` +
