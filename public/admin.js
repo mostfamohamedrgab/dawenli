@@ -154,6 +154,14 @@ async function openUser(id) {
         ${escapeHtml(u.email || "بدون إيميل")}
       </p>
       <p class="muted" style="font-size:var(--text-xs)">اتسجّل ${fmtDate(u.created_at)} · آخر ظهور ${fmtAgo(u.last_seen)}</p>
+      <div style="margin:12px 0;padding:10px 12px;border:1px solid var(--hairline);border-radius:10px">
+        <div style="font-size:var(--text-sm);font-weight:700;margin-bottom:4px">👑 صاحب التطبيق</div>
+        <p class="muted" style="font-size:var(--text-xs);margin:0 0 8px">صاحب التطبيق بيقدر يظبّط مزود الذكاء ويسحب التحديثات من جوّه التطبيق.</p>
+        <button class="btn ${u.is_owner ? "secondary" : ""} sm" id="ownerToggle" data-id="${u.id}" data-on="${u.is_owner ? 1 : 0}">
+          ${u.is_owner ? "اسحب الملكية" : "اجعله صاحب التطبيق"}
+        </button>
+        <span id="ownerMsg" style="font-size:var(--text-sm);margin-inline-start:8px"></span>
+      </div>
       ${d.profile.length ? sec("🧠 دوّنلي يعرف عنه", facts) : ""}
       ${sec("📝 آخر اليوميات", entries)}
       ${sec("💰 آخر العمليات", fin)}
@@ -161,6 +169,18 @@ async function openUser(id) {
       ${d.goals.length ? sec("🎯 الأهداف", goals) : ""}
       ${d.habits.length ? sec("🔁 العادات", habits) : ""}`;
     $("drawerClose").addEventListener("click", closeDrawer);
+    $("ownerToggle")?.addEventListener("click", async (e) => {
+      const b = e.currentTarget, msg = $("ownerMsg");
+      const makeOwner = b.dataset.on !== "1";
+      b.disabled = true; msg.style.color = "var(--ink-muted)"; msg.textContent = "⏳…";
+      try {
+        const r = await api(`/api/admin/users/${b.dataset.id}/owner`, {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_owner: makeOwner }),
+        }).then((r) => r.json());
+        if (r.ok) { msg.style.color = "var(--brand-deep)"; msg.textContent = "✅ اتحفظ"; openUser(Number(b.dataset.id)); load(); }
+        else { msg.style.color = "var(--danger-deep, #b52b27)"; msg.textContent = r.error || "حصل خطأ"; b.disabled = false; }
+      } catch { msg.style.color = "var(--danger-deep, #b52b27)"; msg.textContent = "حصل خطأ"; b.disabled = false; }
+    });
   } catch {
     $("drawer").innerHTML = `<p class="muted">حصل خطأ في التحميل.</p>`;
   }

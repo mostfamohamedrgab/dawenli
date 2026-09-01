@@ -451,13 +451,34 @@ export function getUserByEmail(email) {
   return getUserByEmailStmt.get(String(email).trim().toLowerCase()) || null;
 }
 
+// «مالك يقدر يسجّل دخول» = عنده إيميل وباسورد (مش المستخدم الوهمي بتاع bootstrap)
+const loginableOwnerStmt = db.prepare(
+  `SELECT id FROM users WHERE is_owner = 1 AND email IS NOT NULL AND password_hash IS NOT NULL LIMIT 1`
+);
+export function setUserOwner(userId, isOwner) {
+  return db.prepare(`UPDATE users SET is_owner = ? WHERE id = ?`).run(isOwner ? 1 : 0, userId).changes > 0;
+}
+// عدد الملاك اللي يقدروا يسجّلوا دخول — عشان مانسحبش آخر ملكية ونقفل الإعدادات على الكل
+export function countLoginableOwners() {
+  return db.prepare(
+    `SELECT COUNT(*) c FROM users WHERE is_owner = 1 AND email IS NOT NULL AND password_hash IS NOT NULL`
+  ).get().c;
+}
+
 export function createEmailUser({ name, email, passwordHash }) {
   const cleanEmail = String(email).trim().toLowerCase();
   if (getUserByEmail(cleanEmail)) return null; // الإيميل مستخدم قبل كده
   const info = db
     .prepare(`INSERT INTO users (created_at, name, email, password_hash, last_seen) VALUES (?, ?, ?, ?, ?)`)
     .run(now(), name || null, cleanEmail, passwordHash, now());
-  return getUserByIdStmt.get(Number(info.lastInsertRowid));
+  const id = Number(info.lastInsertRowid);
+  // أول حساب حقيقي في أي نسخة = صاحب التطبيق، عشان يقدر يظبّط مزود الذكاء والتحديثات
+  // من جوّه التطبيق. (المستخدم الوهمي بتاع bootstrap مالوش إيميل فمينفعش يسجّل دخول.)
+  if (!loginableOwnerStmt.get()) {
+    db.prepare(`UPDATE users SET is_owner = 0 WHERE email IS NULL`).run(); // شيل العلم من الوهمي
+    setUserOwner(id, true);
+  }
+  return getUserByIdStmt.get(id);
 }
 
 // bootstrap: نضمن وجود "صاحب" المنصة ونلحق البيانات القديمة (اللي من قبل multi-user) بيه
@@ -469,6 +490,18 @@ export function createEmailUser({ name, email, passwordHash }) {
   }
   for (const t of ["entries", "finance", "health", "conversations", "goals", "conditions", "meals", "habits", "tasks", "ai_usage"]) {
     db.prepare(`UPDATE ${t} SET user_id = ? WHERE user_id IS NULL`).run(owner.id);
+  }
+  // لو النسخة فيها حسابات حقيقية بس ولا واحد فيهم مالك (الملكية عند المستخدم الوهمي)،
+  // نسلّم الملكية لأقدم حساب حقيقي — غير كده محدش هيقدر يفتح إعدادات التطبيق.
+  if (!loginableOwnerStmt.get()) {
+    const first = db
+      .prepare(`SELECT id FROM users WHERE email IS NOT NULL AND password_hash IS NOT NULL ORDER BY id LIMIT 1`)
+      .get();
+    if (first) {
+      db.prepare(`UPDATE users SET is_owner = 0 WHERE email IS NULL`).run();
+      db.prepare(`UPDATE users SET is_owner = 1 WHERE id = ?`).run(first.id);
+      console.log(`👑 اتسلّمت ملكية التطبيق للحساب #${first.id} (أقدم حساب) — يقدر يظبّط الإعدادات من جوّه التطبيق`);
+    }
   }
 })();
 

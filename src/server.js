@@ -8,6 +8,8 @@ import {
   getUserById,
   getUserByEmail,
   createEmailUser,
+  setUserOwner,
+  countLoginableOwners,
   localToday,
   listEntries,
   entriesSince,
@@ -571,6 +573,19 @@ export function startServer() {
     });
     if (!user) return res.status(409).json({ error: "الإيميل ده متسجّل قبل كده" });
     res.json({ ok: true, user: { id: user.id, email: cleanEmail, name: user.name } });
+  });
+  // تحويل ملكية التطبيق لحساب (المالك بيقدر يظبّط الذكاء والتحديثات من جوّه التطبيق)
+  app.put("/api/admin/users/:id/owner", (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    const id = Number(req.params.id);
+    const target = getUserById(id);
+    if (!target) return res.status(404).json({ error: "الحساب مش موجود" });
+    const makeOwner = !!(req.body || {}).is_owner;
+    if (makeOwner && !target.email) return res.status(400).json({ error: "الحساب ده مالوش إيميل فمينفعش يسجّل دخول" });
+    if (!makeOwner && countLoginableOwners() <= 1 && target.is_owner)
+      return res.status(400).json({ error: "ده آخر صاحب للتطبيق — عيّن واحد تاني الأول" });
+    res.json({ ok: setUserOwner(id, makeOwner) });
   });
   // تفاصيل مستخدم واحد (قراءة فقط للمراقبة)
   app.get("/api/admin/users/:id", (req, res) => {
