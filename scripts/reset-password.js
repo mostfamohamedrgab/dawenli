@@ -10,10 +10,23 @@
 
 import Database from "better-sqlite3";
 import crypto from "node:crypto";
+import os from "node:os";
 import "dotenv/config";
 
 const dbPath = process.env.DB_PATH || "./data/dawenli.db";
 const db = new Database(dbPath);
+
+// جدول ثابت لتتبّع عمليات إعادة تعيين كلمة السر (منع إخفاء الأدمن لأي تغيير).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS password_reset_audit (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at      TEXT NOT NULL,
+    actor           TEXT NOT NULL,
+    target_user_id  INTEGER NOT NULL,
+    target_email    TEXT,
+    was_owner       INTEGER NOT NULL DEFAULT 0
+  );
+`);
 
 // نفس صيغة src/server.js بالظبط: "salt:hash" — scrypt، keylen=64
 function hashPassword(pw) {
