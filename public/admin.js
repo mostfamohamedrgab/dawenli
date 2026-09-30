@@ -154,6 +154,14 @@ async function openUser(id) {
         ${escapeHtml(u.email || "بدون إيميل")}
       </p>
       <p class="muted" style="font-size:var(--text-xs)">اتسجّل ${fmtDate(u.created_at)} · آخر ظهور ${fmtAgo(u.last_seen)}</p>
+      <div style="margin:12px 0;padding:10px 12px;border:1px solid var(--hairline);border-radius:10px">
+        <div style="font-size:var(--text-sm);font-weight:700;margin-bottom:4px">👑 صاحب التطبيق</div>
+        <p class="muted" style="font-size:var(--text-xs);margin:0 0 8px">صاحب التطبيق بيقدر يظبّط مزود الذكاء ويسحب التحديثات من جوّه التطبيق.</p>
+        <button class="btn ${u.is_owner ? "secondary" : ""} sm" id="ownerToggle" data-id="${u.id}" data-on="${u.is_owner ? 1 : 0}">
+          ${u.is_owner ? "اسحب الملكية" : "اجعله صاحب التطبيق"}
+        </button>
+        <span id="ownerMsg" style="font-size:var(--text-sm);margin-inline-start:8px"></span>
+      </div>
       ${d.profile.length ? sec("🧠 دوّنلي يعرف عنه", facts) : ""}
       ${sec("📝 آخر اليوميات", entries)}
       ${sec("💰 آخر العمليات", fin)}
@@ -161,6 +169,18 @@ async function openUser(id) {
       ${d.goals.length ? sec("🎯 الأهداف", goals) : ""}
       ${d.habits.length ? sec("🔁 العادات", habits) : ""}`;
     $("drawerClose").addEventListener("click", closeDrawer);
+    $("ownerToggle")?.addEventListener("click", async (e) => {
+      const b = e.currentTarget, msg = $("ownerMsg");
+      const makeOwner = b.dataset.on !== "1";
+      b.disabled = true; msg.style.color = "var(--ink-muted)"; msg.textContent = "⏳…";
+      try {
+        const r = await api(`/api/admin/users/${b.dataset.id}/owner`, {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_owner: makeOwner }),
+        }).then((r) => r.json());
+        if (r.ok) { msg.style.color = "var(--brand-deep)"; msg.textContent = "✅ اتحفظ"; openUser(Number(b.dataset.id)); load(); }
+        else { msg.style.color = "var(--danger-deep, #b52b27)"; msg.textContent = r.error || "حصل خطأ"; b.disabled = false; }
+      } catch { msg.style.color = "var(--danger-deep, #b52b27)"; msg.textContent = "حصل خطأ"; b.disabled = false; }
+    });
   } catch {
     $("drawer").innerHTML = `<p class="muted">حصل خطأ في التحميل.</p>`;
   }
@@ -206,5 +226,179 @@ $("newUserForm").addEventListener("submit", async (e) => {
     out.textContent = "حصل خطأ، جرّب تاني";
   }
 });
+
+/* ===== تحديثات التطبيق (من الجيت) ===== */
+function renderVersion(v) {
+  const st = $("verStatus"), cur = $("verCurrent"), ch = $("verChangelog"), btn = $("verUpdateBtn");
+  if (!v || !v.ok) {
+    st.style.color = "var(--ink-muted)";
+    st.textContent = "غير متاح";
+    cur.textContent = v?.error || "مقدرتش أقرا حالة النسخة";
+    btn.style.display = "none";
+    return;
+  }
+  cur.innerHTML =
+    `النسخة الحالية: <b>${escapeHtml(v.current.sha)}</b> — ${escapeHtml(v.current.subject)}<br>` +
+    `<span style="opacity:.75">${fmtDate(v.current.date)} · فرع ${escapeHtml(v.current.branch)}</span>` +
+    (v.dirty ? `<br><span style="color:var(--warning-deep,#a86a12)">⚠️ فيه تعديلات محلية على السيرفر — التحديث هيمسحها</span>` : "");
+  if (v.remoteError) {
+    st.style.color = "var(--warning-deep, #a86a12)";
+    st.textContent = "⚠️ مقدرتش أتشيّك";
+    ch.innerHTML = `<span class="muted" style="font-size:var(--text-sm)">${escapeHtml(v.remoteError)}</span>`;
+    btn.style.display = "none";
+    return;
+  }
+  if (v.updateAvailable) {
+    st.style.color = "var(--brand-deep)";
+    st.textContent = `🎉 فيه ${v.behind} تحديث جديد`;
+    ch.innerHTML =
+      `<div style="font-size:var(--text-sm);font-weight:700;margin-bottom:6px">الجديد:</div>` +
+      `<ul style="margin:0;padding-inline-start:18px;font-size:var(--text-sm);line-height:1.9">` +
+      v.commits.map((c) => `<li><code>${escapeHtml(c.sha)}</code> ${escapeHtml(c.subject)}</li>`).join("") +
+      `</ul>`;
+    btn.style.display = "";
+  } else {
+    st.style.color = "var(--brand-deep)";
+    st.textContent = "✅ إنت على آخر نسخة";
+    ch.innerHTML = "";
+    btn.style.display = "none";
+  }
+}
+async function loadVersion(check = true) {
+  const st = $("verStatus");
+  if (check) { st.style.color = "var(--ink-muted)"; st.textContent = "⏳ بنتشيّك…"; }
+  try {
+    renderVersion(await api(`/api/admin/version${check ? "" : "?check=0"}`).then((r) => r.json()));
+  } catch {
+    st.textContent = "حصل خطأ";
+  }
+}
+$("verCheckBtn").addEventListener("click", () => loadVersion(true));
+$("verUpdateBtn").addEventListener("click", async () => {
+  if (!confirm("هنسحب آخر نسخة من الجيت ونعيد تشغيل التطبيق. الداتا بتتاخد نسخة احتياطية الأول. نكمّل؟")) return;
+  const out = $("verResult"), btn = $("verUpdateBtn");
+  btn.disabled = true;
+  out.style.color = "var(--ink-muted)";
+  out.textContent = "⏳ بننزّل التحديث… متقفلش الصفحة";
+  try {
+    const data = await api("/api/admin/update", { method: "POST" }).then((r) => r.json());
+    const steps = (data.steps || []).map((s) => escapeHtml(s)).join("<br>");
+    if (data.ok) {
+      out.style.color = "var(--brand-deep)";
+      out.innerHTML = steps + (data.changed ? `<br><b>${escapeHtml(data.message || "")}</b>` : `<br><b>${escapeHtml(data.message || "مفيش جديد")}</b>`);
+      if (data.restarting) {
+        // نستنى السيرفر يقوم تاني وبعدين نحدّث الحالة
+        setTimeout(async () => {
+          out.innerHTML += "<br>🔄 بنتأكد إن التطبيق رجع…";
+          for (let i = 0; i < 10; i++) {
+            await new Promise((r) => setTimeout(r, 2000));
+            try {
+              const r = await fetch("/api/admin/version?check=0");
+              if (r.ok) { out.innerHTML += "<br>✅ التطبيق رجع شغّال بالنسخة الجديدة"; loadVersion(false); load(); return; }
+            } catch {}
+          }
+          out.innerHTML += "<br>⚠️ التطبيق أخد وقت — اعمل ريفريش للصفحة وشوف";
+        }, 2500);
+      } else {
+        loadVersion(false);
+      }
+    } else {
+      out.style.color = "var(--danger-deep, #b52b27)";
+      out.innerHTML = (steps ? steps + "<br>" : "") + escapeHtml(data.error || "حصل خطأ");
+    }
+  } catch {
+    out.style.color = "var(--danger-deep, #b52b27)";
+    out.textContent = "حصل خطأ في التحديث — راجع اللوج على السيرفر";
+  } finally {
+    btn.disabled = false;
+  }
+});
+loadVersion(true);
+
+/* ===== إعدادات مزود الذكاء ===== */
+let AI_PROVIDERS = {};
+function aiSyncFields() {
+  const p = $("aiProvider").value;
+  $("aiBaseUrlWrap").style.display = p === "custom" ? "flex" : "none";
+  $("aiVoiceWrap").style.display = p === "openai" ? "none" : "flex";
+  const def = AI_PROVIDERS[p]?.defaultModel || "";
+  $("aiModel").placeholder = def || "اسم الموديل";
+  // بدّل الموديل الافتراضي مع تغيير المزود — من غير ما نلمس موديل كتبه المستخدم بإيده
+  if (!$("aiModel").value || Object.values(AI_PROVIDERS).some((x) => x.defaultModel === $("aiModel").value)) {
+    $("aiModel").value = def;
+  }
+}
+async function loadAiSettings() {
+  try {
+    const s = await api("/api/admin/ai-settings").then((r) => r.json());
+    AI_PROVIDERS = s.providers || {};
+    const st = $("aiStatus");
+    if (s.configured) {
+      st.style.color = "var(--brand-deep)";
+      st.textContent = `✅ شغّال: ${AI_PROVIDERS[s.provider]?.label || s.provider} · ${s.model}` + (s.source === "env" ? " (من ملف .env)" : "");
+    } else {
+      st.style.color = "var(--danger-deep, #b52b27)";
+      st.textContent = "⚠️ محتاج إعداد — اختار مزود وحط المفتاح عشان التطبيق يشتغل";
+    }
+    if (s.provider) $("aiProvider").value = s.provider;
+    if (s.model) $("aiModel").value = s.model;
+    if (s.baseUrl) $("aiBaseUrl").value = s.baseUrl;
+    $("aiKeyHint").textContent = s.keyHint ? `(المحفوظ: ${s.keyHint} — سيبه فاضي للإبقاء عليه)` : "";
+    aiSyncFields();
+  } catch {}
+}
+$("aiProvider").addEventListener("change", aiSyncFields);
+function aiBody() {
+  return {
+    provider: $("aiProvider").value,
+    api_key: $("aiKey").value.trim(),
+    model: $("aiModel").value.trim(),
+    base_url: $("aiBaseUrl").value.trim(),
+    voice_key: $("aiVoiceKey").value.trim() || undefined,
+  };
+}
+$("aiTestBtn").addEventListener("click", async () => {
+  const out = $("aiResult");
+  out.style.color = "var(--ink-muted)"; out.textContent = "⏳ بنكلم المزود…";
+  try {
+    const data = await api("/api/admin/ai-settings/test", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(aiBody()),
+    }).then((r) => r.json());
+    if (data.ok) {
+      out.style.color = "var(--brand-deep)";
+      out.textContent = `✅ الاتصال شغّال (${data.model}) — رد الموديل: «${data.reply}»`;
+    } else {
+      out.style.color = "var(--danger-deep, #b52b27)";
+      out.textContent = `❌ فشل (${data.model}): ${data.error}`;
+    }
+  } catch {
+    out.style.color = "var(--danger-deep, #b52b27)";
+    out.textContent = "حصل خطأ في الاختبار، جرّب تاني";
+  }
+});
+$("aiForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const out = $("aiResult");
+  out.style.color = "var(--ink-muted)"; out.textContent = "⏳ بنحفظ…";
+  try {
+    const res = await api("/api/admin/ai-settings", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(aiBody()),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      out.style.color = "var(--brand-deep)";
+      out.textContent = "✅ اتحفظ واتفعّل فورًا — دوس «اختبار الاتصال» للتأكيد";
+      $("aiKey").value = ""; $("aiVoiceKey").value = "";
+      loadAiSettings();
+    } else {
+      out.style.color = "var(--danger-deep, #b52b27)";
+      out.textContent = data.error || "حصل خطأ";
+    }
+  } catch {
+    out.style.color = "var(--danger-deep, #b52b27)";
+    out.textContent = "حصل خطأ، جرّب تاني";
+  }
+});
+loadAiSettings();
 
 load();

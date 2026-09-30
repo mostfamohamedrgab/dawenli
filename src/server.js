@@ -8,6 +8,8 @@ import {
   getUserById,
   getUserByEmail,
   createEmailUser,
+  setUserOwner,
+  countLoginableOwners,
   localToday,
   listEntries,
   entriesSince,
@@ -110,7 +112,9 @@ import {
   setAssetMarket,
 } from "./db.js";
 import { pushEnabled, vapidPublicKey, sendPushToUser, notifyUser } from "./push.js";
-import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage, textToSpeech } from "./openai.js";
+import { analyzeEntries, doctorReport, unifiedReport, transcribe, PRICING, chatAboutJournal, classifyImage, textToSpeech, PROVIDERS, aiSettings, saveAiSettings, aiConfigured, aiErrorMessage, refreshAi, chatModel } from "./openai.js";
+import OpenAI from "openai";
+import { versionStatus, pullUpdate, scheduleRestart } from "./updater.js";
 import { buildReportData } from "./report.js";
 import { runAgent } from "./agent.js";
 
@@ -237,6 +241,7 @@ setInterval(() => {
 const loginLimiter = rateLimit({ bucket: "login", max: 8, windowMs: 10 * 60 * 1000 }); // 8 / 10د
 const voiceLimiter = rateLimit({ bucket: "voice", max: 40, windowMs: 10 * 60 * 1000 });
 const uploadLimiter = rateLimit({ bucket: "upload", max: 30, windowMs: 10 * 60 * 1000 });
+const reportLimiter = rateLimit({ bucket: "report", max: 5, windowMs: 15 * 60 * 1000 }); // بلاغات: ٥ كل ربع ساعة
 // أنواع مسموح برفعها — صور نقطية + PDF بس. **مرفوض SVG** (ممكن يحمل سكربت = XSS).
 const ALLOWED_UPLOAD = new Set([
   "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/heic", "image/heif", "application/pdf",
@@ -441,6 +446,16 @@ export function startServer() {
     }
     return admin;
   };
+  // ownerGate: الأدمن أو صاحب التطبيق (is_owner) — عشان صاحب التطبيق يظبّط مزود
+  // الذكاء والتحديثات من جوّه التطبيق من غير ما يسجّل دخول تاني في لوحة الأدمن.
+  // المستخدمين العاديين مايوصلوش (دي إعدادات بتأثر على التطبيق كله).
+  const ownerGate = (req, res) => {
+    if (sessionAdmin(req)) return { kind: "admin" };
+    const user = sessionUser(req);
+    if (user?.is_owner) return { kind: "owner", user };
+    res.status(403).json({ error: "الإعدادات دي لصاحب التطبيق بس" });
+    return null;
+  };
 
   /* ===== API الأدمن ===== */
   app.get("/api/admin/me", (req, res) => {
@@ -458,6 +473,91 @@ export function startServer() {
       pricing: PRICING,
     });
   });
+  /* ===== تحديثات التطبيق من الجيت ===== */
+  app.get("/api/admin/version", async (req, res) => {
+    if (!ownerGate(req, res)) return;
+    // check=0 → قراءة سريعة من غير ما نضرب على الريبو (للعرض الأولي)
+    res.json(await versionStatus({ checkRemote: req.query.check !== "0" }));
+  });
+  let _updating = false;
+  app.post("/api/admin/update", async (req, res) => {
+    if (!ownerGate(req, res)) return;
+    if (_updating) return res.status(409).json({ ok: false, error: "فيه تحديث شغّال دلوقتي — استنى شوية" });
+    _updating = true;
+    try {
+      const out = await pullUpdate();
+      if (out.ok && out.changed) {
+        res.json({ ...out, restarting: true, message: "التحديث نزل ✅ — التطبيق بيقوم تاني، استنى ثواني واعمل ريفريش" });
+        scheduleRestart(); // بعد ما الرد يوصل
+        return;
+      }
+      res.status(out.ok ? 200 : 500).json(out);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e?.message || e).slice(0, 200) });
+    } finally {
+      _updating = false;
+    }
+  });
+
+  /* ===== إعدادات مزود الذكاء (OpenAI / Gemini / Grok / مخصص) ===== */
+  app.get("/api/admin/ai-settings", (req, res) => {
+    if (!ownerGate(req, res)) return;
+    const s = aiSettings();
+    res.json({
+      configured: !!s.apiKey,
+      source: s.source, // db = من الإعدادات، env = من ملف .env القديم، none = محتاج إعداد
+      provider: s.provider,
+      model: s.model,
+      baseUrl: s.provider === "custom" ? s.baseURL : undefined,
+      // المفتاح مايتبعتش كامل أبدًا — آخر ٤ حروف للتأكيد بس
+      keyHint: s.apiKey ? `…${s.apiKey.slice(-4)}` : null,
+      hasVoiceKey: !!s.voiceKey,
+      providers: Object.fromEntries(
+        Object.entries(PROVIDERS).map(([k, p]) => [k, { label: p.label, defaultModel: p.defaultModel }])
+      ),
+    });
+  });
+  app.put("/api/admin/ai-settings", (req, res) => {
+    if (!ownerGate(req, res)) return;
+    const { provider, api_key, model, base_url, voice_key } = req.body || {};
+    if (!PROVIDERS[provider]) return res.status(400).json({ error: "اختار مزود صحيح" });
+    const existing = aiSettings();
+    if (!api_key && existing.source !== "db") return res.status(400).json({ error: "حط مفتاح الـ API" });
+    if (provider === "custom" && !String(base_url || "").startsWith("http"))
+      return res.status(400).json({ error: "المزود المخصص محتاج baseURL صحيح (يبدأ بـ https)" });
+    saveAiSettings({
+      provider,
+      apiKey: api_key || undefined,
+      model: model || PROVIDERS[provider].defaultModel,
+      baseUrl: provider === "custom" ? base_url : undefined,
+      voiceKey: voice_key !== undefined ? voice_key : undefined,
+    });
+    res.json({ ok: true });
+  });
+  // اختبار حي: بيكلم المزود فعلاً بمفتاح/موديل الفورم (من غير حفظ) أو بالمحفوظ لو الفورم فاضي
+  app.post("/api/admin/ai-settings/test", async (req, res) => {
+    if (!ownerGate(req, res)) return;
+    const { provider, api_key, model, base_url } = req.body || {};
+    const saved = aiSettings();
+    const p = PROVIDERS[provider || saved.provider] || PROVIDERS.openai;
+    const key = api_key || saved.apiKey;
+    const baseURL = (provider || saved.provider) === "custom" ? (base_url || saved.baseURL) : p.baseURL;
+    const testModel = model || (provider && provider !== saved.provider ? p.defaultModel : saved.model) || p.defaultModel;
+    if (!key) return res.status(400).json({ error: "مفيش مفتاح للاختبار" });
+    try {
+      const tc = new OpenAI({ apiKey: key, ...(baseURL ? { baseURL } : {}), timeout: 20000, maxRetries: 0 });
+      const r = await tc.chat.completions.create({
+        model: testModel,
+        messages: [{ role: "user", content: "رد بكلمة واحدة بس: تمام" }],
+        max_tokens: 10,
+      });
+      res.json({ ok: true, model: testModel, reply: (r.choices?.[0]?.message?.content || "").trim() });
+    } catch (err) {
+      const friendly = aiErrorMessage(err);
+      res.json({ ok: false, model: testModel, error: friendly || String(err?.message || err).slice(0, 300) });
+    }
+  });
+
   // إنشاء حساب مستخدم من الأدمن (التسجيل العام مقفول)
   app.post("/api/admin/users", (req, res) => {
     const admin = adminGate(req, res);
@@ -473,6 +573,19 @@ export function startServer() {
     });
     if (!user) return res.status(409).json({ error: "الإيميل ده متسجّل قبل كده" });
     res.json({ ok: true, user: { id: user.id, email: cleanEmail, name: user.name } });
+  });
+  // تحويل ملكية التطبيق لحساب (المالك بيقدر يظبّط الذكاء والتحديثات من جوّه التطبيق)
+  app.put("/api/admin/users/:id/owner", (req, res) => {
+    const admin = adminGate(req, res);
+    if (!admin) return;
+    const id = Number(req.params.id);
+    const target = getUserById(id);
+    if (!target) return res.status(404).json({ error: "الحساب مش موجود" });
+    const makeOwner = !!(req.body || {}).is_owner;
+    if (makeOwner && !target.email) return res.status(400).json({ error: "الحساب ده مالوش إيميل فمينفعش يسجّل دخول" });
+    if (!makeOwner && countLoginableOwners() <= 1 && target.is_owner)
+      return res.status(400).json({ error: "ده آخر صاحب للتطبيق — عيّن واحد تاني الأول" });
+    res.json({ ok: setUserOwner(id, makeOwner) });
   });
   // تفاصيل مستخدم واحد (قراءة فقط للمراقبة)
   app.get("/api/admin/users/:id", (req, res) => {
@@ -723,7 +836,8 @@ export function startServer() {
       res.json({ reply });
     } catch (err) {
       console.error("ask error:", err);
-      res.status(500).json({ error: "حصل خطأ، جرّب تاني" });
+      const friendly = aiErrorMessage(err);
+      res.status(friendly ? 503 : 500).json({ error: friendly || "حصل خطأ، جرّب تاني" });
     }
   });
   // تاريخ محادثة اسأل دوّنلي (محفوظ)
@@ -886,7 +1000,8 @@ export function startServer() {
       res.json({ reply, receipts });
     } catch (err) {
       console.error("dashboard log error:", err);
-      res.status(500).json({ error: "حصل خطأ أثناء المعالجة، جرّب تاني" });
+      const friendly = aiErrorMessage(err);
+      res.status(friendly ? 503 : 500).json({ error: friendly || "حصل خطأ أثناء المعالجة، جرّب تاني" });
     }
   });
 
@@ -917,7 +1032,8 @@ export function startServer() {
         res.json({ transcript, reply, receipts });
       } catch (err) {
         console.error("dashboard voice error:", err, "| الصوت محفوظ في:", audioPath);
-        res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
+        const friendly = aiErrorMessage(err);
+        res.status(friendly ? 503 : 500).json({ error: friendly || "حصل خطأ أثناء معالجة الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
       }
     }
   );
@@ -959,7 +1075,8 @@ export function startServer() {
         res.json({ transcript, thought });
       } catch (err) {
         console.error("thought voice error:", err, "| الصوت محفوظ في:", audioPath);
-        res.status(500).json({ error: "حصل خطأ أثناء معالجة الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
+        const friendly = aiErrorMessage(err);
+        res.status(friendly ? 503 : 500).json({ error: friendly || "حصل خطأ أثناء معالجة الصوت، جرّب تاني — تسجيلك محفوظ عندنا" });
       }
     }
   );
@@ -1259,6 +1376,49 @@ export function startServer() {
     const user = gate(req, res);
     if (!user) return;
     res.json({ ok: deleteMetricLog(user.id, Number(req.params.logId)) });
+  });
+
+  /* ===== بلّغ عن مشكلة → نظام البلاغات في سينتاكس أكاديمي =====
+     الإرسال من السيرفر (مش من المتصفح) عشان المفتاح السري مايتعرّضش،
+     والموضوع بيتحط «دوّنلي» + نسخة التطبيق تلقائيًا عشان نعرف نصلّح بسرعة. */
+  app.post("/api/report", reportLimiter, async (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const message = String(req.body?.message || "").trim();
+    if (message.length < 10) return res.status(400).json({ error: "اكتب المشكلة بتفصيل شوية (١٠ حروف على الأقل)" });
+    if (message.length > 4000) return res.status(400).json({ error: "البلاغ طويل أوي — اختصره شوية" });
+    if (!config.reportSecret) {
+      return res.status(503).json({ error: "الإبلاغ مش متظبط على السيرفر (مفيش REPORT_SECRET) — كلّم الدعم مباشرة" });
+    }
+    let version = "";
+    try { version = (await versionStatus({ checkRemote: false }))?.current?.sha || ""; } catch {}
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15000);
+      const r = await fetch(config.reportUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "X-Dawenli-Secret": config.reportSecret },
+        body: JSON.stringify({
+          message,
+          name: user.name || "مستخدم دوّنلي",
+          email: user.email || "",
+          version,
+          // مسار داخلي بس (hash أو path) — مانبعتش نص حر يتحوّل لينك في لوحة البلاغات
+          page_url: /^[#/][\w\-/#?=&%.]{0,200}$/.test(String(req.body?.page || "")) ? String(req.body.page) : "/",
+        }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.success) {
+        console.error("report forward failed:", r.status, data);
+        return res.status(502).json({ error: "مقدرتش أبعت البلاغ دلوقتي — جرّب تاني بعد شوية" });
+      }
+      res.json({ ok: true, message: "وصلنا بلاغك ✅ — شكرًا، هنشوفه ونصلّحه" });
+    } catch (err) {
+      console.error("report error:", err);
+      res.status(502).json({ error: "مقدرتش أبعت البلاغ دلوقتي — جرّب تاني بعد شوية" });
+    }
   });
 
   // معالج أخطاء عام — يرجّع JSON نضيف بدل صفحة HTML أو سوكت معلّق (أخطاء body-parser

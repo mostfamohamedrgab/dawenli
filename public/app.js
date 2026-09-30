@@ -75,9 +75,25 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 async function api(path, opts) {
-  const res = await fetch(path, opts);
-  if (res.status === 401) { window.location.href = "/login"; throw new Error("unauth"); }
+  let res;
+  try {
+    res = await fetch(path, opts);
+  } catch {
+    // النت قاطع أو السيرفر بيعيد التشغيل — منرميش المستخدم برّه
+    throw new Error("offline");
+  }
+  // الجلسة خلصت: نوديه على صفحة الدخول ومعاها سبب يتعرض له بدل ما يتنقل فجأة
+  if (res.status === 401) {
+    window.location.href = "/login?reason=expired";
+    throw new Error("unauth");
+  }
   return res;
+}
+// رسالة مفهومة بدل «حصل خطأ» على طول
+function apiErrText(err, res) {
+  if (err?.message === "offline") return "مفيش اتصال بالسيرفر — اتأكد من النت وجرّب تاني";
+  if (res?.status === 403) return "الصفحة دي لصاحب التطبيق بس";
+  return "حصل خطأ، جرّب تاني";
 }
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -116,7 +132,23 @@ function emptyState(title, message) {
 /* ===================== Confirm Modal ===================== */
 const confirmOverlay = $("confirmOverlay");
 let confirmResolver = null;
-function askConfirm() {
+// الافتراضي هو تأكيد الحذف (أغلب الاستخدامات)، وأي حد يقدر يبعت نص مخصّص —
+// عشان مايبقاش زرار زي «اسحب التحديث» بيطلّع مودال مكتوب عليه «امسح».
+const CONFIRM_DEFAULTS = {
+  icon: "🗑️",
+  title: "متأكد أنك تريد حذفها؟",
+  text: "لن تستطيع استرجاعها بعد ذلك.",
+  ok: "امسح",
+  danger: true,
+};
+function askConfirm(opts) {
+  const o = { ...CONFIRM_DEFAULTS, ...(opts || {}) };
+  const q = (sel) => confirmOverlay.querySelector(sel);
+  if (q(".modal-icon")) q(".modal-icon").textContent = o.icon;
+  if (q(".modal-title")) q(".modal-title").textContent = o.title;
+  if (q(".modal-text")) q(".modal-text").textContent = o.text;
+  const ok = $("confirmOk");
+  if (ok) { ok.textContent = o.ok; ok.classList.toggle("danger", !!o.danger); }
   confirmOverlay.classList.remove("hidden");
   return new Promise((resolve) => { confirmResolver = resolve; });
 }
@@ -259,11 +291,17 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("edit
 
 /* ===================== Navigation ===================== */
 function gotoTab(tab) {
+  // حارس: أزرار زي «بلّغ عن مشكلة» و«الإعدادات» بتفتح موديل ومالهاش data-tab،
+  // فكانت بتوصل هنا بـ undefined → الهاش يبقى #undefined وكل الـ panels تتخفي
+  // (الصفحة تفضى تمامًا). أي تاب مش معروف بنتجاهله بدل ما نكسر الصفحة.
+  if (!tab || typeof tab !== "string") return;
   // الأقسام الأربعة بقت جوّه هَب «دفترك» — أي تنقّل ليها يفتح الهَب على نفس القسم
   if (["journal", "thoughts", "ideas", "problems"].includes(tab)) {
     dafterSub = tab; try { localStorage.setItem("dw_dafter_sub", tab); } catch {}
     tab = "dafter";
   }
+  // تاب مش موجود أصلاً (هاش قديم أو اسم غلط) — منخفّيش أي حاجة ومنكتبش هاش خربان
+  if (!document.querySelector(`.tab-panel[data-panel="${CSS.escape(tab)}"]`)) return;
   // نثبّت الصفحة الحالية في الـ hash + localStorage عشان الريلود يفضّل واقف فيها
   try { localStorage.setItem("dw_tab", tab); } catch {}
   try { if ((location.hash || "").replace(/^#/, "") !== tab) history.replaceState(null, "", "#" + tab); } catch {}
@@ -289,12 +327,14 @@ function gotoTab(tab) {
   if (tab === "about") renderAboutPage();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
+// ملاحظة: فيه أزرار .nav-btn بتفتح موديل (بلّغ عن مشكلة / الإعدادات) ومالهاش
+// data-tab — بنتأكد من وجودها قبل التنقّل عشان مانمسحش الصفحة.
 $("sideNav").addEventListener("click", (e) => {
-  const btn = e.target.closest(".nav-btn");
+  const btn = e.target.closest(".nav-btn[data-tab]");
   if (btn) gotoTab(btn.dataset.tab);
 });
 $("tabBar")?.addEventListener("click", (e) => {
-  const btn = e.target.closest(".tabbar-btn");
+  const btn = e.target.closest(".tabbar-btn[data-tab]");
   if (btn) gotoTab(btn.dataset.tab);
 });
 document.querySelectorAll("[data-go]").forEach((c) => c.addEventListener("click", () => gotoTab(c.dataset.go)));
@@ -2603,8 +2643,359 @@ $("moreSheet")?.addEventListener("click", (e) => {
   const btn = e.target.closest(".more-item");
   if (!btn) return;
   closeMore();
-  gotoTab(btn.dataset.tab);
+  // عناصر مش تابات — بتفتح موديل
+  if (btn.dataset.action === "report") { openReport(); return; }
+  if (btn.dataset.action === "aisettings") { openAiSettings(); return; }
+  if (btn.dataset.tab) gotoTab(btn.dataset.tab);
 });
+
+/* ===================== إعدادات صاحب التطبيق (الذكاء + التحديثات) =====================
+   نفس الـ endpoints بتاعة لوحة الأدمن، بس بوابتها بقت «أدمن أو مالك» —
+   فصاحب التطبيق يظبّط المفتاح والمزود من جوّه التطبيق من غير دخول تاني. */
+const AI_PROVIDER_LABELS = { openai: "OpenAI", gemini: "Google Gemini", xai: "xAI (Grok)", custom: "مخصص (متوافق OpenAI)" };
+let _aiProviders = {};
+function openAiSettings() {
+  closeAiSettings();
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay";
+  ov.id = "aiSetOv";
+  ov.innerHTML = `<div class="modal" style="max-width:520px;text-align:right;max-height:88vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
+      <h3 class="modal-title" style="margin:0">⚙️ الإعدادات</h3>
+      <button class="icon-btn" onclick="closeAiSettings()" aria-label="إغلاق">✕</button>
+    </div>
+
+    <div class="td-sec" style="margin-top:10px">
+      <div class="td-label" style="margin-bottom:8px">🧠 مزود الذكاء <span id="aiSetStatus" style="font-size:var(--text-sm);font-weight:600"></span></div>
+      <label class="ef-row"><span>المزود</span>
+        <select id="aiSetProvider" class="field">
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="xai">xAI (Grok)</option>
+          <option value="custom">مخصص (متوافق OpenAI)</option>
+        </select>
+      </label>
+      <label class="ef-row"><span>مفتاح الـ API <span class="muted" id="aiSetHint" style="font-size:var(--text-xs)"></span></span>
+        <input id="aiSetKey" class="field" type="password" autocomplete="off" placeholder="حط المفتاح هنا" />
+      </label>
+      <label class="ef-row"><span>الموديل</span>
+        <input id="aiSetModel" class="field" placeholder="gpt-4o" />
+      </label>
+      <label class="ef-row" id="aiSetBaseWrap" style="display:none"><span>Base URL</span>
+        <input id="aiSetBase" class="field" placeholder="https://api.example.com/v1" />
+      </label>
+      <label class="ef-row" id="aiSetVoiceWrap" style="display:none"><span>مفتاح OpenAI للصوت <span class="muted" style="font-size:var(--text-xs)">(اختياري — التفريغ والنطق)</span></span>
+        <input id="aiSetVoice" class="field" type="password" autocomplete="off" placeholder="sk-…" />
+      </label>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn secondary sm" onclick="testAiSettings()">🧪 اختبار</button>
+        <button class="btn sm" onclick="saveAiSettingsUi()">💾 حفظ</button>
+      </div>
+      <p id="aiSetMsg" style="font-size:var(--text-sm);margin:10px 0 0;line-height:1.8"></p>
+    </div>
+
+    <div class="td-sec" style="margin-top:16px">
+      <div class="td-label" style="margin-bottom:8px">⬆️ تحديثات التطبيق</div>
+      <div id="aiSetVer" class="muted" style="font-size:var(--text-sm);line-height:1.9">⏳ بنتشيّك…</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn secondary sm" onclick="loadOwnerVersion(true)">🔄 اتشيّك</button>
+        <button class="btn sm" id="aiSetUpdBtn" style="display:none" onclick="doOwnerUpdate()">⬇️ اسحب التحديث</button>
+      </div>
+      <p id="aiSetUpdMsg" style="font-size:var(--text-sm);margin:10px 0 0;line-height:1.9"></p>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeAiSettings(); });
+  $("aiSetProvider").addEventListener("change", syncAiFields);
+  loadAiSettingsUi();
+  loadOwnerVersion(true);
+}
+function closeAiSettings() { $("aiSetOv")?.remove(); }
+function syncAiFields() {
+  const p = $("aiSetProvider").value;
+  $("aiSetBaseWrap").style.display = p === "custom" ? "" : "none";
+  $("aiSetVoiceWrap").style.display = p === "openai" ? "none" : "";
+  const def = _aiProviders[p]?.defaultModel || "";
+  $("aiSetModel").placeholder = def || "اسم الموديل";
+  const cur = $("aiSetModel").value;
+  // بدّل الافتراضي مع تغيير المزود — من غير ما نلمس موديل كتبه المستخدم بإيده
+  if (!cur || Object.values(_aiProviders).some((x) => x.defaultModel === cur)) $("aiSetModel").value = def;
+}
+async function loadAiSettingsUi() {
+  try {
+    const res = await api("/api/admin/ai-settings");
+    if (!res.ok) {
+      const st = $("aiSetStatus");
+      if (st) {
+        st.style.color = "var(--danger-deep, #b52b27)";
+        st.textContent = res.status === 403 ? "· الإعدادات دي لصاحب التطبيق بس" : "· مقدرتش أقرا الإعدادات";
+      }
+      return;
+    }
+    const s = await res.json();
+    _aiProviders = s.providers || {};
+    const st = $("aiSetStatus");
+    if (st) {
+      st.style.color = s.configured ? "var(--brand-deep)" : "var(--danger-deep, #b52b27)";
+      st.textContent = s.configured
+        ? `· ✅ ${AI_PROVIDER_LABELS[s.provider] || s.provider} (${s.model})`
+        : "· ⚠️ محتاج إعداد";
+    }
+    if (s.provider) $("aiSetProvider").value = s.provider;
+    if (s.model) $("aiSetModel").value = s.model;
+    if (s.baseUrl) $("aiSetBase").value = s.baseUrl;
+    $("aiSetHint").textContent = s.keyHint ? `(المحفوظ: ${s.keyHint} — سيبه فاضي للإبقاء عليه)` : "";
+    syncAiFields();
+  } catch (err) {
+    if (err?.message === "unauth") return;
+    const st = $("aiSetStatus");
+    if (st) { st.style.color = "var(--danger-deep, #b52b27)"; st.textContent = "· " + apiErrText(err); }
+  }
+}
+function aiSetBody() {
+  return {
+    provider: $("aiSetProvider").value,
+    api_key: $("aiSetKey").value.trim(),
+    model: $("aiSetModel").value.trim(),
+    base_url: $("aiSetBase").value.trim(),
+    voice_key: $("aiSetVoice").value.trim() || undefined,
+  };
+}
+async function testAiSettings() {
+  const m = $("aiSetMsg");
+  m.style.color = "var(--ink-muted)"; m.textContent = "⏳ بنكلم المزود…";
+  try {
+    const d = await api("/api/admin/ai-settings/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(aiSetBody()) }).then((r) => r.json());
+    m.style.color = d.ok ? "var(--brand-deep)" : "var(--danger-deep, #b52b27)";
+    m.textContent = d.ok ? `✅ شغّال (${d.model}) — رد: «${d.reply}»` : `❌ فشل (${d.model}): ${d.error}`;
+  } catch { m.style.color = "var(--danger-deep, #b52b27)"; m.textContent = "حصل خطأ في الاختبار"; }
+}
+async function saveAiSettingsUi() {
+  const m = $("aiSetMsg");
+  m.style.color = "var(--ink-muted)"; m.textContent = "⏳ بنحفظ…";
+  try {
+    const d = await api("/api/admin/ai-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(aiSetBody()) }).then((r) => r.json());
+    if (d.ok) {
+      m.style.color = "var(--brand-deep)"; m.textContent = "✅ اتحفظ واتفعّل فورًا";
+      $("aiSetKey").value = ""; $("aiSetVoice").value = "";
+      loadAiSettingsUi();
+    } else { m.style.color = "var(--danger-deep, #b52b27)"; m.textContent = d.error || "حصل خطأ"; }
+  } catch { m.style.color = "var(--danger-deep, #b52b27)"; m.textContent = "حصل خطأ، جرّب تاني"; }
+}
+async function loadOwnerVersion(check = true) {
+  const el = $("aiSetVer"), btn = $("aiSetUpdBtn");
+  if (!el) return;
+  if (check) el.textContent = "⏳ بنتشيّك…";
+  try {
+    const res = await api(`/api/admin/version${check ? "" : "?check=0"}`);
+    if (!res.ok) {
+      el.textContent = res.status === 403
+        ? "التحديثات دي لصاحب التطبيق بس"
+        : "مقدرتش أقرا النسخة من السيرفر";
+      btn.style.display = "none";
+      return;
+    }
+    const v = await res.json();
+    if (!v.ok) { el.textContent = v.error || "مقدرتش أقرا النسخة"; btn.style.display = "none"; return; }
+    // تاريخ النسخة يوريك بناها إمتى — مفيد تعرف إنت متأخر بقالك قد إيه
+    let when = "";
+    try {
+      if (v.current.date) {
+        when = ` <span class="muted" style="font-size:var(--text-xs)">(${new Date(v.current.date)
+          .toLocaleDateString("ar-EG", { day: "numeric", month: "long", year: "numeric" })})</span>`;
+      }
+    } catch {}
+    el.innerHTML =
+      `النسخة: <b>${escapeHtml(v.current.sha)}</b>${when} — ${escapeHtml(v.current.subject)}` +
+      (v.remoteError ? `<br><span style="color:var(--danger-deep,#b52b27)">${escapeHtml(v.remoteError)}</span>` : "") +
+      // السيرفر بيرجّع dirty من زمان بس الواجهة ماكانتش بتعرضه — والتحديث بيعمل
+      // reset --hard يعني أي تعديل يدوي على ملفات المشروع هيروح من غير سابق إنذار
+      (v.dirty
+        ? `<br><span style="color:var(--danger-deep,#b52b27)">⚠️ فيه تعديلات يدوية على ملفات المشروع — التحديث هيمسحها (بياناتك في data/ مش هتتأثر)</span>`
+        : "") +
+      (v.updateAvailable
+        ? `<br><span style="color:var(--brand-deep);font-weight:700">🎉 فيه ${arNum(v.behind)} تحديث جديد:</span><br>` +
+          v.commits.map((c) => `• ${escapeHtml(c.subject)}`).join("<br>")
+        : v.remoteError ? "" : `<br><span style="color:var(--brand-deep)">✅ إنت على آخر نسخة</span>`);
+    btn.style.display = v.updateAvailable ? "" : "none";
+  } catch (err) {
+    if (err?.message === "unauth") return; // بيتنقل لصفحة الدخول أصلاً
+    el.textContent = apiErrText(err);
+    btn.style.display = "none";
+  }
+}
+/* شريط التقدّم بتاع التحديث */
+function updProgress() {
+  let bar = $("aiSetProg");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "aiSetProg";
+    bar.className = "upd-progress";
+    bar.innerHTML = "<i></i>";
+    $("aiSetUpdMsg").before(bar);
+  }
+  return bar;
+}
+function setUpd(pct, text, tone) {
+  const bar = updProgress(), m = $("aiSetUpdMsg");
+  bar.classList.toggle("busy", pct < 100 && tone !== "fail");
+  bar.classList.toggle("done", pct >= 100 && tone !== "fail");
+  bar.classList.toggle("failed", tone === "fail");
+  bar.firstChild.style.width = Math.min(100, pct) + "%";
+  if (text != null) {
+    m.style.color = tone === "fail" ? "var(--danger-deep, #b52b27)" : tone === "ok" ? "var(--brand-deep)" : "var(--ink-muted)";
+    m.innerHTML = text;
+  }
+}
+// نستنى السيرفر يرجع — بنضرب على ملف عام (مش API) لأن الجلسات بتتمسح مع
+// إعادة التشغيل، فأي endpoint محمي هيرد 401 وهنفتكر إن السيرفر لسه واقع.
+async function waitForServer(maxMs = 90000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < maxMs) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      const r = await fetch("/style.css?ping=" + Date.now(), { cache: "no-store" });
+      if (r.ok) return true;
+    } catch {}
+  }
+  return false;
+}
+async function doOwnerUpdate() {
+  if (!(await askConfirm({
+    icon: "⬆️",
+    title: "تسحب التحديث دلوقتي؟",
+    text: "هناخد نسخة احتياطية للداتا الأول. التطبيق هيقوم تاني، وهتحتاج تسجّل دخول بعدها.",
+    ok: "أيوه، اسحب",
+    danger: false,
+  }))) return;
+  const btn = $("aiSetUpdBtn");
+  btn.disabled = true;
+  setUpd(8, "📦 بناخد نسخة احتياطية للداتا…");
+  // السيرفر بيرد مرة واحدة في الآخر، فبنعرض المراحل بالتقدير عشان الناس تعرف
+  // إن فيه شغل ماشي بدل ما تبص على سبينر واقف.
+  const stages = [
+    [20, "⬇️ بنسحب الكود الجديد من الريبو…"],
+    [40, "🔀 بنطبّق التحديث على الملفات…"],
+    [58, "📚 بنشوف المكتبات اتغيّرت ولا لأ…"],
+  ];
+  let si = 0;
+  const tick = setInterval(() => { if (si < stages.length) { setUpd(stages[si][0], stages[si][1]); si++; } }, 2000);
+  try {
+    const res = await api("/api/admin/update", { method: "POST" });
+    clearInterval(tick);
+    if (res.status === 403) { setUpd(0, "التحديثات دي لصاحب التطبيق بس", "fail"); return; }
+    if (res.status === 409) { setUpd(0, "فيه تحديث شغّال دلوقتي — استنى شوية", "fail"); return; }
+    const d = await res.json().catch(() => ({ ok: false, error: "رد السيرفر مش مفهوم" }));
+    const steps = (d.steps || []).map((s) => escapeHtml(s)).join("<br>");
+
+    if (!d.ok) { setUpd(0, (steps ? steps + "<br>" : "") + escapeHtml(d.error || "حصل خطأ"), "fail"); return; }
+
+    if (!d.changed) { setUpd(100, steps + "<br><b>" + escapeHtml(d.message || "") + "</b>", "ok"); loadOwnerVersion(false); return; }
+
+    if (!d.restarting) { setUpd(100, steps, "ok"); loadOwnerVersion(false); return; }
+
+    setUpd(70, steps + "<br>🔄 التطبيق بيقوم تاني… متقفلش الصفحة");
+    const back = await waitForServer();
+    if (!back) {
+      setUpd(70, steps + "<br>⚠️ التطبيق أخد وقت أطول من المتوقّع. اعمل ريفريش بعد شوية وشوف النسخة.", "fail");
+      return;
+    }
+    // الجداول والأعمدة الجديدة بتتظبط لوحدها أول ما التطبيق يقوم (db.js)
+    setUpd(90, steps + "<br>🗄️ الداتا بيز اتظبطت مع إعادة التشغيل");
+    await new Promise((r) => setTimeout(r, 700));
+    // الجلسات في الذاكرة، فإعادة التشغيل بتخرّج الكل — بنقوله وبنعمل ريلود
+    // عشان الكود الجديد يتحمّل، وصفحة الدخول هتوضّحله إن الجلسة خلصت.
+    setUpd(100, steps + `<br><b>✅ التحديث خلص — بقيت على ${escapeHtml(d.to || "")}</b>` +
+      "<br>🔐 هتحتاج تسجّل دخول تاني (التطبيق قام من جديد). بنعمل ريفريش…", "ok");
+    setTimeout(() => location.reload(), 2200);
+  } catch (err) {
+    clearInterval(tick);
+    if (err?.message === "unauth") return;
+    if (err?.message === "offline") {
+      // السيرفر وقع وهو بيعيد التشغيل — نستنّاه بدل ما نقول فشل
+      setUpd(70, "🔄 السيرفر بيعيد التشغيل… بنستنّاه");
+      const back = await waitForServer();
+      setUpd(back ? 100 : 70,
+        back ? "✅ التطبيق رجع — بنعمل ريفريش…" : "⚠️ السيرفر ماردّش. اعمل ريفريش وشوف النسخة.",
+        back ? "ok" : "fail");
+      if (back) setTimeout(() => location.reload(), 1800);
+      return;
+    }
+    setUpd(0, "حصل خطأ في التحديث", "fail");
+  } finally { btn.disabled = false; }
+}
+window.openAiSettings = openAiSettings;
+window.closeAiSettings = closeAiSettings;
+window.testAiSettings = testAiSettings;
+window.saveAiSettingsUi = saveAiSettingsUi;
+window.loadOwnerVersion = loadOwnerVersion;
+window.doOwnerUpdate = doOwnerUpdate;
+
+/* ===================== بلّغ عن مشكلة =====================
+   البلاغ بيروح لنظام البلاغات في سينتاكس أكاديمي (السيرفر هو اللي بيبعته)،
+   وموضوعه بيتحط «دوّنلي» + نسخة التطبيق تلقائيًا. */
+function openReport() {
+  closeReport();
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay";
+  ov.id = "reportOv";
+  ov.innerHTML = `<div class="modal" style="max-width:460px;text-align:right">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
+      <h3 class="modal-title" style="margin:0">🐞 بلّغ عن مشكلة</h3>
+      <button class="icon-btn" onclick="closeReport()" aria-label="إغلاق">✕</button>
+    </div>
+    <p class="muted" style="font-size:var(--text-sm);margin:0 0 12px">
+      قولّي المشكلة بالتفصيل — إيه اللي عملته وإيه اللي حصل. البلاغ بيروح لفريق سينتاكس أكاديمي وهنصلّحه.
+    </p>
+    <textarea id="reportText" class="field" rows="5" placeholder="مثال: لما بسجّل صوت من الموبايل بيفضل بيلف ومابيتسجّلش…"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+      <button class="btn sm" id="reportSend">إرسال البلاغ</button>
+      <button class="btn ghost sm" onclick="closeReport()">إلغاء</button>
+      <span id="reportMsg" style="font-size:var(--text-sm);flex:1"></span>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeReport(); });
+  $("reportSend").addEventListener("click", sendReport);
+  $("reportText").focus();
+}
+function closeReport() { $("reportOv")?.remove(); }
+async function sendReport() {
+  const ta = $("reportText"), msg = $("reportMsg"), btn = $("reportSend");
+  const text = (ta.value || "").trim();
+  if (text.length < 10) {
+    msg.style.color = "var(--danger-deep, #b52b27)";
+    msg.textContent = "اكتب المشكلة بتفصيل شوية";
+    return;
+  }
+  btn.disabled = true;
+  msg.style.color = "var(--ink-muted)";
+  msg.textContent = "⏳ بنبعت…";
+  try {
+    const res = await api("/api/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, page: location.hash || "/" }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      msg.style.color = "var(--brand-deep)";
+      msg.textContent = data.message || "وصلنا بلاغك ✅";
+      ta.value = "";
+      setTimeout(closeReport, 1800);
+    } else {
+      msg.style.color = "var(--danger-deep, #b52b27)";
+      msg.textContent = data.error || "مقدرتش أبعت البلاغ";
+    }
+  } catch {
+    msg.style.color = "var(--danger-deep, #b52b27)";
+    msg.textContent = "مشكلة في الاتصال — جرّب تاني";
+  } finally {
+    btn.disabled = false;
+  }
+}
+window.openReport = openReport;
+window.closeReport = closeReport;
 
 /* ===================== تصدير التدوينات في ملف ===================== */
 function exportJournal() {
@@ -3042,6 +3433,8 @@ async function loadAll(rerender = true) {
   const first = (state.me?.name || "د").trim()[0] || "د";
   $("userAvatar").textContent = first;
   $("userName").textContent = state.me?.name || "صاحب الدفتر";
+  // إعدادات التطبيق (الذكاء + التحديثات) لصاحب التطبيق بس
+  for (const el of document.querySelectorAll(".owner-only")) el.style.display = state.me?.isOwner ? "" : "none";
   fillCategorySelect();
 
   if (!rerender) return;
@@ -3068,7 +3461,13 @@ loadAll().then(() => {
   drainPending();          // وابعته لو النت موجود
   // رجّع آخر صفحة كان واقف فيها قبل الـ reload (الـ hash الأول لأنه أضمن، وإلا localStorage)
   try {
-    const fromHash = (location.hash || "").replace(/^#/, "");
+    let fromHash = (location.hash || "").replace(/^#/, "");
+    // تنضيف أثر الباج القديم: #undefined في اللينك أو "undefined" متخزّنة
+    if (fromHash === "undefined") {
+      fromHash = "";
+      try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+    }
+    if (localStorage.getItem("dw_tab") === "undefined") localStorage.removeItem("dw_tab");
     let saved = fromHash || localStorage.getItem("dw_tab");
     // أي قسم اتدمج جوّه «دفترك» نفتح الهَب عليه
     if (["journal", "thoughts", "ideas", "problems"].includes(saved)) saved = "dafter";
@@ -3228,3 +3627,236 @@ async function initPWA() {
   };
 }
 initPWA();
+
+/* ===================== لوجو المخ بتاع سينتاكس أكاديمي =====================
+   منقول بالظبط من رسمة الكانفس بتاعة الهوية في سينتاكس أكاديمي
+   (layouts/base.blade.php — #brainCanvas): نفس الإحداثيات ونفس الألوان
+   (شمال برتقالي #fb923c / يمين أزرق #38bdf8) ونفس الحركة.
+   الفرق الوحيد: دعم شاشات الريتينا، ووقف الأنيميشن لما يبقى مش ظاهر أو
+   لما المستخدم يطلب تقليل الحركة — عشان البطارية. */
+function initSyntaxBrain() {
+  var c = document.getElementById("sbBrain");
+  if (!c || c.dataset.ready) return;
+  c.dataset.ready = "1";
+  var ctx = c.getContext("2d");
+
+  // الرسم متعمّل على 48×40 — بنكبّر الباك-بفر للريتينا ونسيب الإحداثيات زي ما هي
+  var W = 48, H = 40;
+  var dpr = Math.min(window.devicePixelRatio || 1, 3);
+  c.width = W * dpr; c.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  var cx = W / 2, cy = H / 2 + 2;
+  var t = 0;
+
+  var particles = [];
+  for (var i = 0; i < 18; i++) {
+    particles.push({
+      angle: Math.random() * Math.PI * 2,
+      radius: 10 + Math.random() * 10,
+      speed: 0.01 + Math.random() * 0.025,
+      size: 0.5 + Math.random() * 1.2,
+      side: Math.random() > 0.5 ? 1 : -1,
+      offset: Math.random() * Math.PI * 2,
+      life: Math.random()
+    });
+  }
+
+  var nodes = [
+    { x: -8, y: -6 }, { x: -14, y: 0 }, { x: -6, y: 4 }, { x: -12, y: 7 },
+    { x: -4, y: -10 }, { x: -10, y: -4 }, { x: -7, y: 10 },
+    { x: 8, y: -6 }, { x: 14, y: 0 }, { x: 6, y: 4 }, { x: 12, y: 7 },
+    { x: 4, y: -10 }, { x: 10, y: -4 }, { x: 7, y: 10 }
+  ];
+  var connections = [
+    [0,1],[1,2],[2,3],[0,4],[4,5],[5,1],[2,6],[5,2],
+    [7,8],[8,9],[9,10],[7,11],[11,12],[12,8],[9,13],[12,9]
+  ];
+  var sparks = [];
+  for (var i = 0; i < 6; i++) {
+    sparks.push({
+      conn: Math.floor(Math.random() * connections.length),
+      progress: Math.random(),
+      speed: 0.005 + Math.random() * 0.012,
+      size: 1.2 + Math.random() * 0.8
+    });
+  }
+
+  function drawBrainHalf(side, color1, color2, glowColor) {
+    var s = side;
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    var glow = ctx.createRadialGradient(s * 8, 0, 2, s * 8, 0, 22);
+    glow.addColorStop(0, glowColor);
+    glow.addColorStop(1, "transparent");
+    ctx.fillStyle = glow;
+    ctx.fillRect(s > 0 ? 0 : -24, -22, 24, 44);
+
+    ctx.beginPath();
+    if (s > 0) {
+      ctx.moveTo(0, -16);
+      ctx.bezierCurveTo(4, -18, 14, -18, 18, -12);
+      ctx.bezierCurveTo(22, -6, 22, 0, 20, 6);
+      ctx.bezierCurveTo(18, 12, 14, 16, 8, 16);
+      ctx.bezierCurveTo(4, 16, 2, 14, 0, 12);
+    } else {
+      ctx.moveTo(0, -16);
+      ctx.bezierCurveTo(-4, -18, -14, -18, -18, -12);
+      ctx.bezierCurveTo(-22, -6, -22, 0, -20, 6);
+      ctx.bezierCurveTo(-18, 12, -14, 16, -8, 16);
+      ctx.bezierCurveTo(-4, 16, -2, 14, 0, 12);
+    }
+    ctx.closePath();
+
+    var grad = ctx.createLinearGradient(s > 0 ? 0 : -20, -16, s > 0 ? 20 : 0, 16);
+    grad.addColorStop(0, color1);
+    grad.addColorStop(1, color2);
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = 0.25 + 0.08 * Math.sin(t * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.7 + 0.15 * Math.sin(t * 2);
+    ctx.strokeStyle = color1;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.3 + 0.1 * Math.sin(t * 1.5);
+    ctx.strokeStyle = color2;
+    ctx.lineWidth = 0.6;
+    if (s > 0) {
+      ctx.beginPath(); ctx.moveTo(4, -12); ctx.quadraticCurveTo(12, -10, 16, -4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(2, -4); ctx.quadraticCurveTo(10, -2, 18, 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(2, 4); ctx.quadraticCurveTo(8, 6, 14, 12); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(-4, -12); ctx.quadraticCurveTo(-12, -10, -16, -4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-2, -4); ctx.quadraticCurveTo(-10, -2, -18, 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-2, 4); ctx.quadraticCurveTo(-8, 6, -14, 12); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawCircuits() {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.globalAlpha = 0.2 + 0.08 * Math.sin(t * 3);
+    ctx.lineWidth = 0.5;
+    for (var i = 0; i < connections.length; i++) {
+      var a = nodes[connections[i][0]], b = nodes[connections[i][1]];
+      ctx.strokeStyle = a.x < 0 ? "rgba(251,146,60,0.5)" : "rgba(56,189,248,0.5)";
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      ctx.globalAlpha = 0.4 + 0.2 * Math.sin(t * 2 + i);
+      ctx.fillStyle = n.x < 0 ? "#fb923c" : "#38bdf8";
+      ctx.beginPath(); ctx.arc(n.x, n.y, 1, 0, Math.PI * 2); ctx.fill();
+    }
+    for (var i = 0; i < sparks.length; i++) {
+      var sp = sparks[i];
+      sp.progress += sp.speed;
+      if (sp.progress >= 1) { sp.progress = 0; sp.conn = Math.floor(Math.random() * connections.length); }
+      var a = nodes[connections[sp.conn][0]], b = nodes[connections[sp.conn][1]];
+      var sx = a.x + (b.x - a.x) * sp.progress;
+      var sy = a.y + (b.y - a.y) * sp.progress;
+      var isLeft = sx < 0;
+      ctx.globalAlpha = 0.9;
+      var sparkGlow = ctx.createRadialGradient(sx, sy, 0, sx, sy, sp.size * 3);
+      sparkGlow.addColorStop(0, isLeft ? "rgba(251,146,60,0.8)" : "rgba(56,189,248,0.8)");
+      sparkGlow.addColorStop(1, "transparent");
+      ctx.fillStyle = sparkGlow;
+      ctx.fillRect(sx - sp.size * 3, sy - sp.size * 3, sp.size * 6, sp.size * 6);
+      ctx.fillStyle = isLeft ? "#fff7ed" : "#f0f9ff";
+      ctx.beginPath(); ctx.arc(sx, sy, sp.size * 0.5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawParticles() {
+    ctx.save();
+    ctx.translate(cx, cy);
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      p.angle += p.speed;
+      p.life += 0.008;
+      if (p.life > 1) p.life = 0;
+      var wobble = Math.sin(t * 3 + p.offset) * 2;
+      var px = Math.cos(p.angle) * (p.radius + wobble) * p.side * 0.7;
+      var py = Math.sin(p.angle) * (p.radius + wobble) * 0.85;
+      var isLeft = px < 0;
+      ctx.globalAlpha = 0.3 + 0.5 * Math.sin(p.life * Math.PI);
+      ctx.fillStyle = isLeft ? "#fb923c" : "#38bdf8";
+      ctx.beginPath(); ctx.arc(px, py, p.size, 0, Math.PI * 2); ctx.fill();
+      if (p.size > 1) {
+        var pg = ctx.createRadialGradient(px, py, 0, px, py, p.size * 2.5);
+        pg.addColorStop(0, isLeft ? "rgba(251,146,60,0.3)" : "rgba(56,189,248,0.3)");
+        pg.addColorStop(1, "transparent");
+        ctx.fillStyle = pg;
+        ctx.fillRect(px - p.size * 2.5, py - p.size * 2.5, p.size * 5, p.size * 5);
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawCenter() {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.globalAlpha = 0.15 + 0.1 * Math.sin(t * 2);
+    var cg = ctx.createLinearGradient(-2, -16, 2, 16);
+    cg.addColorStop(0, "#fb923c");
+    cg.addColorStop(0.5, "#d946ef");
+    cg.addColorStop(1, "#38bdf8");
+    ctx.strokeStyle = cg;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -15);
+    ctx.lineTo(0, 13);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function frame() {
+    t += 0.016;
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.globalAlpha = 0.06 + 0.03 * Math.sin(t * 1.5);
+    var outerGlow = ctx.createRadialGradient(cx, cy, 5, cx, cy, 24);
+    outerGlow.addColorStop(0, "#a855f7");
+    outerGlow.addColorStop(0.5, "rgba(99,102,241,0.2)");
+    outerGlow.addColorStop(1, "transparent");
+    ctx.fillStyle = outerGlow;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
+    drawBrainHalf(-1, "#fb923c", "#f97316", "rgba(251,146,60,0.12)");
+    drawBrainHalf(1, "#38bdf8", "#0ea5e9", "rgba(56,189,248,0.12)");
+    drawCenter();
+    drawCircuits();
+    drawParticles();
+  }
+
+  // إطار أول فورًا: اللوجو يبان على طول حتى لو الأنيميشن لسه مبدأش
+  // (تاب في الخلفية أو البانر بره الشاشة — الـrAF مابيشتغلش ساعتها)
+  frame();
+
+  // حركة أقل؟ نسيب الإطار الثابت وخلاص
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  var running = false, rafId = 0;
+  function loop() { frame(); rafId = requestAnimationFrame(loop); }
+  function start() { if (!running) { running = true; loop(); } }
+  function stop() { if (running) { running = false; cancelAnimationFrame(rafId); } }
+
+  // نشتغل بس لما اللوجو يبقى ظاهر فعلاً والتاب مفتوح
+  var visible = true;
+  if (window.IntersectionObserver) {
+    new IntersectionObserver(function (es) {
+      visible = es[0].isIntersecting;
+      if (visible && !document.hidden) start(); else stop();
+    }, { threshold: 0 }).observe(c);
+  } else start();
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden || !visible) stop(); else start();
+  });
+}
+initSyntaxBrain();

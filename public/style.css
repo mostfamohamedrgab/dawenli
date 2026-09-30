@@ -2000,3 +2000,183 @@ select.field { cursor: pointer; }
 .gl-row .gl-del:hover { opacity: 1; color: var(--danger-deep, #b52b27); }
 .gl-row .gl-edit { flex: none; width: 26px; height: 26px; opacity: .5; }
 .gl-row .gl-edit:hover { opacity: 1; }
+
+/* ===========================================================================
+   بانر سينتاكس أكاديمي (أول النظرة العامة)
+   السكشن ده مقصود يبقى شاذ عن هوية دوّنلي (ورق فاتح) — بياخد هوية سينتاكس
+   أكاديمي بالظبط: خلفية غامقة وتدرّجات بنفسجي/وردي، منقولة من
+   courses/public/assets/css/app.css (:root).
+   =========================================================================== */
+.syntax-banner {
+  /* توكنز سينتاكس — محلية للسكشن ده بس عشان ماتأثرش على باقي التطبيق */
+  --sx-bg: #0a0a0f;
+  --sx-surface: #12121a;
+  --sx-surface-2: #1a1a24;
+  --sx-text: #f5f5f7;
+  --sx-muted: #a0a0a8;
+  --sx-primary: #6366f1;
+  --sx-primary-light: #818cf8;
+  --sx-accent: #a855f7;
+  --sx-pink: #ec4899;
+  --sx-border: rgba(255, 255, 255, 0.08);
+  --sx-gradient-text: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  --sx-gradient-btn: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin-bottom: 26px;
+  padding: 24px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  background: linear-gradient(135deg, var(--sx-surface-2) 0%, var(--sx-bg) 65%);
+  border: 1px solid var(--sx-border);
+  border-radius: 24px; /* --radius-lg عندهم */
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  color: var(--sx-text);
+}
+/* توهّج بنفسجي في الخلفية — نفس إحساس الموقع */
+.syntax-banner::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -60px;
+  top: -110px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.28), transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+.syntax-banner::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: -70px;
+  bottom: -120px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.22), transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.sb-text { flex: 1 1 320px; min-width: 0; }
+
+/* سطر اللوجو — نفس لوك الهيدر بتاعهم: مخ + «سينتاكس Academy» بتدرّج */
+.sb-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--sx-muted);
+}
+.sb-brain { flex: none; width: 34px; height: 28px; display: block; }
+.sb-logo {
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  background: var(--sx-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.sb-logo .sb-accent { -webkit-text-fill-color: var(--sx-primary-light); color: var(--sx-primary-light); }
+
+.sb-title {
+  font: var(--type-h3);
+  color: var(--sx-text);
+  margin: 0 0 8px;
+}
+/* الخربشة الخضرا بتاعة دوّنلي مش من هويتهم — بنستبدلها بخط تدرّج */
+.sb-title .sb-mark {
+  background: var(--sx-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.sb-sub {
+  font-size: var(--text-sm);
+  line-height: 1.8;
+  color: var(--sx-muted);
+  margin: 0;
+  max-width: 48ch;
+}
+
+.sb-cta { flex: none; }
+.sb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border-radius: 100px; /* --radius-full عندهم */
+  font-weight: 800;
+  font-size: var(--text-base);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  color: #fff;
+  background: var(--sx-gradient-btn);
+  border: 0;
+  box-shadow: 0 6px 22px rgba(99, 102, 241, 0.38);
+  transition: transform var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast) var(--ease-soft), filter var(--dur-fast) var(--ease-soft);
+}
+.sb-btn:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 10px 28px rgba(99, 102, 241, 0.5); }
+.sb-btn:active { transform: scale(0.98); }
+.sb-btn:focus-visible { outline: 2px solid var(--sx-primary-light); outline-offset: 3px; }
+
+@media (max-width: 640px) {
+  .syntax-banner { padding: 18px 20px; gap: 14px; flex-direction: column; align-items: flex-start; }
+  /* في وضع العمود الـflex-basis بيتحسب على الارتفاع — نلغيه */
+  .sb-text { flex: 0 0 auto; width: 100%; }
+  .syntax-banner::before { width: 170px; height: 170px; top: -80px; inset-inline-start: -50px; }
+  .sb-kicker { font-size: var(--text-xs); margin-bottom: 7px; }
+  .sb-brain { width: 30px; height: 25px; }
+  .sb-title { font-size: var(--text-lg); margin-bottom: 5px; }
+  .sb-sub { font-size: var(--text-xs); line-height: 1.6; }
+  .sb-cta { width: 100%; }
+  .sb-btn { width: 100%; }
+}
+/* الرسم نفسه بيوقف من الجافاسكربت لو المستخدم مبيحبش الحركة */
+
+
+/* ---------- شريط تقدّم تحديث التطبيق ---------- */
+.upd-progress {
+  margin-top: 12px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-wash);
+  border: 1.5px solid var(--ink);
+  overflow: hidden;
+}
+.upd-progress > i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--brand);
+  border-radius: var(--radius-pill);
+  transition: width var(--dur-slow, .5s) var(--ease-soft);
+}
+.upd-progress.done > i { background: var(--brand-deep); }
+.upd-progress.failed > i { background: var(--danger, #d05a55); }
+/* خطوط متحركة تدّي إحساس إن فيه شغل شغّال */
+.upd-progress.busy > i {
+  background-image: linear-gradient(45deg,
+    rgba(255,255,255,.28) 25%, transparent 25%, transparent 50%,
+    rgba(255,255,255,.28) 50%, rgba(255,255,255,.28) 75%, transparent 75%);
+  background-size: 18px 18px;
+  animation: updStripes 1s linear infinite;
+}
+@keyframes updStripes { from { background-position: 0 0; } to { background-position: 18px 0; } }
+@media (prefers-reduced-motion: reduce) { .upd-progress.busy > i { animation: none; } }
+
+/* مودال التأكيد لازم يبقى فوق أي مودال تاني.
+   الموديلات الديناميكية (الإعدادات/البلاغ) بتتضاف آخر الـ body وبنفس الـ
+   z-index، فترتيب الـDOM كان بيخلّيها تغطّي التأكيد → الشاشة تسوّد والزراير
+   مش شغّالة والوعد بتاع askConfirm مابيتحلّش (التطبيق يبان واقف). */
+#confirmOverlay { z-index: 300; }

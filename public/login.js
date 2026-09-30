@@ -22,6 +22,18 @@ tabLogin.addEventListener("click", () => { signup = false; refresh(); });
 tabSignup.addEventListener("click", () => { signup = true; refresh(); });
 refresh();
 
+// لو اتنقل هنا لأن الجلسة خلصت، نقوله ليه بدل ما يلاقي نفسه برّه فجأة
+// (بعد refresh عشان مايمسحش الرسالة)
+try {
+  const reason = new URLSearchParams(location.search).get("reason");
+  if (reason === "expired") {
+    authSub.textContent = "جلستك خلصت — سجّل دخولك تاني وتكمّل من حيث ما وقفت";
+    errorEl.textContent = "⏰ خرجت تلقائيًا لأن جلستك انتهت. بياناتك زي ما هي.";
+    errorEl.hidden = false;
+    history.replaceState(null, "", location.pathname);
+  }
+} catch {}
+
 // إظهار/إخفاء كلمة السر
 const togglePw = document.getElementById("togglePw");
 const pwInput = document.getElementById("emailPassword");
