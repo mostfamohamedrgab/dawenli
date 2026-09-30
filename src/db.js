@@ -619,6 +619,7 @@ export function normNote(s) {
     .replace(/ة/g, "ه")
     .replace(/[ؤئ]/g, "ء")
     .replace(/\s+/g, " ")
+    .replace(/^من\s+/, "") // بادئة وصل شائعة («من مشروع…» = «مشروع…») — عشان المقارنة متتخدعش بيها
     .toLowerCase();
 }
 
@@ -626,19 +627,24 @@ const insertFinanceStmt = db.prepare(`
   INSERT INTO finance (created_at, user_id, entry_date, direction, amount, currency, category, note)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `);
+// بندوّر على تطابق في نافذة ±14 يوم (مش نفس اليوم بس) — عشان لو المستخدم أعاد سرد
+// نفس الدفعة بعد كام يوم (والـ agent مكانش شايفها في سياق آخر ٣ أيام) مايتسجّلش تاني.
+const DUP_WINDOW_DAYS = 14;
 const findDupFinanceStmt = db.prepare(
-  `SELECT id, note FROM finance WHERE user_id = ? AND entry_date = ? AND direction = ? AND amount = ?`
+  `SELECT id, note FROM finance WHERE user_id = ? AND direction = ? AND amount = ? AND entry_date >= ? AND entry_date <= ?`
 );
 export function addFinance({ userId, entryDate, direction, amount, currency, category, note }) {
   const eDate = entryDate || today();
   const dir = direction === "income" ? "income" : "expense";
   const amt = Number(amount) || 0;
-  // حاجز تكرار: نفس اليوم + نفس الاتجاه + نفس المبلغ + ملاحظة مطابقة (بعد تطبيع) = نفس
-  // القيد (من تسجيل صوتي تاني مثلاً) — نرجّع القديم بدل ما نكرّر. ملاحظة مختلفة = قيد مختلف.
-  // بنمنع التكرار بس لما فيه ملاحظة فعلية مطابقة — عشان منخلطش مصروفين حقيقيين
-  // بنفس المبلغ ومن غير وصف (دول بيفضلوا منفصلين).
+  // حاجز تكرار: نفس الاتجاه + نفس المبلغ + ملاحظة مطابقة (بعد تطبيع) وفي نافذة ±14 يوم = نفس
+  // القيد (من تسجيل صوتي تاني مثلاً، حتى لو بتاريخ مختلف) — نرجّع القديم بدل ما نكرّر.
+  // ملاحظة مختلفة = قيد مختلف. بنمنع التكرار بس لما فيه ملاحظة فعلية مطابقة — عشان منخلطش
+  // مصروفين حقيقيين بنفس المبلغ ومن غير وصف (دول بيفضلوا منفصلين).
   const nn = normNote(note);
-  const existing = nn ? findDupFinanceStmt.all(userId, eDate, dir, amt).find((r) => normNote(r.note) === nn) : null;
+  const from = new Date(new Date(eDate + "T00:00:00Z").getTime() - DUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10);
+  const to = new Date(new Date(eDate + "T00:00:00Z").getTime() + DUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10);
+  const existing = nn ? findDupFinanceStmt.all(userId, dir, amt, from, to).find((r) => normNote(r.note) === nn) : null;
   if (existing) return Number(existing.id);
   const info = insertFinanceStmt.run(
     now(),
