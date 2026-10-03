@@ -30,4 +30,9 @@ export const config = {
   // بلاغات المستخدمين بتتبعت لنظام البلاغات في سينتاكس أكاديمي (موضوعها بيتحط «دوّنلي» تلقائيًا)
   reportUrl: process.env.REPORT_URL || "https://syntax.academy/api/dawenli-report",
   reportSecret: process.env.REPORT_SECRET || "",
+  // الربط بماكينة المحتوى (content-os) — فلوس المشاريع البرمجية بتتقيّد هناك لوحدها على المشروع.
+  // اختياري ولمستخدم واحد بس (صاحب الماكينة): لو MACHINE_URL فاضي الميزة مقفولة.
+  machineUrl: (process.env.MACHINE_URL || "").replace(/\/+$/, ""), // مثلاً http://127.0.0.1:8823
+  machineUserId: Number(process.env.MACHINE_USER_ID || 0),
+  machineUsdRate: Number(process.env.MACHINE_USD_RATE || 50), // دولار → جنيه لما المشروع بالجنيه
 };

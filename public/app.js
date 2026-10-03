@@ -603,7 +603,7 @@ window.startTour = startTour; // عشان نقدر نشغّلها يدويًا
 /* ===================== الكومبوزر: رتّبهالي ===================== */
 // سطر الإيصال من الـ agent → عالمه (للون الـ chip)
 function receiptWorld(line) {
-  if (line.startsWith("💰")) return "finances";
+  if (line.startsWith("💰") || line.startsWith("💼") || line.startsWith("↩️")) return "finances";
   if (line.startsWith("💡")) return "ideas";
   if (line.startsWith("🧩")) return "problems";
   if (line.startsWith("🩺") || line.startsWith("🧠") || line.startsWith("🍽️") || line.startsWith("🩹")) return "health";
@@ -1888,7 +1888,7 @@ function finRowHtml(f) {
   return `<div class="list-row">
     <div class="lm">
       <span class="l1">${f.direction === "income" ? "➕ دخل" : "➖ صرف"} · ${fmtShort(f.entry_date)}${f.category ? ` · ${CAT_ICONS[f.category] || ""} ${escapeHtml(f.category)}` : ""}</span>
-      <span class="l2">${escapeHtml(f.note || "—")}</span>
+      <span class="l2">${escapeHtml(f.note || "—")}${f.project_title ? ` · <span title="${f.machine_sync === "ok" ? "متقيّدة في الماكينة على المشروع" : "مستنية تتقيّد في الماكينة"}">💼 ${escapeHtml(f.project_title)}${f.machine_sync === "ok" ? "" : " ⏳"}</span>` : ""}</span>
     </div>
     <div class="row-actions">
       <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}">${arNum(f.amount)} ${curLabel(f)}</span>

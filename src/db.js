@@ -331,6 +331,11 @@ addColumnIfMissing("tasks", "resources", "TEXT"); // موارد المهمة: و
 addColumnIfMissing("goals", "resources", "TEXT"); // موارد الهدف: وصف/روابط/مصادر
 addColumnIfMissing("goals", "period", "TEXT");    // 'week' | 'month' | 'date' — null = مستمر بلا نهاية
 addColumnIfMissing("goals", "deadline", "TEXT");  // YYYY-MM-DD آخر يوم متابعة — null = مستمر
+// ربط الحركة بمشروع في الماكينة (content-os): id المشروع واسمه، والـ id بتاع الحركة هناك بعد ما تتقيّد
+addColumnIfMissing("finance", "project_id", "TEXT");
+addColumnIfMissing("finance", "project_title", "TEXT");
+addColumnIfMissing("finance", "machine_id", "TEXT");        // id الحركة في الماكينة (fdw<id> لو احنا اللي عملناها)
+addColumnIfMissing("finance", "machine_sync", "TEXT");      // 'ok' = متزامنة، null = محتاجة تتبعت (هتتعاد المحاولة)
 db.prepare(`UPDATE tasks SET status = 'pending' WHERE status = 'open'`).run();
 
 // ===== إعدادات التطبيق (key/value) — بتتقدّم على الـ env (مثلاً مزود الذكاء ومفاتيحه) =====
@@ -682,25 +687,28 @@ const insertFinanceStmt = db.prepare(`
   INSERT INTO finance (created_at, user_id, entry_date, direction, amount, currency, category, note)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `);
-// بندوّر على تطابق في نافذة ±14 يوم (مش نفس اليوم بس) — عشان لو المستخدم أعاد سرد
-// نفس الدفعة بعد كام يوم (والـ agent مكانش شايفها في سياق آخر ٣ أيام) مايتسجّلش تاني.
-const DUP_WINDOW_DAYS = 14;
+// نافذة التكرار: الدخل ±14 يوم — عشان لو المستخدم أعاد سرد نفس الدفعة بعد كام يوم (والـ agent
+// مكانش شايفها في سياق آخر ٣ أيام) مايتسجّلش تاني. المصاريف ±يوم بس — «بنزين ١٠٠٠» كل أسبوع
+// مصروف حقيقي جديد، ونافذة ١٤ يوم كانت هتبلعه من غير ما حد ياخد باله.
+const DUP_WINDOW_DAYS = { income: 14, expense: 1 };
 const findDupFinanceStmt = db.prepare(
   `SELECT id, note FROM finance WHERE user_id = ? AND direction = ? AND amount = ? AND entry_date >= ? AND entry_date <= ?`
 );
-export function addFinance({ userId, entryDate, direction, amount, currency, category, note }) {
+// زي addFinance بس بيقول كمان لو القيد كان موجود أصلًا ({ id, duplicate }) — عشان الإيصال مايكدبش
+export function addFinanceChecked({ userId, entryDate, direction, amount, currency, category, note }) {
   const eDate = entryDate || today();
   const dir = direction === "income" ? "income" : "expense";
   const amt = Number(amount) || 0;
-  // حاجز تكرار: نفس الاتجاه + نفس المبلغ + ملاحظة مطابقة (بعد تطبيع) وفي نافذة ±14 يوم = نفس
+  // حاجز تكرار: نفس الاتجاه + نفس المبلغ + ملاحظة مطابقة (بعد تطبيع) وفي نافذة التكرار = نفس
   // القيد (من تسجيل صوتي تاني مثلاً، حتى لو بتاريخ مختلف) — نرجّع القديم بدل ما نكرّر.
   // ملاحظة مختلفة = قيد مختلف. بنمنع التكرار بس لما فيه ملاحظة فعلية مطابقة — عشان منخلطش
   // مصروفين حقيقيين بنفس المبلغ ومن غير وصف (دول بيفضلوا منفصلين).
   const nn = normNote(note);
-  const from = new Date(new Date(eDate + "T00:00:00Z").getTime() - DUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10);
-  const to = new Date(new Date(eDate + "T00:00:00Z").getTime() + DUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10);
+  const win = DUP_WINDOW_DAYS[dir];
+  const from = new Date(new Date(eDate + "T00:00:00Z").getTime() - win * 86400000).toISOString().slice(0, 10);
+  const to = new Date(new Date(eDate + "T00:00:00Z").getTime() + win * 86400000).toISOString().slice(0, 10);
   const existing = nn ? findDupFinanceStmt.all(userId, dir, amt, from, to).find((r) => normNote(r.note) === nn) : null;
-  if (existing) return Number(existing.id);
+  if (existing) return { id: Number(existing.id), duplicate: true };
   const info = insertFinanceStmt.run(
     now(),
     userId,
@@ -713,10 +721,38 @@ export function addFinance({ userId, entryDate, direction, amount, currency, cat
   );
   // ربط تلقائي: الدخل/الصرف بعملة معيّنة يزوّد/ينقّص أي هدف بنفس الوحدة (مثلاً هدف «دولار»)
   try { applyFinanceToGoals(userId, dir, amt, currency, note, 1); } catch {}
-  return Number(info.lastInsertRowid);
+  return { id: Number(info.lastInsertRowid), duplicate: false };
+}
+export function addFinance(args) {
+  return addFinanceChecked(args).id;
+}
+
+export function getFinance(userId, id) {
+  return db.prepare(`SELECT * FROM finance WHERE user_id = ? AND id = ?`).get(userId, id) || null;
+}
+// ربط/فك ربط قيد بمشروع في الماكينة (projectId فاضي = فك الربط). بيعلّم القيد إنه محتاج يتبعت.
+export function setFinanceProject(userId, id, { projectId, projectTitle }) {
+  const ok = db.prepare(
+    `UPDATE finance SET project_id = ?, project_title = ?, machine_sync = NULL WHERE user_id = ? AND id = ?`
+  ).run(projectId || null, projectId ? projectTitle || null : null, userId, id).changes > 0;
+  return ok ? getFinance(userId, id) : null;
+}
+export function markFinanceSynced(userId, id, machineId) {
+  db.prepare(`UPDATE finance SET machine_id = ?, machine_sync = 'ok' WHERE user_id = ? AND id = ?`).run(machineId, userId, id);
+}
+// اتعدّل (مبلغ/تاريخ/وصف) → لازم يتبعت تاني لو مربوط
+export function markFinanceDirty(userId, id) {
+  db.prepare(`UPDATE finance SET machine_sync = NULL WHERE user_id = ? AND id = ? AND (project_id IS NOT NULL OR machine_id IS NOT NULL)`)
+    .run(userId, id);
+}
+// قيود مستنية تتبعت للماكينة (كانت مقفولة وقتها مثلاً) — ربط جديد أو تعديل أو فك ربط
+export function financePendingMachine(userId) {
+  return db.prepare(
+    `SELECT id FROM finance WHERE user_id = ? AND machine_sync IS NULL AND (project_id IS NOT NULL OR machine_id IS NOT NULL)`
+  ).all(userId).map((r) => r.id);
 }
 // تطبيع اسم العملة لكود موحّد
-function normCurKey(s) {
+export function normCurKey(s) {
   const x = String(s || "").trim().toLowerCase();
   if (["دولار", "usd", "$", "dollar", "dollars"].includes(x)) return "USD";
   if (["جنيه", "egp", "ج.م", "جم", "le"].includes(x)) return "EGP";

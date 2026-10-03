@@ -90,6 +90,8 @@ import {
   getFile,
   deleteFile,
   updateFinance,
+  getFinance,
+  markFinanceDirty,
   updateHealth,
   updateEntry,
   updateTaskFields,
@@ -117,6 +119,7 @@ import OpenAI from "openai";
 import { versionStatus, pullUpdate, scheduleRestart } from "./updater.js";
 import { buildReportData } from "./report.js";
 import { runAgent } from "./agent.js";
+import { syncFinance, forgetFinance } from "./machine.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
@@ -970,7 +973,15 @@ export function startServer() {
 
   /* ===== تعديل أي عنصر (مرونة التعديل) — PUT /api/<نوع>/:id ===== */
   const updaters = {
-    finance: updateFinance,
+    // لو القيد متقيّد في الماكينة على مشروع، التعديل بيروح هناك كمان
+    finance: (uid, id, patch) => {
+      const ok = updateFinance(uid, id, patch);
+      if (ok) {
+        markFinanceDirty(uid, id);
+        syncFinance(uid, id).catch(() => {});
+      }
+      return ok;
+    },
     health: updateHealth,
     entries: updateEntry,
     tasks: updateTaskFields,
@@ -1132,7 +1143,13 @@ export function startServer() {
   /* ===== الحذف ===== */
   const deleters = {
     entries: deleteEntry,
-    finance: deleteFinance,
+    // اللي دوّنلي قيّده في الماكينة بيتمسح من هناك كمان
+    finance: (uid, id) => {
+      const row = getFinance(uid, id);
+      const ok = deleteFinance(uid, id);
+      if (ok) forgetFinance(uid, row).catch(() => {});
+      return ok;
+    },
     health: deleteHealth,
     goals: deleteGoal,
     conversations: deleteConversation,

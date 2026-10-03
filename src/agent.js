@@ -13,8 +13,10 @@ import {
   correctJournal,
   listEntries,
   entriesSince,
-  addFinance,
+  addFinanceChecked,
   deleteFinance,
+  getFinance,
+  setFinanceProject,
   normNote,
   touchUser,
   financeSince,
@@ -52,6 +54,7 @@ import {
   activeProblems,
   PROBLEM_AREAS,
 } from "./db.js";
+import { machineProjects, syncFinance, forgetFinance, syncPending } from "./machine.js";
 
 /* ===================== الأدوات ===================== */
 
@@ -378,9 +381,165 @@ const TOOLS = [
   },
 ];
 
+// أدوات الرسالة دي: لو المستخدم صاحب الماكينة وعنده مشاريع، log_finance بياخد project_id
+// وبتظهر أداة الربط. لأي مستخدم تاني الأدوات زي ما هي (مشاريعه مش بتبان لحد).
+function toolsFor(projects) {
+  if (!projects.length) return TOOLS;
+  const ids = projects.map((p) => p.id);
+  const projectId = {
+    type: "string",
+    enum: ids,
+    description: "id المشروع من projects في السياق — حطّه بس لو الحركة تبع مشروع برمجي منهم وانت متأكد",
+  };
+  return [
+    ...TOOLS.map((t) =>
+      t.function.name !== "log_finance"
+        ? t
+        : {
+            ...t,
+            function: {
+              ...t.function,
+              parameters: {
+                ...t.function.parameters,
+                properties: { ...t.function.parameters.properties, project_id: projectId },
+              },
+            },
+          }
+    ),
+    {
+      type: "function",
+      function: {
+        name: "link_finance_project",
+        description:
+          "اربط قيد مالي **متسجّل خلاص** بمشروع من projects (بيتقيّد في الماكينة على المشروع)، أو فك ربطه بـ project_id=\"none\". استخدمها لما المستخدم يأكّد إن قيد تبع مشروع (رد على سؤالك) أو يصحّح الربط. ماتسجّلش القيد تاني بـ log_finance.",
+        parameters: {
+          type: "object",
+          properties: {
+            finance_id: { type: "number", description: "id القيد من finance_today / finance_recent" },
+            project_id: { type: "string", enum: [...ids, "none"] },
+          },
+          required: ["finance_id", "project_id"],
+        },
+      },
+    },
+  ];
+}
+
+/* ===================== حارس «كل مبلغ يتسجّل» =====================
+   الموديل ساعات بيسجّل أول مبلغ في الرسالة ويسيب الباقي — حصل فعلًا: «صرفت ٤٠٠ عشا، ١٣٠ شاور جيل،
+   ٢٠٠ جاتوه» اتسجّل منها الـ ٤٠٠ بس لحد ما المستخدم سأل «مسجلتش ليه؟». فبنطلّع المبالغ من النص
+   بالكود (مش بالموديل)، ولو فيه مبلغ ماتسجّلش بنرجّعله مرة كمان بالمبالغ الناقصة بالاسم. */
+
+const toLatinDigits = (s) =>
+  String(s || "")
+    .replace(/[٠-٩]/g, (d) => d.charCodeAt(0) - 0x660)
+    .replace(/[۰-۹]/g, (d) => d.charCodeAt(0) - 0x6f0)
+    .replace(/(\d)٫(?=\d)/g, "$1.")
+    .replace(/(\d)[,٬](?=\d{3}(?!\d))/g, "$1"); // 15,000 → 15000
+
+const AR_LETTER = "\\u0621-\\u064A";
+const MULT_RE = new RegExp(`^\\s*(ألف|الف|آلاف|الاف|مليون|k|ك)(?![${AR_LETTER}a-z])`, "i");
+const AND_RE = new RegExp(`^\\s*و\\s*(\\d+(?:\\.\\d+)?|نص)(?![\\d${AR_LETTER}])`);
+const CURRENCY_AFTER_RE = new RegExp(
+  `^\\s*(\\$|€|£|usd|egp|ج\\.?\\s?م|جنيه|جنية|جنيهات|دولار|ريال|درهم|يورو|ج(?![${AR_LETTER}]))`, "i"
+);
+// أرقام مش فلوس: وقت/كمية/مدة
+const NON_MONEY_UNIT_RE = new RegExp(
+  `^\\s*(ساعة|ساعه|ساعات|دقيقة|دقيقه|دقايق|دقائق|ثانية|يوم|ايام|أيام|اسبوع|أسبوع|اسابيع|أسابيع|شهر|شهور|سنة|سنه|سنين|كيلو|كجم|جرام|جرامات|لتر|متر|كم|خطوة|خطوه|خطوات|صفحة|صفحه|صفحات|مرة|مره|مرات|ركعة|ركعات|كوباية|كوب|حباية|حبة|حبه|قرص|سيجارة|سجارة|سجاير|نفر|فرد|افراد|أفراد|شخص|%|٪)(?![${AR_LETTER}])`
+);
+const BEFORE_NON_MONEY_RE = /(الساعة|الساعه|يوم|رقم|سنة|سنه|#)\s*$/;
+const FIN_VERB_RE =
+  /(صرفت|صرف|دفعت|دفع|اشتريت|اشترت|جبت|كلفني|كلّفني|خرج مني|قبضت|استلمت|كسبت|جالي|جاتلي|وصلني|اتحولي|حولت|حوّلت|سلفت|دخلي|عربون|دفعة|دفعه|فاتورة|فاتوره|مصاريف|مصروف|اشتراك)/;
+
+export function moneyMentions(text) {
+  const t = toLatinDigits(text);
+  const hasVerb = FIN_VERB_RE.test(t);
+  const out = [];
+  const re = /\d+(?:\.\d+)?/g;
+  let m;
+  while ((m = re.exec(t))) {
+    const start = m.index;
+    let end = start + m[0].length;
+    const before = t.slice(Math.max(0, start - 12), start);
+    // جزء من تاريخ/وقت (2026-10-02، 10/2، 5:30)
+    if (/[\d][/:\-]$/.test(before) || /^[/:\-]\d/.test(t.slice(end, end + 2))) continue;
+    let value = Number(m[0]);
+    let rest = t.slice(end);
+    let mult = 1;
+    const mm = rest.match(MULT_RE);
+    if (mm) {
+      mult = /مليون/.test(mm[1]) ? 1e6 : 1000;
+      value *= mult;
+      rest = rest.slice(mm[0].length);
+      const and = rest.match(AND_RE); // «١٥ ألف و٥٠٠» = 15500، «ألف ونص» = 1500
+      if (and) {
+        const add = and[1] === "نص" ? mult / 2 : Number(and[1]);
+        if (add < mult) {
+          value += add;
+          rest = rest.slice(and[0].length);
+          re.lastIndex = t.length - rest.length; // الرقم اللي اتضاف مايتعدّش لوحده
+        }
+      }
+    }
+    if (NON_MONEY_UNIT_RE.test(rest)) continue;
+    const marked = /[$+]\s*$/.test(before) || CURRENCY_AFTER_RE.test(rest);
+    if (!marked) {
+      if (mult === 1 && (value < 5 || !hasVerb || BEFORE_NON_MONEY_RE.test(before))) continue;
+      // رقم من غير عملة جوّه سؤال («صرفت ٥٠٠ امبارح؟») مش تسجيل
+      const lineStart = t.lastIndexOf("\n", start) + 1;
+      const lineEnd = t.indexOf("\n", end);
+      if (/[؟?]/.test(t.slice(lineStart, lineEnd < 0 ? t.length : lineEnd))) continue;
+    }
+    out.push(value);
+  }
+  return out;
+}
+
+// المبالغ اللي اتقالت ومفيش قيد بيها: بنشيل اللي اتسجّل في الرسالة دي (مع التكرار — ٢٠٠ مرتين = مرتين)
+function uncoveredAmounts(mentions, logged) {
+  const pool = [...logged];
+  return mentions.filter((a) => {
+    const i = pool.findIndex((x) => Math.abs(x - a) < 0.01);
+    if (i < 0) return true;
+    pool.splice(i, 1);
+    return false;
+  });
+}
+
 /* ===================== تنفيذ الأدوات ===================== */
 
 const fmtNum = (n) => Number(n).toLocaleString("en-US");
+
+// الربط بالماكينة للقيود الجديدة بس (اتسجّلت في آخر ٤٨ ساعة). القيود القديمة غالبًا متقيّدة هناك بالإيد
+// بتاريخ مختلف — في التجربة الموديل ربط لوحده دفعة ٢٦/٩ اللي متقيّدة في الماكينة بتاريخ ٢٠/٩، فكانت هتتكرّر.
+const LINK_MAX_AGE_MS = 48 * 3600 * 1000;
+
+// ربط/فك ربط قيد بمشروع في الماكينة + إيصال واضح بالنتيجة (project = null يعني فك الربط)
+async function linkFinanceProject(userId, financeId, project) {
+  const before = getFinance(userId, financeId);
+  if (!before) return { ok: false, receipt: `⚠️ ملقيتش القيد #${financeId}` };
+  if (Date.now() - Date.parse(before.created_at) > LINK_MAX_AGE_MS && !before.machine_id)
+    return {
+      ok: false,
+      old: true,
+      error: `القيد #${financeId} قديم (اتسجّل ${String(before.created_at).slice(0, 10)}) — الربط للقيود الجديدة بس عشان ماتتكرّرش في الماكينة. ماتحاولش تاني.`,
+      receipt: `💼 القيد #${financeId} قديم — مابربطش القديم بالماكينة عشان ماتتكرّرش هناك (لو لازم، ضيفها من تاب الشغل)`,
+    };
+  const where = project ? `«${project.title}»` : "";
+  if (project && before.project_id === project.id && before.machine_sync === "ok")
+    return { ok: true, receipt: `💼 متقيّدة على مشروع ${where} في الماكينة من قبل كده` };
+  setFinanceProject(userId, financeId, { projectId: project?.id, projectTitle: project?.title });
+  const s = await syncFinance(userId, financeId);
+  if (!project)
+    return { ok: true, receipt: s.ok ? `💼 اتفك ربط القيد #${financeId} من المشروع` : `💼 اتفك الربط — والماكينة هتتحدّث أول ما ترجع` };
+  if (!s.ok) return { ok: true, receipt: `💼 على مشروع ${where} — الماكينة مش متاحة دلوقتي، هتتقيّد أول ما ترجع` };
+  return {
+    ok: true,
+    receipt: s.existing
+      ? `💼 على مشروع ${where} — كانت متقيّدة في الماكينة قبل كده فربطتها بيها (ماتكرّرتش)`
+      : `💼 اتقيّدت في الماكينة على مشروع ${where}`,
+  };
+}
 
 function daysAgo(n) {
   const d = new Date(`${localToday()}T00:00:00Z`);
@@ -412,9 +571,9 @@ const DAY_HINT_RE = new RegExp(
 );
 const hasDayHint = (s) => DAY_HINT_RE.test(String(s || ""));
 
-// بينفّذ أداة واحدة ويرجّع { result للموديل, receipt سطر للمستخدم }
-// ctx: { userId, sourceText } — النص الأصلي بيتحفظ في اليوميات مش ملخص الموديل بس
-function executeTool(ctx, name, args) {
+// بينفّذ أداة واحدة ويرجّع { result للموديل, receipt سطر للمستخدم, amount لو اتقيّد مبلغ }
+// ctx: { userId, sourceText, seenFinance, projects } — النص الأصلي بيتحفظ في اليوميات مش ملخص الموديل بس
+async function executeTool(ctx, name, args) {
   const { userId } = ctx;
   const today = localToday();
   let date = isDate(args.date) ? args.date : today;
@@ -455,9 +614,9 @@ function executeTool(ctx, name, args) {
       // نفس الرسالة (الـ DB كمان بيمنع التكرار عبر الرسائل في addFinance).
       const finDir = args.direction === "income" ? "income" : "expense";
       const finKey = `${date}|${finDir}|${amount}|${normNote(args.note)}`;
-      if (ctx.seenFinance?.has(finKey)) return { result: { ok: true, duplicate: true } };
+      if (ctx.seenFinance?.has(finKey)) return { result: { ok: true, duplicate: true }, amount };
       ctx.seenFinance?.add(finKey);
-      addFinance({
+      const saved = addFinanceChecked({
         userId,
         entryDate: date,
         direction: args.direction,
@@ -467,16 +626,49 @@ function executeTool(ctx, name, args) {
         note: args.note || null,
       });
       const sign = args.direction === "income" ? "➕ دخل" : "➖ صرف";
+      const line = `${fmtNum(amount)} ${args.currency || "جنيه"}${args.category ? " · " + args.category : ""}${args.note ? " · " + args.note : ""}`;
+      // الإيصال لازم يقول الحقيقة: لو القيد كان موجود أصلًا (نفس المبلغ والوصف) ماتسجّلش تاني
+      const receipts = [saved.duplicate ? `💰 ↩️ متسجّلة قبل كده (#${saved.id}) فماكرّرتهاش: ${line}` : `💰 ${sign}: ${line}`];
+      const project = args.project_id && ctx.projects?.find((p) => p.id === args.project_id);
+      if (project) {
+        const l = await linkFinanceProject(userId, saved.id, project);
+        if (!(l.old && saved.duplicate)) receipts.push(l.receipt); // قيد قديم متكرّر: كفاية إيصال «متسجّلة قبل كده»
+      }
+      // دخل شكله شغل ومن غير مشروع → التذكير في نتيجة الأداة نفسها (الموديل بيشوفها قبل ما يرد —
+      // قاعدة البرومبت لوحدها ماكانتش كفاية: «قبضت ٣٠٠ دولار دفعة من شغل» اتسجّلت من غير سؤال)
+      const looksLikeWork =
+        finDir === "income" && !saved.duplicate && (args.category === "شغل" || /دفع|مشروع|عميل|عربون|شغل|project|client/i.test(args.note || ""))
+        && !/رعاي|سبونسر|sponsor|تعاون|كورس|سينتاكس|syntax|اكاديمي|أكاديمي/i.test(args.note || "");
+      const hint = !project && ctx.projects?.length && looksLikeWork
+        ? `الدخل ده شكله من شغل ومش مربوط بمشروع. لو واضح من الكلام إنه تبع مشروع من projects → link_finance_project بالـ id ${saved.id}. لو مش واضح → لازم تسأل المستخدم في ردّك سؤال قصير: «الـ ${fmtNum(amount)} دي تبع أنهي مشروع؟» وسمّيله أقرب مشروعين. لو مش مشروع برمجي (رعاية/كورس) سيبه.`
+        : undefined;
       return {
-        result: { ok: true },
-        receipt: `💰 ${sign}: ${fmtNum(amount)} ${args.currency || "جنيه"}${args.category ? " · " + args.category : ""}${args.note ? " · " + args.note : ""}`,
+        result: { ok: true, id: saved.id, ...(saved.duplicate ? { duplicate: true } : {}), ...(project ? { project: project.title } : {}), ...(hint ? { hint } : {}) },
+        receipt: receipts.join("\n"),
+        amount,
       };
     }
     case "delete_finance": {
       const id = Number(args.id);
       if (!(id > 0)) return { result: { ok: false, error: "محتاج id صحيح" } };
+      const row = getFinance(userId, id);
       const ok = deleteFinance(userId, id);
-      return { result: { ok }, receipt: ok ? `🗑️ اتمسح قيد مالي غلط (#${id})` : `⚠️ ملقيتش القيد #${id}` };
+      if (ok) await forgetFinance(userId, row); // لو كان متقيّد في الماكينة يتشال من هناك كمان
+      // amount: المبلغ اللي اتقال في «امسح الـ ٣٠٠» اتعامل معاه — مايتعدّش «ماتسجّلش»
+      return { result: { ok }, receipt: ok ? `🗑️ اتمسح قيد مالي غلط (#${id})` : `⚠️ ملقيتش القيد #${id}`, amount: ok ? row?.amount : undefined };
+    }
+    case "link_finance_project": {
+      const id = Number(args.finance_id);
+      const project = args.project_id === "none" ? null : ctx.projects?.find((p) => p.id === args.project_id);
+      if (!(id > 0) || (args.project_id !== "none" && !project))
+        return { result: { ok: false, error: "محتاج finance_id صحيح و project_id من projects" } };
+      const row = getFinance(userId, id);
+      const r = await linkFinanceProject(userId, id, project);
+      return {
+        result: { ok: r.ok, ...(r.error ? { error: r.error } : project ? { project: project.title } : { unlinked: true }) },
+        receipt: r.receipt,
+        amount: r.ok ? row?.amount : undefined,
+      };
     }
     case "log_idea": {
       if (!args.title) return { result: { ok: false, error: "محتاج عنوان للفكرة" } };
@@ -722,8 +914,11 @@ function weekdayOf(dateStr) {
   return AR_WEEKDAYS[new Date(`${dateStr}T00:00:00Z`).getUTCDay()];
 }
 
+const STAGE_AR = { lead: "محتمل", meeting: "ميتنج", proposal: "عرض سعر", won: "اتكسب", delivering: "شغّال", delivered: "اتسلّم" };
+const finProject = (f) => (f.project_title ? ` · 💼 ${f.project_title}` : "");
+
 // لقطة سريعة من بيانات المستخدم — بتتبني مع كل رسالة عشان الـ agent يكون فاهم وضعه
-function buildSnapshot(userId) {
+function buildSnapshot(userId, projects = []) {
   const today = localToday();
   // آخر ٣ أيام — عشان الـ agent يشوف قيود امبارح كمان ومايعيدش تسجيل نفس اليوم بتاريخ تاني
   const since3 = new Date(new Date(today + "T00:00:00Z").getTime() - 2 * 86400000).toISOString().slice(0, 10);
@@ -766,16 +961,25 @@ function buildSnapshot(userId) {
     spent_today: spentToday,
     // قائمة مصاريف/دخل النهاردة المسجّلة فعلًا — عشان الـ agent يقارن ومايكرّرش نفس القيد
     finance_today: todayFinance.map(
-      (f) => `#${f.id} ${f.direction === "income" ? "دخل" : "صرف"} ${f.amount} ${f.currency || "جنيه"}${f.category ? " · " + f.category : ""}${f.note ? " · " + f.note : ""}`
+      (f) => `#${f.id} ${f.direction === "income" ? "دخل" : "صرف"} ${f.amount} ${f.currency || "جنيه"}${f.category ? " · " + f.category : ""}${f.note ? " · " + f.note : ""}${finProject(f)}`
     ),
     // قيود آخر ٣ أيام بتواريخها — لكشف إعادة سرد نفس اليوم بتاريخ مختلف
     finance_recent: recentFinance.map(
-      (f) => `${f.entry_date} #${f.id} ${f.direction === "income" ? "دخل" : "صرف"} ${f.amount} ${f.currency || "جنيه"}${f.note ? " · " + f.note : ""}`
+      (f) => `${f.entry_date} #${f.id} ${f.direction === "income" ? "دخل" : "صرف"} ${f.amount} ${f.currency || "جنيه"}${f.note ? " · " + f.note : ""}${finProject(f)}`
     ),
     // دخل آخر ٤٥ يوم (دفعات المشاريع) — قبل ما تسجّل أي دخل قارن بيه ومتكرّرش دفعة موجودة
     income_recent: recentIncome.map(
-      (f) => `${f.entry_date} #${f.id} ${f.amount} ${f.currency || "جنيه"}${f.note ? " · " + f.note : ""}`
+      (f) => `${f.entry_date} #${f.id} ${f.amount} ${f.currency || "جنيه"}${f.note ? " · " + f.note : ""}${finProject(f)}`
     ),
+    // مشاريع الشغل البرمجية من الماكينة — للربط (project_id). فاضية لأي مستخدم مش صاحب الماكينة
+    ...(projects.length
+      ? {
+          projects: projects.map(
+            (p) =>
+              `${p.id} — ${p.title}${p.client && !p.title.includes(p.client) ? " · العميل: " + p.client : ""}${p.note ? " · " + p.note : ""} · ${STAGE_AR[p.stage] || p.stage} · اتحصّل ${fmtNum(p.collected)} من ${fmtNum(p.value)} ${p.currency}`
+          ),
+        }
+      : {}),
     goals: goals.map((g) => {
       const base = `${g.title}: ${g.current}${g.unit ? " " + g.unit : ""}${g.target ? ` من ${g.target}` : ""}`;
       if (goalExpired(g, today)) return `${base} — ⌛ خلص وقته (${g.deadline}) فبطّلنا متابعته، ماتزوّدهوش إلا لو المستخدم طلب صراحةً`;
@@ -799,6 +1003,8 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 
 # قواعد الاستخراج
 - استخرج **كل** اللي في الكلام: مصاريف ودخل (بالبند)، صحة ونفسية، أكل، عادات، أهداف، مهام بمواعيدها، وتدوينة اليوميات.
+- **🔴 كل مبلغ في رسالة المستخدم الحالية = قيد (أهم قاعدة في الفلوس):** رسالة فيها ٣ مصاريف = ٣ نداءات log_finance — **ابعتهم كلهم مع بعض في نفس الرد** (نداءات متوازية)، كل مبلغ بوصفه وبنده. ممنوع تسجّل واحد وتسيب الباقي، وممنوع تقول «هتأكد إنه مش متسجّل» وتقف — انت شايف اللي اتسجّل في finance_today و finance_recent و income_recent: **لو مبلغ من الرسالة الحالية مش موجود هناك يبقى مش متسجّل، سجّله دلوقتي من غير سؤال.** (ده حصل فعلًا: «صرفت ٤٠٠ عشا، ١٣٠ شاور جيل، ٢٠٠ جاتوه» اتسجّل منها الـ ٤٠٠ بس، والمستخدم اضطر يرجع يقول «مسجلتش ليه؟».) **المبالغ اللي في رسايله القديمة في المحادثة اتعامل معاها خلاص — ماتسجّلهاش تاني** إلا لو هو بيطلب ده دلوقتي صراحةً («مسجلتش ليه الـ…؟»).
+- **الفلوس اللي بتتصرف على حد تاني = مصروف المستخدم نفسه:** علاج أو تحاليل لمراته، مصاريف بيت، حاجة لابنه، هدية لحد — كلها **مصروفه هو** وبتتسجّل بـ log_finance عادي بالبند المناسب واسم الشخص في note. قاعدة «صحة حد تاني ماتسجّلهاش» تخص log_health بس، مش الفلوس.
 - **اليوم الصح لكل حاجة (مهم):** المستخدم ساعات بيحكي عن يوم فات — "امبارح عملت كذا"، "أول امبارح"، "يوم التلات اللي فات"، "من ٣ أيام"، أو حتى وسط الكلام. لو الحدث حصل في يوم فات → سجّله **بتاريخ اليوم ده مش النهاردة**: حِط \`date\` على **كل** أداة تسجيل (save_journal / log_finance / log_health / log_meal / log_habit / log_metric) بالتاريخ المحسوب من **past_days** اللي في السياق (مثلاً لو النهاردة الجمعة و"امبارح" يبقى الخميس بتاريخه). **🔴 لو المستخدم ماذكرش أي يوم صراحةً (ولا «امبارح» ولا اسم يوم ولا تاريخ) → التاريخ = النهاردة (today من السياق) حتمًا. متفترضش «امبارح» أو أي يوم فات من نفسك، ومتقولش في ردّك «أمس» أو «امبارح» طول ما هو ماقالهاش** — ده كان بيحصل مع رسايل قصيرة زي «+500$ مشروع كذا» فتتسجّل غلط بتاريخ امبارح. الرسالة الواحدة ممكن تبقى فيها حاجات لأيام مختلفة — **كل واحدة بتاريخها هي**.
 - **🔴 توجيه عام للتاريخ (ركّز جدًا):** لو المستخدم قال في أول أو وسط كلامه إن **التدوينة كلها عن يوم فات** — زي «ده تدوين امبارح»، «التدوين ده بتاع امبارح»، «أنا بتكلم عن يوم الأربع»، «ده كان يوم كذا» — يبقى ده **التاريخ الافتراضي لكل البنود في الرسالة دي** (يوميات + فلوس + أكل + صحة + متتبِّعات + عادات). حِط نفس الـ\`date\` ده على كل نداء تسجيل، **إلا** لو بند معيّن قال صراحةً يوم تاني. متسجّلش أي حاجة على النهاردة طول ما التوجيه العام قال يوم فات. احسب التاريخ من past_days (لو قال يوم أسبوع أو "امبارح")، أو من التاريخ الحالي في السياق لو قال تاريخ صريح زي "٢ يوليو". لو حصل تضارب في كلامه (قال أكتر من يوم) خُد أول يوم صريح قاله للتدوينة.
 - لما المستخدم يحكي عن يومه أو مشاعره → لازم تسجّل save_journal. لو بيسأل سؤال بس من غير حكي → ماتسجّلش يوميات.
@@ -814,8 +1020,8 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 - **الأفكار (log_idea):** لو قال فكرة أو حاجة ناوي/نفسه يعملها من غير معاد محدد ("عندي فكرة…"، "نفسي أعمل قناة"، "المفروض أجرّب كذا") → سجّلها بـ log_idea. لو ليها معاد واضح فهي مهمة (add_task) مش فكرة. شوف \`recent_ideas\` في السياق ومتكرّرش فكرة موجودة.
 - **المشاكل والهموم (log_problem):** لو حسّيت إن في حاجة مضايقة المستخدم أو بتقلقه أو عايز يتخلص منها ("متضايق من شغلي"، "تعبان نفسيًا بسبب…"، "في مشكلة بيني وبين حد") → سجّلها بـ log_problem بالمجال المناسب، **حتى لو ماطلبش صراحةً**. ده غير العرض الصحي اللحظي (log_health). شوف \`active_problems\` في السياق: لو نفس الهمّ متسجّل بلاش تكرار؛ ولو قال إنه اتحسّن/خلص → resolve_problem.
 - الصحة النفسية: قلق، توتر، حزن، ضغط نفسي → log_health بـ category="نفسية" و body_region="راس".
-- صحة حد تاني غير المستخدم ماتسجّلهاش خالص.
-- **متسجّلش نفس الحاجة مرتين (مهم جدًا في الفلوس):** في سياقك \`finance_today\` فيها كل المصاريف/الدخل المسجّلة النهاردة. **قبل** أي نداء \`log_finance\`، بُص عليها كويس: لو نفس المبلغ (أو قريب منه) ووصف مشابه أو نفس البند اتسجّل خلاص — حتى لو المستخدم قاله بصيغة تانية أو في تسجيل صوتي منفصل (مثلاً «موزع واي فاي للبي سي ٤٠٠» و«موزع واي فاي ٤٠٠»، أو «أبو طارق ٩٥» و«أبو طارق كشري ٩٥») → **ماتسجّلوش تاني**. المستخدم بيدردش وبيكرّر نفس الحاجة بكلام مختلف، والتكرار ده بيبوّظ مجموع مصاريفه. لو عندك شك حقيقي إنهم عمليتين مختلفتين بنفس المبلغ، اسأله سؤال قصير («ده غير الـ ٤٠٠ اللي سجّلتهم قبل كده؟») بدل ما تسجّل تكرار. نفس المبدأ لباقي المحاور (أكل، صحة، مهام): لو واضح إنه متسجّل، بلاش تكرار.
+- صحة حد تاني غير المستخدم ماتسجّلهاش في log_health — بس لو صرف عليها فلوس (علاج، تحاليل، دكتور) المصروف نفسه بيتسجّل بـ log_finance عادي.
+- **متسجّلش نفس الحاجة مرتين (مهم جدًا في الفلوس):** في سياقك \`finance_today\` فيها كل المصاريف/الدخل المسجّلة النهاردة. **قبل** أي نداء \`log_finance\`، بُص عليها كويس: لو نفس المبلغ (أو قريب منه) ووصف مشابه أو نفس البند اتسجّل خلاص — حتى لو المستخدم قاله بصيغة تانية أو في تسجيل صوتي منفصل (مثلاً «موزع واي فاي للبي سي ٤٠٠» و«موزع واي فاي ٤٠٠»، أو «أبو طارق ٩٥» و«أبو طارق كشري ٩٥») → **ماتسجّلوش تاني**. المستخدم بيدردش وبيكرّر نفس الحاجة بكلام مختلف، والتكرار ده بيبوّظ مجموع مصاريفه. **بس التكرار معناه إن نفس المبلغ موجود فعلًا في القوائم دي بوصف مشابه — مش مجرد احتمال؛ لو مش موجود هناك يبقى جديد وسجّله على طول.** لو عندك شك حقيقي إنهم عمليتين مختلفتين بنفس المبلغ، اسأله سؤال قصير («ده غير الـ ٤٠٠ اللي سجّلتهم قبل كده؟») بدل ما تسجّل تكرار. نفس المبدأ لباقي المحاور (أكل، صحة، مهام): لو واضح إنه متسجّل، بلاش تكرار.
 - **التصحيح/الإلغاء في الفلوس (مهم — ده كان بيعمل تكرار):** لو المستخدم قال إن قيد مالي اتسجّل غلط أو عايز يلغيه أو يغيّر مبلغه/بنده/وصفه («القيد ده غلط»، «ده مش X ده Y»، «المبلغ غلط»، «ألغِ المصروف الفلاني») → **ماتسجّلش قيد جديد على طول**. هات الـ id الأول بـ get_data (topic=finance أو day)، امسح القيد الغلط بـ delete_finance بالـ id، وبعدها لو فيه قيمة صحيحة سجّلها بـ log_finance. كده التصحيح مايعملش نسخة زيادة.
 - **تصحيح الأهداف (مهم — كان بيكرّر):** لو المستخدم قال رقم هدف غلط، أو «امسح/شيل المبلغ الفلاني من الهدف»، أو «الهدف المفروض بقى كذا» → **ماتستخدمش add_amount نهائيًا** (ده بيزوّد تاني ويعمل تكرار). استخدم upsert_goal بـ **set_current** بالقيمة الصح (= الرصيد الحالي ناقص المبلغ الغلط، أو الإجمالي الصحيح اللي قاله). add_amount بس لتقدّم **جديد** حقيقي.
 
@@ -848,6 +1054,26 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 - ممنوع: نصايح طبية أو إنك تدّعي إنك دكتور، كلام واعظ أو رسمي، تكرار كلامه بالنص.
 - متقولش "سجلت كذا وكذا" بالتفصيل — في رسالة تأكيد منفصلة بتتبعت تلقائيًا. ركّز انت على الرد الإنساني.`;
 
+// بيتضاف بس لصاحب الماكينة لما يكون عنده مشاريع — باقي المستخدمين مايشوفوهوش
+const PROJECTS_PROMPT = `# مشاريع الشغل (projects) — الربط بالماكينة
+في سياقك \`projects\` فيها مشاريع المستخدم البرمجية من الماكينة (تاب «الشغل»): id المشروع، اسمه، العميل، وملاحظة (غالبًا الدومين).
+- أي **دخل أو مصروف تبع مشروع منهم** (دفعة/عربون/باقي حساب من العميل، أو سيرفر/دومين/اشتراك/مقاول/فريلانسر للمشروع ده) → سجّله بـ log_finance **وحط project_id**. ده بيقيّده في الماكينة على المشروع لوحده — المستخدم مش هيكتبه تاني هناك.
+- المستخدم غالبًا **مش هيقول اسم المشروع زي ما هو**: ممكن يقول اسم العميل («جالي من خالد»)، الدومين أو جزء منه («wegsm»)، أو وصف («بتوع الطاقة»، «سيستم الأقساط»، «أبليكيشن الجملة»). طابق بالمعنى مع الاسم والعميل والملاحظة.
+- **متأكد؟** حط project_id على طول. **مش متأكد** — الحركة شكلها شغل (دفعة، عميل، دولار من شغل، سيرفر) بس ممكن تبقى تبع أكتر من مشروع أو الاسم مش واضح → سجّلها من غير project_id، واسأل سؤال واحد قصير بالاسم: «الـ ٥٠٠$ دي تبع مشروع WE GSM؟». لما يأكّد → **link_finance_project** بالـ id بتاع القيد (من finance_today) — **ماتسجّلش القيد تاني**.
+- لو قال إن الربط غلط («لا ده مش تبع wegsm» / «ده تبع مشروع الطاقة») → link_finance_project بالمشروع الصح، أو project_id="none" لو مالوش مشروع.
+- **مالهاش project_id:** المصاريف الشخصية (أكل، بيت، علاج، مواصلات)، ورعايات وتعاونات القناة (Kimi، Aisa، Creao…)، ودخل سينتاكس أكاديمي والكورسات — دي مش مشاريع برمجية، إلا لو فيه مشروع بنفس الاسم في projects.
+- دخل من شغل برمجي **مش موجود** في projects → سجّله عادي، وقوله في جملة إن المشروع ده مش في الماكينة (يضيفه في تاب الشغل الأول لو عايزه يتحسب هناك).
+- القيد المربوط بيبان في finance_today/finance_recent وجنبه «💼 اسم المشروع» — ماتربطهوش تاني.
+- **link_finance_project بس للقيد اللي بتتكلموا عنه دلوقتي** (اللي لسه متسجّل أو اللي سألت عليه والمستخدم أكّد). **ماتربطش قيود قديمة من نفسك** — حتى لو شايف في income_recent دفعة قديمة مش مربوطة، دي غالبًا متقيّدة في الماكينة من زمان وربطها بيكرّرها.
+- دخل لمشروع وفي income_recent **نفس المبلغ لنفس المشروع** من كام يوم → ده ممكن يبقى نفس الدفعة: اسأل «ده غير الـ ٥٠٠٠ اللي اتسجّلت يوم كذا؟» قبل ما تسجّل.`;
+
+// رسالة الفحص لما يفضل مبلغ اتقال ومفيش قيد بيه
+const missingNudge = (miss, hasProjects) =>
+  `⚠️ فحص تلقائي قبل ما ترد: المستخدم ذكر المبالغ دي في رسالته ومفيش أي قيد اتسجّل بيها لحد دلوقتي: ${miss.map(fmtNum).join("، ")}.
+سجّل كل واحد منهم دلوقتي بـ log_finance (نداء لكل مبلغ — كلهم مع بعض — بوصفه وبنده وتاريخه من كلامه${hasProjects ? "، و project_id لو تبع مشروع" : ""}).
+تجاهل المبلغ بس لو مش مصروف/دخل أصلًا (سعر بيسأل عنه، هدف، رقم مش فلوس) أو جزء من مبلغ اتسجّل خلاص.
+بعدها اكتب ردّك النهائي للمستخدم.`;
+
 /* ===================== حلقة الـ agent ===================== */
 
 const MAX_TURNS = 6;
@@ -856,33 +1082,59 @@ const HISTORY_LIMIT = 8;
 export async function runAgent({ user, text, kind = "text" }) {
   const userId = user.id;
   touchUser(userId); // حدّث آخر ظهور مع كل نشاط فعلي
+  syncPending(userId).catch(() => {}); // قيود مستنية تتبعت للماكينة (لو كانت مقفولة)
   const seenFinance = new Set(); // حاجز تكرار للفلوس داخل نفس الرسالة
-  const snapshot = buildSnapshot(userId);
+  const projects = await machineProjects(userId); // [] لأي مستخدم مش صاحب الماكينة
+  const snapshot = buildSnapshot(userId, projects);
   const history = recentConversations(userId, HISTORY_LIMIT);
+  const tools = toolsFor(projects);
+
+  // المبالغ اللي في الكلام — عشان نتأكد في الآخر إن كل واحد اتسجّل. المبالغ اللي ليها قيد
+  // بنفس الرقم في آخر ٣ أيام ممكن تبقى إعادة سرد، فمابنزنّش عليها — بس بنقول للمستخدم.
+  const mentions = text ? moneyMentions(text) : [];
+  const priorAmounts = financeSince(userId, daysAgo(2)).map((f) => Number(f.amount));
+  const logged = [];
+  let nudged = false;
 
   const messages = [
     { role: "system", content: SYSTEM_PROMPT },
+    ...(projects.length ? [{ role: "system", content: PROJECTS_PROMPT }] : []),
     {
       role: "system",
       content: `# سياق المستخدم دلوقتي\n${JSON.stringify(snapshot, null, 1)}`,
     },
   ];
+  const handled = []; // مبالغ اتسجّلت من الرسايل اللي فاتت — عشان الموديل مايرجعش يسجّلها
   for (const c of history) {
     if (c.user_text) messages.push({ role: "user", content: c.user_text });
     if (c.ai_reply) messages.push({ role: "assistant", content: c.ai_reply });
+    try {
+      for (const t of JSON.parse(c.meta_json || "null")?.tools || [])
+        if (t.tool === "log_finance" && t.args?.amount) handled.push(`${fmtNum(t.args.amount)}${t.args.currency ? " " + t.args.currency : ""}${t.args.note ? " (" + t.args.note + ")" : ""}`);
+    } catch {}
   }
+  // من غير الملاحظة دي، رسالة قصيرة زي «+500$ wegsm» خلّت الموديل يسجّل تاني دفعات من رسايل قديمة
+  if (history.some((c) => c.user_text))
+    messages.push({
+      role: "system",
+      content: `ملاحظة من النظام: الرسايل اللي فاتت فوق اتعامل معاها خلاص${handled.length ? ` (اتسجّل منها: ${handled.join("، ")})` : ""}. سجّل بس اللي في رسالة المستخدم الجاية دي — إلا لو هو بيطلب صراحةً تسجّل حاجة من رسالة قديمة.`,
+    });
   messages.push({ role: "user", content: text });
 
   const receipts = [];
   const toolLog = [];
   let reply = "";
 
+  // المبالغ اللي اتقالت ومالهاش قيد — من غير اللي ليه قيد بنفس الرقم في آخر ٣ أيام (إعادة سرد محتملة)
+  const missingNow = () => uncoveredAmounts(uncoveredAmounts(mentions, logged), priorAmounts);
+
   const model = chatModel(); // موديل المزود المتظبط في الإعدادات (openai/gemini/grok...)
-  for (let turn = 0; turn < MAX_TURNS; turn++) {
+  // +1 لفة احتياطي لفحص المبالغ الناقصة
+  for (let turn = 0; turn < MAX_TURNS + 1; turn++) {
     const res = await client.chat.completions.create({
       model,
       messages,
-      tools: TOOLS,
+      tools,
       // أول لفة الموديل لازم ينده أداة على الأقل (يسجّل أو يجيب بيانات) —
       // من غيرها الموديلات الصغيرة بترد كلام وخلاص ومفيش حاجة بتتسجل
       tool_choice: turn === 0 ? "required" : "auto",
@@ -897,6 +1149,14 @@ export async function runAgent({ user, text, kind = "text" }) {
 
     if (!msg.tool_calls?.length) {
       reply = (msg.content || "").trim();
+      // قبل ما نقفل: لو فيه مبلغ اتقال ومفيش قيد بيه → نرجّع للموديل مرة واحدة بالمبالغ دي بالاسم
+      const miss = nudged ? [] : missingNow();
+      if (miss.length) {
+        nudged = true;
+        console.log(`🔎 مبالغ اتقالت وماتسجّلتش: ${miss.join("، ")} — بنرجّع للموديل`);
+        messages.push({ role: "system", content: missingNudge(miss, projects.length > 0) });
+        continue;
+      }
       break;
     }
 
@@ -907,13 +1167,14 @@ export async function runAgent({ user, text, kind = "text" }) {
       } catch {}
       let out;
       try {
-        out = executeTool({ userId, sourceText: text, seenFinance }, tc.function.name, args);
+        out = await executeTool({ userId, sourceText: text, seenFinance, projects }, tc.function.name, args);
       } catch (err) {
         // اللوج ده بيطلع في pm2 logs — أهم حاجة للتشخيص على السيرفر
         console.error(`❌ tool ${tc.function.name} failed with args ${JSON.stringify(args)}:`, err);
         out = { result: { ok: false, error: "حصل خطأ داخلي في الأداة" } };
       }
       if (out.receipt) receipts.push(out.receipt);
+      if (out.amount > 0) logged.push(Number(out.amount));
       toolLog.push({ tool: tc.function.name, args });
       messages.push({
         role: "tool",
@@ -924,6 +1185,14 @@ export async function runAgent({ user, text, kind = "text" }) {
   }
 
   if (!reply) reply = "تمام، سجّلتلك كل حاجة ✅";
+
+  // الشفافية: أي مبلغ اتقال وفضل من غير قيد بيظهر للمستخدم صريح — مايضطرش يكتشفه بعدين
+  const stillMissing = missingNow();
+  if (stillMissing.length)
+    receipts.push(`⚠️ ماتسجّلش: ${stillMissing.map(fmtNum).join("، ")} — لو دي مصاريف/دخل قولّي «سجّلها»`);
+  const skippedAsRepeat = uncoveredAmounts(uncoveredAmounts(mentions, logged), stillMissing);
+  if (skippedAsRepeat.length)
+    receipts.push(`↩️ ماكرّرتش ${skippedAsRepeat.map(fmtNum).join("، ")} — فيه قيد بنفس المبلغ في آخر ٣ أيام. لو جديدة قولّي «سجّلها»`);
 
   // ضمانة: أي تسجيل صوتي فيه سرد حقيقي لازم يبقى يومية — حتى لو الموديل نسي ينده save_journal.
   // النص أصلاً متسجّل في conversations، بس ده بيخلّيه يظهر في "يومياتك" بدل ما يتوزّع ويبان إنه ضاع.
