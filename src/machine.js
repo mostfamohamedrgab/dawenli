@@ -46,6 +46,7 @@ export async function machineProjects(userId) {
           value: Number(d.value) || 0,
           collected: Number(d.collected) || 0,
           monthly: d.billing === "monthly" ? Number(d.monthly) || 0 : 0, // تجديد شهري: قيمة الشهر
+          team: String(d.team || "").slice(0, 120), // موظفين/فريلانسرز على المشروع — لربط مرتباتهم
           note: String(d.note || "").slice(0, 80),
         })),
     };
@@ -106,7 +107,9 @@ export async function syncFinance(userId, financeId) {
     }
 
     const machineId = f.machine_id || `fdw${f.id}`;
-    const category = f.direction === "income" ? "دفعة" : f.category && f.category !== "أخرى" ? f.category : "مصروف";
+    const category = f.direction === "income" ? "دفعة"
+      : /مرتب|راتب|salary/i.test(f.note || "") ? "مرتبات" // مرتب حد من فريق المشروع
+      : f.category && f.category !== "أخرى" ? f.category : "مصروف";
     await call("POST", "/api/finance", {
       id: machineId,
       dt: f.entry_date,
