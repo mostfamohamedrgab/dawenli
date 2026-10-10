@@ -33,6 +33,9 @@ export async function machineProjects(userId) {
   if (Date.now() - cache.at < 60_000) return cache.list;
   try {
     const w = await call("GET", "/api/work");
+    // الموظفين اللي ليهم قاعدة توزيع مرتب (تبويب الفريق) — مرتبهم بيتقسم على مشاريعهم في الماكينة لوحده
+    const nz = (s) => String(s || "").replace(/\s+/g, "");
+    const auto = new Set((w.staff || []).filter((s) => (s.rules || []).length).map((s) => nz(s.name)));
     cache = {
       at: Date.now(),
       list: (w.deals || [])
@@ -47,6 +50,7 @@ export async function machineProjects(userId) {
           collected: Number(d.collected) || 0,
           monthly: d.billing === "monthly" ? Number(d.monthly) || 0 : 0, // تجديد شهري: قيمة الشهر
           team: String(d.team || "").slice(0, 120), // موظفين/فريلانسرز على المشروع — لربط مرتباتهم
+          team_auto: String(d.team || "").split(/[،,]/).map((x) => x.trim()).filter((x) => x && auto.has(nz(x))).join("، "),
           note: String(d.note || "").slice(0, 80),
         })),
     };
