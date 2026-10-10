@@ -54,6 +54,12 @@ export async function machineProjects(userId) {
           note: String(d.note || "").slice(0, 80),
         })),
     };
+    // «مصاريف الشغل العامة» في الماكينة (deal_id = general) كأنها مشروع: اشتراكات الأدوات (Claude/ChatGPT/
+    // Cursor…)، السيرفرات، الدومينات، إعلانات فيسبوك — مصاريف شغل مش تبع مشروع واحد. الماكينة بتخصمها من
+    // صافي الربح (والإعلانات بتتوزّع على مشاريع فيسبوك لوحدها).
+    cache.list.push({ id: "general", title: "🧰 مصاريف الشغل العامة", client: "", stage: "won", currency: "EGP",
+      value: 0, collected: 0, monthly: 0, team: "", team_auto: "", general: true,
+      note: "أدوات واشتراكات (Claude/ChatGPT/Cursor…)، سيرفرات، دومينات، إعلانات" });
   } catch (e) {
     console.error("⚠️ الماكينة مش متاحة (المشاريع):", e.message);
   }
@@ -113,6 +119,7 @@ export async function syncFinance(userId, financeId) {
     const machineId = f.machine_id || `fdw${f.id}`;
     const category = f.direction === "income" ? "دفعة"
       : /مرتب|راتب|salary/i.test(f.note || "") ? "مرتبات" // مرتب حد من فريق المشروع
+      : f.project_id === "general" ? (/إعلان|اعلان|فيس|facebook|ads/i.test(f.note || "") ? "إعلانات" : "أدوات واشتراكات")
       : f.category && f.category !== "أخرى" ? f.category : "مصروف";
     await call("POST", "/api/finance", {
       id: machineId,
