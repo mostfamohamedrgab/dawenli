@@ -45,6 +45,7 @@ export async function machineProjects(userId) {
           currency: d.currency || "EGP",
           value: Number(d.value) || 0,
           collected: Number(d.collected) || 0,
+          monthly: d.billing === "monthly" ? Number(d.monthly) || 0 : 0, // تجديد شهري: قيمة الشهر
           note: String(d.note || "").slice(0, 80),
         })),
     };
