@@ -59,7 +59,7 @@ export async function machineProjects(userId) {
     // صافي الربح (والإعلانات بتتوزّع على مشاريع فيسبوك لوحدها).
     cache.list.push({ id: "general", title: "🧰 مصاريف الشغل العامة", client: "", stage: "won", currency: "EGP",
       value: 0, collected: 0, monthly: 0, team: "", team_auto: "", general: true,
-      note: "أدوات واشتراكات (Claude/ChatGPT/Cursor…)، سيرفرات، دومينات، إعلانات" });
+      note: "اشتراك Claude دايمًا — وأي مصروف شغل عام تاني بعد ما المستخدم يأكّد إنه للشغل" });
   } catch (e) {
     console.error("⚠️ الماكينة مش متاحة (المشاريع):", e.message);
   }
