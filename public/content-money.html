@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>💸 ماليات المحتوى — دوّنلي</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07070c;--card:rgba(24,24,34,.7);--line:rgba(255,255,255,.08);
+    --txt:#eef;--mut:#9a9ab5;--dim:#6a6a86;
+    --pur:#8b5cff;--pur2:#b79bff;--cyan:#37e6d8;--green:#2fe08a;--gold:#ffc24b;--pink:#ff6ba6;--orange:#ff9552;--blue:#4aa8ff;
+    --glow:rgba(139,92,255,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+  a{color:inherit;text-decoration:none}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .osbar{border-bottom:1px solid var(--line);background:rgba(10,10,16,.7);backdrop-filter:blur(8px);position:sticky;top:0;z-index:20}
+  .osbar .in{max-width:1100px;margin:0 auto;padding:11px 22px;display:flex;align-items:center;gap:14px}
+  .logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--green),#12b46a);display:grid;place-items:center;font-weight:900;font-size:16px;box-shadow:0 4px 18px rgba(47,224,138,.3)}
+  .osbar b{font-size:15px}
+  .back{margin-inline-start:auto;font-size:12.5px;color:var(--mut);border:1px solid var(--line);border-radius:100px;padding:6px 14px;transition:.15s}
+  .back:hover{border-color:var(--pur2);color:var(--txt)}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 22px 70px}
+  h1{margin:0 0 4px;font-size:28px;font-weight:900;letter-spacing:-.5px;
+    background:linear-gradient(100deg,#fff 20%,var(--green) 70%,var(--cyan));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:20px}
+
+  /* ملخّص */
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+  .kpi .l{font-size:12.5px;color:var(--mut)}
+  .kpi .v{font-size:30px;font-weight:900;margin-top:4px}
+  .kpi .v small{font-size:14px;font-weight:700;color:var(--dim);margin-inline-start:4px}
+  .kpi.inc .v{color:var(--green)} .kpi.exp .v{color:var(--pink)} .kpi.net .v{color:var(--cyan)}
+  @media(max-width:640px){.kpis{grid-template-columns:1fr}}
+
+  /* تقارير */
+  .reports{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:26px}
+  @media(max-width:760px){.reports{grid-template-columns:1fr}}
+  .rep{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+  .rep h3{margin:0 0 12px;font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px}
+  .repbar{margin-bottom:10px}
+  .repbar .top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px}
+  .repbar .top .amt{font-weight:800}
+  .repbar .track{height:8px;border-radius:100px;background:rgba(255,255,255,.06);overflow:hidden}
+  .repbar .track>i{display:block;height:100%;border-radius:100px}
+  .inc .track>i{background:linear-gradient(90deg,var(--green),var(--cyan))}
+  .exp .track>i{background:linear-gradient(90deg,var(--pink),var(--orange))}
+
+  /* إضافة */
+  .addbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:24px}
+  .addbar select,.addbar input{background:#0c0c14;border:1px solid var(--line);border-radius:9px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none}
+  .addbar select:focus,.addbar input:focus{border-color:var(--cyan)}
+  .addbar .amt{width:110px}
+  .addbar .desc{flex:1;min-width:150px}
+  .btn{background:linear-gradient(135deg,var(--green),#12b46a);color:#042;border:none;border-radius:9px;font-family:inherit;font-weight:800;font-size:13px;padding:9px 16px;cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+
+  /* أقسام */
+  .section{margin-bottom:26px}
+  .section>h2{font-size:17px;font-weight:900;margin:0 0 12px;display:flex;align-items:center;gap:9px}
+  .section.inc>h2{color:var(--green)} .section.exp>h2{color:var(--pink)}
+  .section>h2 .tot{margin-inline-start:auto;font-family:'JetBrains Mono',monospace}
+  .cat{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden}
+  .cathd{display:flex;align-items:center;gap:10px;padding:13px 16px;cursor:pointer;user-select:none}
+  .cathd:hover{background:rgba(255,255,255,.03)}
+  .cathd .name{font-weight:800;font-size:14px}
+  .cathd .cnt{font-size:11px;color:var(--dim);background:rgba(255,255,255,.06);border-radius:100px;padding:2px 9px}
+  .cathd .sum{margin-inline-start:auto;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px}
+  .cathd .arw{color:var(--dim);transition:.2s;font-size:12px}
+  .cat.open .arw{transform:rotate(90deg)}
+  .items{display:none;border-top:1px solid var(--line)}
+  .cat.open .items{display:block}
+  .item{display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04)}
+  .item:last-child{border-bottom:none}
+  .item .d{flex:1;min-width:0}
+  .item .dt{font-size:11px;color:var(--dim);font-family:'JetBrains Mono',monospace}
+  .item .a{font-family:'JetBrains Mono',monospace;font-weight:800;min-width:72px;text-align:end}
+  .section.inc .item .a{color:var(--green)} .section.exp .item .a{color:var(--pink)}
+  .item .x{background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;padding:2px 4px}
+  .item .x:hover{color:var(--pink)}
+  .empty{color:var(--dim);font-size:13px;padding:20px;text-align:center}
+  /* تجميع فرعي بالبراند */
+  .brand{border-bottom:1px solid rgba(255,255,255,.04)}
+  .brand:last-child{border-bottom:none}
+  .brandhd{display:flex;align-items:center;gap:10px;padding:10px 16px 10px 30px;cursor:pointer;user-select:none;font-size:13px}
+  .brandhd:hover{background:rgba(255,255,255,.03)}
+  .brandhd .name{font-weight:700}
+  .brandhd .cnt{font-size:10px;color:var(--dim);background:rgba(255,255,255,.06);border-radius:100px;padding:2px 8px}
+  .brandhd .sum{margin-inline-start:auto;font-family:'JetBrains Mono',monospace;font-weight:800}
+  .section.inc .brandhd .sum{color:var(--green)} .section.exp .brandhd .sum{color:var(--pink)}
+  .brandhd .arw{color:var(--dim);transition:.2s;font-size:11px}
+  .brand.open .arw{transform:rotate(90deg)}
+  .bitems{display:none;background:rgba(0,0,0,.16)}
+  .brand.open .bitems{display:block}
+  .bitems .item{padding-inline-start:36px}
+</style>
+  <link rel="stylesheet" href="/w-mobile.css">
+  <link rel="icon" href="/assets/logo/dawwenli-mark.svg" type="image/svg+xml">
+</head>
+<body>
+  <div class="osbar"><div class="in">
+    <div class="logo">💸</div><b>الماليات</b>
+    <a class="back" href="/projects">💼 المشاريع</a>
+    <a class="back" href="/" style="margin-inline-start:0">← رجوع لدوّنلي</a>
+  </div></div>
+  <div class="wrap">
+    <h1>💸 ماليات المحتوى</h1>
+    <div class="sub">دخل ومصاريف المحتوى بس (رعايات، ريفيوهات، مونتاج، معدّات…) — مفصولة عن مشاريع البرمجة. بالدولار، والجنيه متحوّل بسعر ٥٠. أي بند هنا بيتسجّل في «الفلوس» في دوّنلي كمان (إلا سجل نوشن القديم).</div>
+    <div id="app"><div class="empty">بحمّل…</div></div>
+  </div>
+
+<script>
+const $=s=>document.querySelector(s);
+const money=n=>(Math.round((n||0)*100)/100).toLocaleString('en-US');
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let DATA=null;
+
+function load(){
+  fetch('/api/w/content').then(r=>r.json()).then(d=>{DATA=d;draw();})
+    .catch(()=>{$('#app').innerHTML='<div class="empty">مقدرتش أجيب الماليات — اتأكد إن السيرفر شغّال.</div>';});
+}
+
+function groupBy(rows,kind){
+  const g={};
+  rows.filter(r=>r.kind===kind).forEach(r=>{(g[r.category]=g[r.category]||[]).push(r);});
+  // ترتيب الفئات بالإجمالي تنازلي
+  return Object.entries(g).map(([cat,items])=>({
+    cat, items:items.sort((a,b)=>(b.amount||0)-(a.amount||0)),
+    total:items.reduce((s,x)=>s+(x.amount||0),0)
+  })).sort((a,b)=>b.total-a.total);
+}
+
+function reportBars(groups,total,cls){
+  return groups.map(g=>{
+    const pct=total?Math.round(g.total/total*100):0;
+    return `<div class="repbar"><div class="top"><span>${esc(g.cat)}</span>`
+      +`<span class="amt">${money(g.total)} <span style="color:var(--dim);font-weight:600">${pct}%</span></span></div>`
+      +`<div class="track"><i style="width:${pct}%"></i></div></div>`;
+  }).join('') || '<div class="empty" style="padding:8px">مفيش بيانات</div>';
+}
+
+// استخراج اسم البراند من الملاحظة (لتجميع دفعات نفس الجهة)
+function brandKey(note){
+  let s=(note||'—').trim();
+  s=s.split(/\s[—–-]\s|—|–/)[0].trim();                    // شيل وصف الدفعة بعد الشرطة
+  s=s.replace(/^(من|كسب من|تعاون مع|التعاون مع|كسب|مع)\s+/,'').trim();
+  s=s.replace(/\s*(الدفعة|دفعة|دفعه)\s*(الأولى|الثانية|التانية|الثانيه|أولى|اولي|تانية|تانيه).*$/,'').trim();
+  s=s.replace(/\(.*?\)/g,'').trim();
+  if(!s) s=(note||'—').trim();
+  const low=s.toLowerCase();
+  const alias=[[/whacka|waka/,'Waka'],[/ultahost|ultrahost|hostinger/,'Hostinger'],
+    [/genspark|جينيس/,'Genspark'],[/verdant|verdent/,'Verdante'],
+    [/aisa/,'Aisa'],[/creao/,'Creao'],[/kimi/,'Kimi'],[/minimax/,'minimax']];
+  for(const [re,name] of alias){ if(re.test(low)||re.test(s)) return name; }
+  return s;
+}
+function itemRow(it){
+  return `<div class="item"><span class="a">${money(it.amount)}</span>`
+    +`<span class="d">${esc(it.note||'—')}</span><span class="dt">${it.dt||''}</span>`
+    +`<button class="x" title="امسح" onclick="del('${it.id}')">🗑️</button></div>`;
+}
+function catBlock(g,kindCls){
+  // تجميع فرعي بالبراند
+  const bg={}; g.items.forEach(it=>{const k=brandKey(it.note);(bg[k]=bg[k]||[]).push(it);});
+  const brands=Object.entries(bg).map(([b,items])=>({
+    b, items:items.sort((a,b)=>(a.dt<b.dt?1:-1)),
+    total:items.reduce((s,x)=>s+(x.amount||0),0)
+  })).sort((a,b)=>b.total-a.total);
+  const inner=brands.map(br=>{
+    if(br.items.length===1) return itemRow(br.items[0]);   // دفعة واحدة → بند مباشر
+    return `<div class="brand"><div class="brandhd" onclick="this.parentNode.classList.toggle('open')">`
+      +`<span class="arw">▶</span><span class="name">${esc(br.b)}</span>`
+      +`<span class="cnt">${br.items.length} دفعات</span>`
+      +`<span class="sum">${money(br.total)}</span></div>`
+      +`<div class="bitems">${br.items.map(itemRow).join('')}</div></div>`;
+  }).join('');
+  return `<div class="cat">`
+    +`<div class="cathd" onclick="this.parentNode.classList.toggle('open')">`
+    +`<span class="arw">▶</span><span class="name">${esc(g.cat)}</span>`
+    +`<span class="cnt">${g.items.length} بند · ${brands.length} جهة</span>`
+    +`<span class="sum">${money(g.total)}</span></div>`
+    +`<div class="items">${inner}</div></div>`;
+}
+
+function draw(){
+  const t=DATA.totals, rows=DATA.rows;
+  const inc=groupBy(rows,'income'), exp=groupBy(rows,'expense');
+  const cats=[...new Set(rows.map(r=>r.category))];
+  let h='';
+  // ملخّص
+  h+=`<div class="kpis">`
+    +`<div class="kpi inc"><div class="l">الدخل</div><div class="v">${money(t.income)}<small>$</small></div></div>`
+    +`<div class="kpi exp"><div class="l">المصاريف</div><div class="v">${money(t.expense)}<small>$</small></div></div>`
+    +`<div class="kpi net"><div class="l">الصافي</div><div class="v">${money(t.net)}<small>$</small></div></div></div>`;
+  // تقارير
+  h+=`<div class="reports">`
+    +`<div class="rep inc"><h3>📈 الدخل حسب الفئة</h3>${reportBars(inc,t.income)}</div>`
+    +`<div class="rep exp"><h3>📉 المصاريف حسب الفئة</h3>${reportBars(exp,t.expense)}</div></div>`;
+  // إضافة
+  h+=`<div class="addbar">`
+    +`<select id="a-kind"><option value="income">＋ دخل</option><option value="expense">－ مصروف</option></select>`
+    +`<input id="a-cat" class="desc" list="cats" placeholder="الفئة (رعاية/معدّات...)" style="flex:none;width:180px">`
+    +`<input id="a-amt" class="amt" type="number" placeholder="المبلغ $">`
+    +`<input id="a-dt" type="date">`
+    +`<input id="a-desc" class="desc" placeholder="الوصف (مين/إيه)">`
+    +`<button class="btn" onclick="add()">＋ إضافة بند</button>`
+    +`<datalist id="cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>`;
+  // قسم الدخل
+  h+=`<div class="section inc"><h2>📈 الدخل <span class="tot">${money(t.income)}</span></h2>`
+    +(inc.map(g=>catBlock(g)).join('')||'<div class="empty">مفيش دخل مسجّل</div>')+`</div>`;
+  // قسم المصاريف
+  h+=`<div class="section exp"><h2>📉 المصاريف <span class="tot">${money(t.expense)}</span></h2>`
+    +(exp.map(g=>catBlock(g)).join('')||'<div class="empty">مفيش مصاريف مسجّلة</div>')+`</div>`;
+  $('#app').innerHTML=h;
+  const dt=$('#a-dt'); if(dt)dt.value=new Date().toISOString().slice(0,10);
+}
+
+function add(){
+  const g=id=>document.getElementById(id);
+  const body={kind:g('a-kind').value,category:g('a-cat').value.trim(),
+    amount:parseFloat(g('a-amt').value||'0'),dt:g('a-dt').value,note:g('a-desc').value.trim()};
+  if(!body.amount){alert('اكتب المبلغ');return;}
+  if(!body.category){alert('اكتب الفئة');return;}
+  fetch('/api/w/content',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(r=>r.json()).then(load);
+}
+function del(id){
+  if(!confirm('تمسح البند ده؟'))return;
+  fetch('/api/w/content?id='+encodeURIComponent(id),{method:'DELETE'}).then(r=>r.json()).then(r=>{if(r.ok===false)alert(r.error||'معرفتش أمسح');load();});
+}
+load();
+</script>
+</body>
+</html>

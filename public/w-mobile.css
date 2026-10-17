@@ -1,0 +1,83 @@
+/* ═══════════════════════════════════════════════════════════════
+   ماكينة المحتوى — طبقة الموبايل
+   بتتحمّل بعد ستايل كل صفحة، فبتغلبه من غير ما نلمس الصفحات نفسها.
+   السبورة (board.html) ليها معالجة خاصة جوّاها — مش بتحمّل الملف ده.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── تابلت وتحت: الجريدات الرباعية/الثلاثية تبقى عمودين ───────────── */
+@media (max-width: 900px) {
+  .mt, .g3, .g4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .board { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* ── موبايل ───────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+
+  /* مفيش تمرير أفقي أبدًا */
+  html, body { overflow-x: hidden !important; max-width: 100%; }
+
+  /* هوامش الحاويات تضيق — الشاشة صغيرة، الكلام أهم من الفراغ */
+  .wrap, .in, .page { padding-left: 14px !important; padding-right: 14px !important; }
+
+  /* كل الجريدات تبقى عمود واحد */
+  .grid, .mt, .g2, .g3, .g4, .kpis, .reports, .board, .ch-grid, .row {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* الجداول تتزحلق جوّه نفسها بدل ما تكسّر الصفحة */
+  table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* أهداف لمس محترمة (٤٤px هو المعيار) */
+  button, .btn, .tbtn, .calbtn, .fx, select { min-height: 42px; }
+  .chip, .bitem { min-height: 44px; }
+
+  /* ١٦px على الحقول — أقل من كده سفاري بيزوّم لوحده وقت الكتابة */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* عناصر كانت بعرض ثابت على الديسكتوب */
+  .amt { width: auto !important; min-width: 84px; }
+  .pk { width: auto !important; min-width: 118px; }
+  .bar, .chip { max-width: none !important; }
+  .desc, .step { min-width: 0 !important; }
+
+  /* قوائم منسدلة تاخد عرض الشاشة بدل ما تطلع بره */
+  .menu {
+    min-width: 0 !important;
+    width: calc(100vw - 28px) !important;
+    inset-inline-start: 8px !important;
+    max-height: 60vh; overflow: auto;
+  }
+
+  /* شريط التنقّل يتزحلق أفقي بدل ما يتكوّم */
+  nav {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  nav::-webkit-scrollbar { display: none; }
+  nav > * { flex: none; }
+
+  /* شريط الفلاتر كمان */
+  .filterbar { flex-wrap: wrap; gap: 8px; }
+
+  /* عناوين أهدى شوية */
+  h1 { font-size: 22px !important; line-height: 1.35 !important; }
+  h2 { font-size: 18px !important; }
+  .stitle { font-size: 17px !important; }
+  .osbar .in { padding: 9px 14px !important; gap: 10px !important; }
+
+  /* صور/فيديو مبتطلعش بره */
+  img, video, canvas, iframe { max-width: 100%; height: auto; }
+
+  /* المودالات تاخد الشاشة */
+  .modal, .dlg, .sheet, .popup { width: calc(100vw - 20px) !important; max-width: none !important; }
+}
+
+/* ── موبايل ضيّق ─────────────────────────────────────────────────── */
+@media (max-width: 420px) {
+  .kpis, .fin-kpis { gap: 8px !important; }
+  .wrap, .in, .page { padding-left: 11px !important; padding-right: 11px !important; }
+  .osbar .ver, .osbar .right .mono { display: none; }
+}

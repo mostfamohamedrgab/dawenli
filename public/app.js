@@ -315,7 +315,6 @@ function gotoTab(tab) {
   if (tab === "habits") renderHabitsPage();
   if (tab === "goals") renderGoalsPage();
   if (tab === "finances") renderFinancesPage();
-  if (tab === "work") window.renderWorkPage?.();
   if (tab === "ideas") renderIdeasPage();
   if (tab === "tasks") renderTasksPage();
   if (tab === "assets") renderAssetsPage();
@@ -3449,7 +3448,6 @@ async function loadAll(rerender = true) {
   if (active === "habits") renderHabitsPage();
   if (active === "goals") renderGoalsPage();
   if (active === "finances") renderFinancesPage();
-  if (active === "work") window.renderWorkPage?.();
   if (active === "ideas") renderIdeasPage();
   if (active === "tasks") renderTasksPage();
   if (active === "assets") renderAssetsPage();

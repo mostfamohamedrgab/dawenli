@@ -1,5 +1,5 @@
 /* دوّنلي — Service Worker (PWA: تثبيت + أوفلاين خفيف + إشعارات) */
-const CACHE = "dawenli-v50";
+const CACHE = "dawenli-v51";
 // أصول ثابتة آمنة للتخزين (مش بيانات مستخدم).
 const SHELL = [
   "/style.css",
@@ -32,7 +32,7 @@ self.addEventListener("fetch", (e) => {
   // التنقّل (الصفحات) + الكود/الستايل (app.js, style.css): الشبكة الأول عشان أي
   // deploy يظهر فورًا، ولو النت قاطع نرجع آخر نسخة متخزّنة. (الـ stale-while-revalidate
   // كان بيعرض ستايل قديم بعد كل نشر.)
-  if (req.mode === "navigate" || url.pathname === "/style.css" || url.pathname === "/app.js" || url.pathname === "/work.js") {
+  if (req.mode === "navigate" || url.pathname === "/style.css" || url.pathname === "/app.js") {
     const isNav = req.mode === "navigate";
     e.respondWith(
       fetch(req)

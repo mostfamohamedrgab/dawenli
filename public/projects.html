@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>💼 المشاريع — دوّنلي</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07070c;--bg2:#0c0c14;--card:rgba(24,24,34,.7);--card2:rgba(255,255,255,.04);--line:rgba(255,255,255,.08);
+    --txt:#eef;--mut:#9a9ab5;--dim:#6a6a86;
+    --pur:#8b5cff;--pur2:#b79bff;--cyan:#37e6d8;--green:#2fe08a;--gold:#ffc24b;--pink:#ff6ba6;--orange:#ff9552;--blue:#4aa8ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+  a{color:inherit;text-decoration:none}
+  /* عزل اتجاه الأرقام اللاتينية — من غير display:inline-block، ده بيطلّع الـ<td> برّه الجدول */
+  .mono{font-family:'JetBrains Mono',monospace;direction:ltr;unicode-bidi:isolate}
+  span.mono{display:inline-block}
+  .osbar{border-bottom:1px solid var(--line);background:rgba(10,10,16,.7);backdrop-filter:blur(8px);position:sticky;top:0;z-index:20}
+  .osbar .in{max-width:1240px;margin:0 auto;padding:11px 22px;display:flex;align-items:center;gap:14px}
+  .logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--gold),var(--orange));display:grid;place-items:center;font-size:16px}
+  .osbar b{font-size:15px}
+  .back{margin-inline-start:auto;font-size:12.5px;color:var(--mut);border:1px solid var(--line);border-radius:100px;padding:6px 14px}
+  .back:hover{border-color:var(--pur2);color:var(--txt)}
+  .wrap{max-width:1240px;margin:0 auto;padding:24px 22px 90px}
+  h1{margin:0 0 4px;font-size:28px;font-weight:900;letter-spacing:-.5px;
+    background:linear-gradient(100deg,#fff 20%,var(--gold) 70%,var(--orange));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:20px}
+
+  .kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:18px}
+  /* هوية فيسبوك — أزرق #1877F2 + لوجو f الحقيقي، عشان تتميّز من أول نظرة */
+  .kpi.fb{background:linear-gradient(160deg,rgba(24,119,242,.26),rgba(24,119,242,.07) 70%);border-color:rgba(24,119,242,.55);position:relative;overflow:hidden}
+  .kpi.fb::after{content:'';position:absolute;inset:auto auto -18px -14px;width:74px;height:74px;opacity:.10;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M24 12.07C24 5.41 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.5c-1.5 0-1.96.93-1.96 1.89v2.26h3.32l-.53 3.5h-2.8V24C19.62 23.1 24 18.1 24 12.07'/%3E%3C/svg%3E") no-repeat center/contain;pointer-events:none}
+  .kpi.fb .l{color:#cfe2ff;display:flex;align-items:center;gap:6px;font-weight:700}
+  .kpi.fb .v{color:#fff}.kpi.fb2 .v{color:var(--green)}
+  .kpi.fb .s{color:#8fb4ea}
+  .fbi{width:16px;height:16px;flex:0 0 16px;display:inline-block;vertical-align:-3px}
+  .kpi.ed{cursor:pointer;position:relative}
+  .kpi.ed:hover{border-color:var(--blue)}
+  .kpi.ed .pen{position:absolute;top:9px;left:11px;font-size:11px;opacity:.55}
+  .fxo{font-size:10.5px;color:var(--dim);font-weight:500}
+  .xst{font-size:11px;padding:2px 8px;border-radius:99px;cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.05);color:var(--dim)}
+  .xst.wip{background:rgba(255,194,75,.13);color:var(--gold)} .xst.done{background:rgba(52,211,153,.13);color:var(--green)}
+  .kpis.k3{grid-template-columns:repeat(3,1fr)}
+  .exp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px}
+  .exp-box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+  .exp-box b{font-size:13px;display:block;margin-bottom:6px}
+  @media(max-width:700px){.exp-grid{grid-template-columns:1fr}.kpis.k3{grid-template-columns:1fr}}
+  .kpi.drill{cursor:pointer;position:relative}
+  .kpi.drill:hover{border-color:var(--blue)}
+  .kpi.drill .pen{position:absolute;top:9px;left:11px;font-size:11px;opacity:.45}
+  .dtw{max-height:62vh;overflow:auto;margin-top:4px}
+  .dt{width:100%;border-collapse:collapse}
+  .dt td{padding:7px 9px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
+  .dt td.num{text-align:left;white-space:nowrap;font-weight:700}
+  .dt td.ttl{font-weight:700}
+  .dt .s{font-size:10.5px;color:var(--dim);margin-top:1px}
+  .dt tr.dtsum td{border-top:2px solid var(--line);border-bottom:none;font-weight:900;font-size:14.5px;padding-top:9px}
+  .kpi input{width:100%;box-sizing:border-box;background:var(--card2);border:1px solid var(--blue);border-radius:8px;color:var(--txt);font:900 19px 'JetBrains Mono',monospace;padding:3px 7px;margin-top:3px}
+  .kpi .s{font-size:10.5px;color:var(--dim);margin-top:2px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px}
+  .kpi .l{font-size:11.5px;color:var(--mut)}
+  .kpi .v{font-size:21px;font-weight:900;margin-top:3px}
+  .kpi.a .v{color:var(--gold)}.kpi.b .v{color:var(--blue)}.kpi.c .v{color:var(--green)}
+  .kpi.d .v{color:var(--pink)}.kpi.e .v{color:var(--cyan)}.kpi.f .v{color:var(--orange)}
+  @media(max-width:1250px){.kpis{grid-template-columns:repeat(4,1fr)}}
+  @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}}
+
+  .alert{background:rgba(255,107,166,.1);border:1px solid var(--pink);border-radius:13px;padding:12px 16px;margin-bottom:18px;font-size:13.5px;font-weight:700;color:var(--pink)}
+
+  .barrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  h2{margin:26px 0 12px;font-size:17px;font-weight:900;display:flex;align-items:center;gap:9px}
+  h2 .n{font-size:12px;font-weight:700;color:var(--dim);background:var(--card2);border-radius:100px;padding:2px 9px}
+  .btn{background:linear-gradient(135deg,var(--gold),var(--orange));color:#221500;border:none;border-radius:9px;font-family:inherit;font-weight:800;font-size:13px;padding:9px 16px;cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.g{background:linear-gradient(135deg,var(--green),#12b46a);color:#042}
+  .btn.o{background:none;border:1px solid var(--line);color:var(--mut)}
+  .btn.o:hover{border-color:var(--pur2);color:var(--txt)}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-inline-start:auto}
+  .tab{font-size:12px;border:1px solid var(--line);border-radius:100px;padding:5px 12px;cursor:pointer;color:var(--mut);background:none;font-family:inherit}
+  .tab.on{border-color:var(--gold);color:var(--gold);background:rgba(255,194,75,.08)}
+
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  th{font-size:11.5px;color:var(--dim);font-weight:700;text-align:right;padding:10px 12px;background:rgba(255,255,255,.03);white-space:nowrap}
+  td{padding:11px 12px;border-top:1px solid var(--line);font-size:13px;vertical-align:top}
+  tr.d{cursor:pointer}
+  tr.d:hover td{background:rgba(255,255,255,.025)}
+  .ttl{font-weight:800}
+  .cl{font-size:11.5px;color:var(--mut);margin-top:2px}
+  .st{font-size:11px;font-weight:800;border-radius:100px;padding:3px 10px;white-space:nowrap;display:inline-block}
+  .num{font-weight:800;white-space:nowrap;text-align:right}
+  .pos{color:var(--green)}.neg{color:var(--pink)}.zero{color:var(--dim)}
+  .nx{font-size:12px;color:var(--mut)}
+  .nx b{color:var(--txt);font-weight:700}
+  .nx.late{color:var(--pink)}
+  .nx.late b{color:var(--pink)}
+  .empty{color:var(--dim);font-size:13px;padding:22px;text-align:center;background:var(--card);border:1px dashed var(--line);border-radius:14px}
+
+  /* كروت المشاريع */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+  .pcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 17px;cursor:pointer;transition:.15s;display:flex;flex-direction:column;gap:12px}
+  .pcard:hover{border-color:var(--pur2);transform:translateY(-1px)}
+  .pcard.op{border-color:var(--gold)}
+  .pc-top{display:flex;align-items:flex-start;gap:10px}
+  .pc-drag{cursor:grab;color:var(--dim);font-size:17px;line-height:1;padding:2px 3px;user-select:none;touch-action:none}
+  .pc-drag:hover{color:var(--blue)}
+  .pcard.sort-ghost{opacity:.35}
+  .ordbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin:2px 0 10px}
+  .pc-logo{width:44px;height:44px;border-radius:11px;object-fit:cover;background:#0d0d16;border:1px solid var(--line);flex:0 0 44px}
+  .pc-src{font-size:10.5px;font-weight:700;color:#fff;background:#1877F2;border-radius:100px;padding:2px 8px;margin-top:5px;display:inline-flex;align-items:center;gap:4px}
+  .pc-ttl{font-weight:800;font-size:15.5px;line-height:1.35;flex:1}
+  .pc-cl{font-size:11.5px;color:var(--mut);margin-top:3px}
+  .pc-badge{font-size:10.5px;font-weight:800;border-radius:100px;padding:3px 9px;white-space:nowrap}
+  .pc-nums{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .pc-n{background:var(--card2);border-radius:10px;padding:8px 10px}
+  .pc-n .l{font-size:10.5px;color:var(--mut)}
+  .pc-n .v{font-size:16px;font-weight:800;margin-top:2px;white-space:nowrap}
+  .pc-n .v small{font-size:10px;color:var(--dim);font-weight:700}
+  .pc-det{grid-column:1/-1;margin-top:2px;border-top:1px solid var(--line);padding-top:12px}
+  /* فلتر الفترة */
+  .pbar{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:14px}
+  .pbar .lbl{font-size:12px;color:var(--dim);font-weight:700}
+  .pbar input[type=date],.pbar select,.tabs select{background:var(--card2);border:1px solid var(--line);border-radius:9px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 8px}
+  .tabs select option{background:#12121b}
+  /* المصاريف العامة */
+  .gen{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:18px}
+  .gen.op{border-color:var(--pink)}
+  .gen-h{display:flex;align-items:center;gap:9px;cursor:pointer;flex-wrap:wrap}
+  .gen-h b{font-size:14.5px}
+  .gen-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+  @media(max-width:900px){.gen-cards{grid-template-columns:repeat(2,1fr)}}
+  .gc{background:var(--card2);border-radius:12px;padding:10px 12px}
+  .gc .l{font-size:11px;color:var(--mut)}
+  .gc .v{font-size:19px;font-weight:900;margin-top:2px;white-space:nowrap}
+  .gc .s{font-size:10.5px;color:var(--dim);margin-top:3px}
+  .gc.fb{background:rgba(74,168,255,.09)}.gc.fb .v{color:var(--blue)}
+  .when{font-size:10.5px;color:var(--dim);white-space:nowrap}
+  .pc-dates{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--dim)}
+  .pc-exp{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px;margin:9px 0 7px;padding:7px 10px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+  .pc-exp .mv-n{margin-inline-start:auto;color:var(--blue);font-size:11px}
+  .pc-dates b{color:var(--mut);font-weight:700}
+  /* لوحة الحركات جوّه المشروع */
+  .det td{background:rgba(0,0,0,.22);padding:14px 16px}
+  .mv{display:flex;align-items:center;gap:10px;font-size:12.5px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+  .mv:last-child{border:none}
+  .mv .k,td .k{font-size:10.5px;font-weight:800;border-radius:100px;padding:2px 8px}
+  .mv .k.income,td .k.income{background:rgba(47,224,138,.14);color:var(--green)}
+  .mv .k.expense,td .k.expense{background:rgba(255,107,166,.14);color:var(--pink)}
+  .mv .cat{font-weight:700}
+  .mv .nt{color:var(--dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mv .x{color:var(--dim);cursor:pointer;font-size:14px;padding:0 4px}
+  .mv .x:hover{color:var(--pink)}
+  .addmv{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:12px}
+  input,select,textarea{background:var(--bg2);border:1px solid var(--line);border-radius:9px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none}
+  input:focus,select:focus,textarea:focus{border-color:var(--gold)}
+  .addmv input[type=number]{width:105px}
+  .addmv .cat2{width:130px}
+  .addmv .nt2{flex:1;min-width:130px}
+
+  /* مودال */
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.66);backdrop-filter:blur(3px);z-index:60;display:none;align-items:flex-start;justify-content:center;padding:40px 18px;overflow:auto}
+  .ov.on{display:flex}
+  .md{background:#12121c;border:1px solid var(--line);border-radius:18px;width:100%;max-width:560px;padding:22px 24px}
+  .md h3{margin:0 0 16px;font-size:18px;font-weight:900}
+  .fld{margin-bottom:13px}
+  .fld label{display:block;font-size:11.5px;color:var(--mut);margin-bottom:5px;font-weight:700}
+  .fld input,.fld select,.fld textarea{width:100%}
+  .fld textarea{resize:vertical;min-height:62px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .acts{display:flex;gap:9px;margin-top:18px;align-items:center}
+  .acts .del{margin-inline-start:auto;background:none;border:1px solid rgba(255,107,166,.4);color:var(--pink);border-radius:9px;font-family:inherit;font-weight:700;font-size:12.5px;padding:8px 14px;cursor:pointer}
+  .hint{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.5}
+.ex-hint{font-size:10.5px;color:var(--gold);margin-top:2px}
+.extras{margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed rgba(255,255,255,.08)}
+.mv .k.ex{background:rgba(255,194,75,.14);color:var(--gold)}
+</style>
+  <link rel="stylesheet" href="/w-mobile.css">
+  <link rel="icon" href="/assets/logo/dawwenli-mark.svg" type="image/svg+xml">
+</head>
+<body>
+  <div class="osbar"><div class="in">
+    <div class="logo">💼</div><b>الشغل</b>
+    <a class="back" href="/content" style="margin-inline-start:auto">💸 ماليات المحتوى</a>
+    <a class="back" href="/" style="margin-inline-start:0">← رجوع لدوّنلي</a>
+  </div></div>
+
+  <div class="wrap">
+    <h1>💼 العملاء والمشاريع</h1>
+    <div class="sub">مشاريع البرمجة بس — كل مشروع بمدفوعاته ومصاريفه، والمتبقي بيتحسب لوحده. أي دفعة هنا بتتسجّل في «الفلوس» في دوّنلي كمان. (رعايات ومصاريف القناة في «💸 ماليات المحتوى».)</div>
+    <div id="app"><div class="empty">بحمّل…</div></div>
+  </div>
+
+  <div class="ov" id="ov"><div class="md" id="md"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money=n=>(Math.round((n||0)*100)/100).toLocaleString('en-US');
+const today=()=>new Date().toISOString().slice(0,10);
+const sign=n=>n>0?'pos':(n<0?'neg':'zero');
+
+const ST={lead:['مهتم','var(--dim)'],meeting:['ميتنج','var(--blue)'],proposal:['عرض','var(--gold)'],
+          won:['مكسوب','var(--green)'],delivering:['بيتسلّم','var(--cyan)'],delivered:['اتسلّم','var(--green)'],
+          lost:['ضاع','var(--pink)']};
+const SRC=['إعلان','القناة','إحالة','معرفة شخصية','لينكدإن','تاني'];
+
+let D=null, FIN=[], FILTER='all', OPEN=null, VIEW='deals', PER='all', PFROM='', PTO='', SRCF='', LOGK='all';
+
+/* ── الفترة: كل الأرقام بتتحسب على تاريخ الدفعة/المصروف الفعلي (dt) ── */
+const ymd=d=>d.toISOString().slice(0,10);
+function perRange(){
+  const n=new Date(), y=n.getFullYear(), m=n.getMonth();
+  if(PER==='month') return [ymd(new Date(Date.UTC(y,m,1))), ymd(new Date(Date.UTC(y,m+1,0)))];
+  if(PER==='last')  return [ymd(new Date(Date.UTC(y,m-1,1))), ymd(new Date(Date.UTC(y,m,0)))];
+  if(PER==='30')    return [ymd(new Date(Date.now()-29*864e5)), today()];
+  if(PER==='year')  return [y+'-01-01', y+'-12-31'];
+  if(PER==='custom')return [PFROM||'0000', PTO||'9999'];
+  return null;
+}
+function inPer(dt){const r=perRange(); if(!r)return true; dt=(dt||'').slice(0,10); return dt>=r[0]&&dt<=r[1];}
+const GEN='general';
+// لوجو فيسبوك الرسمي (دايرة زرقا + f بيضا)
+const FBI=`<svg class="fbi" viewBox="0 0 24 24" aria-label="Facebook"><circle cx="12" cy="12" r="12" fill="#1877F2"/><path fill="#fff" d="M16.67 15.47l.53-3.47h-3.33V9.75c0-.95.47-1.88 1.96-1.88h1.51V4.92s-1.37-.24-2.68-.24c-2.74 0-4.53 1.66-4.53 4.67V12H7.08v3.47h3.05V24a12.1 12.1 0 003.74 0v-8.53h2.8z"/></svg>`;
+const FBW=FBI.replace('fill="#1877F2"','fill="#fff"').replace('<path fill="#fff"','<path fill="#1877F2"');
+const LIVE=['won','delivering','delivered'];
+const isFb=src=>/فيس|face|fb|meta|إعلان|اعلان/i.test(src||'');
+const isAd=f=>/إعلان|اعلان|فيس|facebook|meta|ads/i.test((f.category||'')+' '+(f.note||''));
+const dStart=d=>d.started_at||d.deposit_at||(d.created_at||'').slice(0,10);
+function fmtD(s){ if(!s)return '—'; const [y,m,d]=s.slice(0,10).split('-'); return `${+d}/${+m}/${y}`; }
+function fmtAt(s){ if(!s)return ''; return fmtD(s)+(s.length>11?' '+s.slice(11,16):''); }
+
+// ===== تفاصيل كروت الإجماليات (دوس على أي كارت يفتح المشاريع اللي مكوّناه) =====
+const LIVE_ST=['won','delivering','delivered'];
+// الإجماليات بالجنيه — حركة على مشروع بالدولار بتتحوّل بسعر السيرفر (D.fx)
+function fxOf(cur){ return (D&&D.fx&&D.fx[(cur||'EGP').toUpperCase()])||1; }
+const _SYM={USD:'$',SAR:' ريال',AED:' درهم',EUR:'€'};
+// العرض دايمًا بالجنيه: مبلغ بعملة المشروع → جنيه بالسعر، والمبلغ الأصلي صغير جنبه
+function egp(n,cur,neg){ const c=(cur||'EGP').toUpperCase(); const v=(+n||0)*fxOf(c);
+  return `${neg?'-':''}${money(v)} <small>ج</small>`+(c!=='EGP'&&+n?`<span class="fxo"> (${money(n)}${_SYM[c]||' '+c})</span>`:''); }
+function fxAmt(f){ const d=(D.deals||[]).find(x=>x.id===f.deal_id); return (+f.amount||0)*fxOf(d&&d.currency); }
+function _fxNote(curs){ const o=[...new Set(curs.filter(c=>c&&c!=='EGP'))];
+  return o.length? ` <span class="s" style="display:inline">(بالجنيه — ${o.map(c=>c+' بسعر '+fxOf(c)).join('، ')})</span>`:''; }
+function _kRow(name,sub,amount,cur,neg){
+  return `<tr><td class="ttl">${esc(name||'—')}${sub?`<div class="s">${esc(sub)}</div>`:''}</td>`
+    +`<td class="num mono"${neg?' style="color:var(--pink)"':''}>${egp(amount,cur,neg)}</td></tr>`;
+}
+function _kTable(rows,tl,tot){
+  return `<div class="dtw"><table class="dt"><tbody>${rows||'<tr><td class="zero">مفيش بيانات</td><td></td></tr>'}`
+    +`<tr class="dtsum"><td class="ttl">${tl}</td><td class="num mono">${money(tot)}</td></tr></tbody></table></div>`;
+}
+function kpiDetail(kind){
+  const DS=D.deals||[]; let title='',rows='',tot=0,tl='الإجمالي'; const curs=[];
+  const R=(n,s,a,c,neg)=>{curs.push(c||'EGP');return _kRow(n,s,a,c,neg);};
+  if(kind==='collected'){
+    title='💰 محصّل — المشاريع اللي دفعت';
+    DS.filter(d=>+d.collected>0).sort((a,b)=>b.collected-a.collected)
+      .forEach(d=>rows+=R(d.title,d.client_name,d.collected,d.currency));
+    tot=D.totals.collected;
+  }else if(kind==='due'){
+    title='⏳ متبقي على العملاء — لكل مشروع شغّال';
+    DS.filter(d=>LIVE_ST.includes(d.stage)&&+d.due>0).sort((a,b)=>b.due-a.due)
+      .forEach(d=>rows+=R(d.title,d.client_name,d.due,d.currency));
+    tot=D.totals.due;
+  }else if(kind==='profit'){
+    title='📈 صافي ربح — ربح كل مشروع شغّال';
+    DS.filter(d=>LIVE_ST.includes(d.stage)).sort((a,b)=>b.profit-a.profit)
+      .forEach(d=>rows+=R(d.title,d.client_name,d.profit,d.currency,+d.profit<0));
+    const g=(D.general&&D.general.total)||0;
+    if(g)rows+=_kRow('مصاريف عامة','مش تبع مشروع',g,'EGP',true);
+    const anl=(D.general&&D.general.ads_nonlive)||0;
+    if(anl)rows+=_kRow('إعلانات على مشاريع لسه في الطريق','نصيبهم من إعلانات فيسبوك',anl,'EGP',true);
+    tot=D.totals.profit;
+  }else if(kind==='spent'){
+    title='🧾 مصاريف — مشاريع + عامة';
+    DS.filter(d=>+d.spent>0).sort((a,b)=>b.spent-a.spent)
+      .forEach(d=>rows+=R(d.title,d.client_name,d.spent,d.currency));
+    const bc=(D.general&&D.general.by_cat)||{};
+    Object.keys(bc).sort((a,b)=>bc[b]-bc[a]).forEach(k=>rows+=_kRow('عام · '+k,'مصروف عام',bc[k],'EGP'));
+    tot=D.totals.spent;
+  }else{ // فترة: pcollected / pspent / pnet — من سجل الدفعات في الفترة
+    const mv=FIN.filter(f=>f.deal_id&&inPer(f.dt));
+    const nm=f=>{ if(f.deal_id==='general')return ['عام'+(f.category?' · '+f.category:''),'مصروف عام','EGP'];
+      const d=DS.find(x=>x.id===f.deal_id); return d?[d.title,d.client_name||'',d.currency]:[f.deal_id,'','']; };
+    if(kind==='pnet'){
+      title='📊 صافي الفترة = محصّل − مصاريف'; tl='صافي الفترة';
+      const inc=mv.filter(f=>f.kind==='income').reduce((s,f)=>s+fxAmt(f),0);
+      const exp=mv.filter(f=>f.kind!=='income').reduce((s,f)=>s+fxAmt(f),0);
+      rows=_kRow('محصّل في الفترة','',inc,'EGP')+_kRow('مصاريف في الفترة','',exp,'EGP',true);
+      tot=inc-exp;
+    }else{
+      const inc=kind==='pcollected'; title=inc?'💰 محصّل في الفترة':'🧾 مصاريف في الفترة';
+      const sel=mv.filter(f=>inc?f.kind==='income':f.kind!=='income').sort((a,b)=>(+b.amount||0)-(+a.amount||0));
+      sel.forEach(f=>{const[t,c,cu]=nm(f);rows+=R(t+(f.note?' · '+f.note:''),(c?c+' · ':'')+fmtD(f.dt),f.amount,cu);});
+      tot=sel.reduce((s,f)=>s+fxAmt(f),0);
+    }
+  }
+  openMd(`<h3>${title}</h3>${_kTable(rows,tl+_fxNote(curs),tot)}`
+    +`<div class="acts"><button class="btn o" onclick="closeMd()">تمام</button></div>`);
+}
+
+let _lastLoad=0;
+function load(){
+  Promise.all([fetch('/api/w/work').then(r=>r.json()),fetch('/api/w/finance').then(r=>r.json())])
+    .then(([w,f])=>{D=w;FIN=f.rows||[];_lastLoad=Date.now();draw();})
+    .catch(()=>{$('#app').innerHTML='<div class="empty">مقدرتش أجيب البيانات — اتأكد إن السيرفر شغّال.</div>';});
+}
+// تحديث تلقائي أول ما ترجع للتبويب — من غير ما يقطع تعديل/فورم شغّال
+function _maybeReload(){
+  if(document.visibilityState!=='visible')return;
+  if(Date.now()-_lastLoad<1500)return;            // throttle
+  if(ADEDIT)return;                                // بتعدّل إعلانات فيسبوك
+  if($('#ov')&&$('#ov').classList.contains('on'))return; // مودال/فورم مفتوح
+  const ae=document.activeElement;
+  if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))return; // بتكتب في حقل
+  load();
+}
+document.addEventListener('visibilitychange',_maybeReload);
+window.addEventListener('focus',_maybeReload);
+
+function stChip(s){const[l,c]=ST[s]||['?','var(--dim)'];
+  return `<span class="st" style="color:${c};background:color-mix(in srgb,${c} 14%,transparent)">${l}</span>`;}
+
+function draw(){
+  const t=D.totals;
+  let h='';
+
+  // فلتر الفترة
+  h+=`<div class="pbar"><span class="lbl">📅 الفترة:</span>`+[['all','الكل'],['month','الشهر ده'],['last','الشهر اللي فات'],
+      ['30','آخر ٣٠ يوم'],['year','السنة دي'],['custom','من … لـ']]
+      .map(([k,l])=>`<button class="tab ${PER===k?'on':''}" onclick="PER='${k}';draw()">${l}</button>`).join('')
+    +(PER==='custom'?`<input type="date" value="${PFROM}" onchange="PFROM=this.value;draw()"><span class="lbl">لـ</span>
+        <input type="date" value="${PTO}" onchange="PTO=this.value;draw()">`:'')+`</div>`;
+
+  let K;
+  if(PER==='all'){
+    K=[['c','محصّل (إجمالي المستلم)',money(t.collected),'collected'],['d','مصاريف',money(t.spent),'spent'],
+       ['e','صافي ربح',money(t.profit),'profit'],['f','متبقي',money(Math.max(0,t.due)),'due']];
+  }else{
+    const mv=FIN.filter(f=>f.deal_id&&inPer(f.dt));
+    const inc=mv.filter(f=>f.kind==='income').reduce((s,f)=>s+fxAmt(f),0);
+    const exp=mv.filter(f=>f.kind!=='income').reduce((s,f)=>s+fxAmt(f),0);
+    K=[['c','محصّل في الفترة',money(inc),'pcollected'],['d','مصاريف في الفترة',money(exp),'pspent'],
+       ['e','صافي الفترة',money(inc-exp),'pnet'],['f','متبقي (كله)',money(Math.max(0,t.due)),'due']];
+  }
+  // فيسبوك: المصروف (قابل للتعديل) + اللي اتحصّل من عملاء الإعلان + المتوقع منهم
+  const fb=fbStats();
+  h+='<div class="kpis">'+K.map(([k,l,v,kind])=>`<div class="kpi ${k} drill" onclick="kpiDetail('${kind}')" title="دوس تشوف التفاصيل"><span class="pen">🔎</span><div class="l">${l}</div><div class="v mono">${v}</div></div>`).join('')
+    +(ADEDIT
+      ? `<div class="kpi fb"><div class="l">${FBI} إعلانات فيسبوك</div>
+          <input id="ad-in" type="number" step="any" value="${fb.ads||''}" onkeydown="if(event.key==='Enter')saveAds();if(event.key==='Escape'){ADEDIT=false;draw();}" onblur="saveAds()">
+          <div class="s">Enter للحفظ</div></div>`
+      : `<div class="kpi fb ed" onclick="ADEDIT=true;draw();setTimeout(()=>{const i=document.getElementById('ad-in');i&&(i.focus(),i.select())})" title="دوس عشان تعدّل">
+          <span class="pen">✏️</span><div class="l">${FBI} إعلانات فيسبوك</div><div class="v mono">${money(fb.ads)}</div></div>`)
+    +`<div class="kpi fb fb2"><div class="l">${FBI} المحصّل من فيسبوك</div><div class="v mono">${money(fb.got)}</div>
+        <div class="s">${fb.n} عميل من الإعلان</div></div>`
+    +`<div class="kpi fb"><div class="l">${FBI} المتوقع من فيسبوك</div><div class="v mono">${money(fb.exp)}</div>
+        <div class="s">${fb.ads?'كل ١ج إعلان = '+(fb.exp/fb.ads).toFixed(1)+'ج':'&nbsp;'}</div></div>`
+    +'</div>';
+
+
+  // دخل/مصروف شغل متسجّل في دوّنلي ومش مربوط بمشروع — اربطه من هنا
+  if((D.unlinked||[]).length){
+    const opts='<option value="">— اربطه بمشروع —</option>'+D.deals.filter(d=>d.stage!=='lost').map(d=>`<option value="${d.id}">${esc(d.title)}</option>`).join('')+`<option value="${GEN}">🧾 مصاريف عامة</option>`;
+    h+=`<details class="gen" style="margin-bottom:18px"><summary class="gen-h" style="list-style:none"><b>📥 فلوس شغل في دوّنلي مش مربوطة بمشروع</b>
+        <span style="color:var(--dim);font-size:11.5px">${D.unlinked.length} حركة — اربط كل واحدة بمشروعها عشان تتحسب</span>
+        <span style="margin-inline-start:auto;color:var(--mut);font-size:12px">▼ افتح</span></summary><div class="pc-det" style="margin-top:12px">`
+      +D.unlinked.map(f=>`<div class="mv"><span class="k ${f.kind}">${f.kind==='income'?'مدفوع':'مصروف'}</span>
+          <span class="mono" style="color:var(--dim);font-size:11px">${fmtD(f.dt)}</span>
+          <span class="nt" style="color:var(--txt)">${esc(f.note)}</span>
+          <span class="num mono ${f.kind==='income'?'pos':'neg'}">${money(f.amount)} ${esc(f.currency||'')}</span>
+          <select onchange="linkFin(${f.id},this.value)">${opts}</select></div>`).join('')+`</div></details>`;
+  }
+
+  // تبديل بين المشاريع والعملاء — العملاء في تبويب جانبي
+  h+=`<div class="barrow" style="margin-top:4px">
+      <button class="tab ${VIEW==='deals'?'on':''}" onclick="VIEW='deals';OPEN=null;draw()">📋 المشاريع ${D.deals.filter(d=>!+d.archived).length}</button>
+      <button class="tab ${VIEW==='clients'?'on':''}" onclick="VIEW='clients';draw()">👤 العملاء ${D.clients.length}</button>
+      <button class="tab ${VIEW==='log'?'on':''}" onclick="VIEW='log';draw()">🧾 سجل الدفعات</button>
+      <button class="tab ${VIEW==='exp'?'on':''}" onclick="VIEW='exp';draw()">💸 المصاريف</button>
+      <button class="tab ${VIEW==='staff'?'on':''}" onclick="VIEW='staff';draw()">👥 الفريق ${(D.staff||[]).length}</button>
+      <button class="btn" style="margin-inline-start:auto" onclick="${VIEW==='clients'?'clientForm()':VIEW==='staff'?'staffForm()':VIEW==='exp'?`document.getElementById('e-amt').focus()`:'dealForm()'}">➕ ${VIEW==='clients'?'عميل جديد':VIEW==='staff'?'موظف جديد':VIEW==='exp'?'مصروف جديد':'مشروع جديد'}</button>
+    </div>`;
+
+  if(VIEW==='clients'){
+    h+= D.clients.length? `<table><thead><tr><th>الاسم</th><th>التليفون</th>
+        <th>مشاريع</th><th></th></tr></thead><tbody>`
+      + D.clients.map(c=>`<tr><td class="ttl">${esc(c.name)||'<span class="zero">بدون اسم</span>'}</td>
+          <td class="mono" style="font-size:12px">${esc(c.phone)||'—'}</td>
+          <td class="num">${c.deals}</td>
+          <td><button class="btn o" style="padding:5px 11px;font-size:11.5px" onclick="clientForm('${c.id}')">تعديل</button></td></tr>`).join('')
+      + `</tbody></table>`
+      : `<div class="empty">مفيش عملاء لسه — بيتضافوا لوحدهم لما تكتب اسم العميل في المشروع.</div>`;
+    $('#app').innerHTML=h; return;
+  }
+  if(VIEW==='log'){ h+=logView(); $('#app').innerHTML=h; return; }
+  if(VIEW==='exp'){ h+=expView(); $('#app').innerHTML=h; return; }
+  if(VIEW==='staff'){ h+=staffView(); $('#app').innerHTML=h; return; }
+
+  // فلاتر بسيطة للمشاريع
+  // المؤرشفة (مشاريع قديمة خلصانة) مابتظهرش هنا — بس فلوسها داخلة في الأرقام فوق
+  const ACT=sortDeals(D.deals.filter(d=>!+d.archived)), ARC=sortDeals(D.deals.filter(d=>+d.archived));
+  const counts={open:0,live:0,all:ACT.length,lost:0,arch:ARC.length};
+  ACT.forEach(d=>{if(['lead','meeting','proposal'].includes(d.stage))counts.open++;
+    else if(d.stage==='lost')counts.lost++;else counts.live++;});
+  h+=`<div class="tabs" style="margin:0 0 12px">`+[['all','الكل',counts.all],
+      ['open','في الطريق',counts.open],['live','شغّالة',counts.live],['lost','ضاعت',counts.lost]].concat(counts.arch?[['arch','📦 مؤرشفة',counts.arch]]:[])
+      .map(([k,l,n])=>`<button class="tab ${FILTER===k?'on':''}" onclick="FILTER='${k}';draw()">${l} ${n}</button>`).join('')
+      +`<select style="margin-inline-start:auto" onchange="SRCF=this.value;draw()">
+          <option value="">كل المصادر</option><option value="fb" ${SRCF==='fb'?'selected':''}>📘 من إعلان فيسبوك</option>
+          <option value="other" ${SRCF==='other'?'selected':''}>من غير الإعلان</option></select></div>`;
+
+  const rows=(FILTER==='arch'?ARC:ACT).filter(d=>FILTER==='all'||FILTER==='arch'||
+    (FILTER==='open'&&['lead','meeting','proposal'].includes(d.stage))||
+    (FILTER==='lost'&&d.stage==='lost')||
+    (FILTER==='live'&&['won','delivering','delivered'].includes(d.stage)))
+    .filter(d=>!SRCF||(SRCF==='fb'?isFb(d.source):!isFb(d.source)))
+    // في فترة معيّنة: المشروع يظهر لو بدأ فيها أو اتدفع/اتصرف عليه فيها
+    .filter(d=>PER==='all'||inPer(dStart(d))||FIN.some(f=>f.deal_id===d.id&&inPer(f.dt)));
+
+  const manual=D.deals.some(d=>+d.pos>0);
+  if(rows.length&&FILTER!=='arch') h+=`<div class="ordbar">↕ ${manual?'<b>ترتيبك</b> — اسحب من ⠿ عشان تغيّره':'<b>الأكثر نشاطًا الأول</b> (آخر دفعة أو مصروف، أو إضافة المشروع) — اسحب من ⠿ لو عايز ترتّب بنفسك'}
+      ${manual?`<button class="tab" onclick="resetOrder()">↺ رجّع حسب النشاط</button>`:''}</div>`;
+  h+= rows.length? `<div class="cards" id="dcards">`+rows.map(d=>dealCard(d)).join('')+`</div>`
+    : `<div class="empty">مفيش مشاريع هنا — دوس «➕ مشروع جديد».</div>`;
+
+  $('#app').innerHTML=h;
+  if(window.Sortable&&FILTER!=='arch'&&$('#dcards'))
+    Sortable.create($('#dcards'),{handle:'.pc-drag',animation:160,ghostClass:'sort-ghost',onEnd:e=>{if(e.oldIndex!==e.newIndex)saveOrder();}});
+}
+
+function dealCard(d){
+  const cur=d.currency||'EGP';
+  const mo=d.billing==='monthly';
+  const unknown=!mo&&!(parseFloat(d.value)>0);
+  const op=OPEN===d.id;
+  const val=unknown? '<small>غير معروف</small>' : egp(d.value,cur);
+  const rem=unknown? '<small>—</small>'
+                   : `<span class="${d.due>0?'neg':'pos'}">${egp(d.due,cur)}</span>`;
+  const logo=d.logo? `<img class="pc-logo" src="${esc(d.logo)}" onerror="this.style.display='none'">` : '';
+  const src=d.source? `<div class="pc-src">${/فيس|face|fb/i.test(d.source)?FBW+' إعلان فيسبوك':esc(d.source)}</div>` : '';
+  return `<div class="pcard ${op?'op':''}" data-id="${d.id}" onclick="toggle('${d.id}')">
+    <div class="pc-top"><span class="pc-drag" title="اسحب عشان ترتّب" onclick="event.stopPropagation()">⠿</span>${logo}
+      <div style="flex:1"><div class="pc-ttl">${esc(d.title)||'بدون عنوان'}</div>
+        <div class="pc-cl">👤 ${esc(d.client_name)||'بدون عميل'}${d.team?` <span style="color:var(--cyan)">· 👥 ${esc(d.team)}</span>`:''}</div>${src}</div>
+      ${mo?`<span class="pc-badge" style="color:var(--cyan);background:rgba(34,211,238,.12)">🔁 شهري</span>`:''}
+      ${cur!=='EGP'?`<span class="pc-badge" style="color:var(--gold);background:rgba(255,194,75,.12)" title="المشروع متسعّر بالـ${cur} — العرض بالجنيه بسعر ${fxOf(cur)}">${cur} → ج</span>`:''}</div>
+    <div class="pc-nums">
+      <div class="pc-n"><div class="l">💰 محصّل</div><div class="v mono pos">${egp(d.collected,cur)}</div></div>
+      ${mo?`<div class="pc-n"><div class="l">قيمة الشهر</div><div class="v mono">${egp(d.monthly,cur)}</div></div>`
+          :`<div class="pc-n"><div class="l">الدفعة المبدئية</div><div class="v mono">${d.deposit?egp(d.deposit,cur):'—'}</div></div>`}
+      <div class="pc-n"><div class="l">${mo?'المستحق لحد النهارده':'الإجمالي'}</div><div class="v mono">${val}</div>${mo?`<div class="ex-hint mono">${d.months_due||0} شهر</div>`:''}${+d.extras_total>0?`<div class="ex-hint mono">منها +${money(d.extras_total*fxOf(cur))}ج تطويرات</div>`:''}</div>
+      <div class="pc-n"><div class="l">باقي على العميل</div><div class="v mono">${rem}</div></div>
+    </div>
+    ${(+d.spent>0||+d.moves>0)?`<div class="pc-exp">
+      <span>💸 مصاريف: <b class="mono neg">${egp(d.spent,cur)}</b>${+d.ad_share>0?`<span class="fxo"> (منها ${money(d.ad_share)}ج إعلانات فيسبوك)</span>`:''}${+d.staff_in>0?`<span class="fxo"> (منها ${money(d.staff_in)}ج مرتبات متوزّعة)</span>`:''}</span>
+      <span>📈 الربح: <b class="mono ${d.profit>=0?'pos':'neg'}">${egp(Math.abs(d.profit),cur,d.profit<0)}</b></span>
+      <span class="mv-n">${op?'':`🧾 ${d.moves||0} حركة — دوس تشوف المدفوعات والمصاريف`}</span></div>`:''}
+    <div class="pc-dates"><span>📅 دخل: <b>${fmtD(dStart(d))}</b></span>${d.last_act?`<span>⚡ آخر نشاط: <b>${fmtD(d.last_act)}</b></span>`:''}
+      ${lastPay(d)?`<span>💵 آخر دفعة: <b>${fmtD(lastPay(d).dt)}</b></span>`:''}
+      ${mo?`<span>🔁 اتدفع <b>${d.months_paid||0}</b> من <b>${d.months_due||0}</b> شهر</span>${d.next_bill?`<span>📆 الجاي: <b>${fmtD(d.next_bill)}</b></span>`:''}`:''}</div>
+    ${op?`<div class="pc-det">${detailBody(d)}</div>`:''}
+    </div>`;
+}
+
+function detailBody(d){
+  const mv=FIN.filter(f=>f.deal_id===d.id).sort((a,b)=>(b.dt||'').localeCompare(a.dt||''));
+  const tasks=parseTasks(d.tasks);
+  let h=``;
+  // التاسكات
+  if(tasks.length){
+    const ts=tasks.reduce((s,t)=>s+(parseFloat(t.price)||0),0);
+    h+=`<div style="margin-bottom:13px"><b style="font-size:13px">✅ التاسكات</b>
+        <span style="color:var(--dim);font-size:11.5px"> · ${tasks.length} · مجموع ${money(ts)}</span>`;
+    h+=tasks.map(t=>`<div class="mv"><span class="cat" style="flex:1">${esc(t.title)||'—'}</span>
+        <span class="num mono">${t.price?egp(t.price,d.currency):'<span class=zero>بدون سعر</span>'}</span></div>`).join('');
+    h+=`</div>`;
+  }
+  // التطويرات الإضافية: شغل زيادة اتفقت عليه بعد البداية — بيتضاف على الإجمالي والباقي
+  const ex=parseTasks(d.extras);
+  h+=`<div class="extras" onclick="event.stopPropagation()"><div style="display:flex;gap:9px;align-items:center;margin-bottom:6px">
+      <b style="font-size:13px">🧩 تطويرات إضافية</b>
+      <span style="color:var(--dim);font-size:11.5px">${ex.length?`${ex.length} · مجموع ${money(d.extras_total)} · الاتفاق الأصلي ${money(d.base_value)}`:'شغل زيادة اتفقت عليه بعد البداية — بيتضاف على الإجمالي والباقي'}</span></div>`;
+  h+=ex.map((x,i)=>`<div class="mv"><span class="k ex" ${x.auto?'title="اتضاف لوحده: دفعة عدّت إجمالي المشروع"':''}>${x.auto?'🤖 تلقائي':'تطوير'}</span>
+        <span class="mono" style="color:var(--dim);font-size:11px">${esc(x.dt)||'—'}</span>
+        <span class="cat" style="flex:1">${esc(x.title)||'—'}</span>
+        <span class="xst ${x.st||''}" title="دوس تغيّر الحالة" onclick="stExtra('${d.id}',${i})">${XST[x.st||'']}</span>
+        <span class="num mono pos">+${egp(x.amount,d.currency)}</span>
+        <span class="x" onclick="delExtra('${d.id}',${i})">✕</span></div>`).join('');
+  h+=`<div class="addmv"><input class="nt2" id="x-title" placeholder="التطوير (مثلاً: موديول المخازن + تطبيق موبايل)">
+      <input type="number" id="x-amt" placeholder="${(d.currency||'EGP')==='EGP'?'المبلغ':'المبلغ بالـ'+esc(d.currency)}" step="any">
+      <input type="date" id="x-dt" value="${today()}">
+      <select id="x-st"><option value="">— الحالة</option><option value="wip">🛠 شغّالين عليه</option><option value="done">✅ اتعمل</option></select>
+      <button class="btn g" style="padding:8px 14px" onclick="addExtra('${d.id}')">➕ ضيف تطوير</button></div></div>`;
+  h+=`<div style="display:flex;gap:9px;align-items:center;margin-bottom:11px">
+      <b style="font-size:13px">💸 المدفوعات والمصاريف</b>
+      <span style="color:var(--dim);font-size:11.5px">${mv.length} حركة</span>
+      <button class="btn o" style="margin-inline-start:auto;padding:6px 13px;font-size:12px" onclick="event.stopPropagation();dealForm('${d.id}')">✏️ تعديل المشروع</button>
+      <button class="btn o" style="padding:6px 13px;font-size:12px" onclick="event.stopPropagation();archive('${d.id}',${+d.archived?0:1})">${+d.archived?'↩ رجّعه':'📦 أرشفة'}</button></div>`;
+  h+= mv.length? mv.map(f=>`<div class="mv">
+        <span class="k ${f.kind}">${f.kind==='income'?'مدفوع':'مصروف'}</span>
+        <span class="mono" style="color:var(--dim);font-size:11px">${esc(f.dt)||'—'}</span>
+        <span class="cat">${esc(f.category)||'—'}</span>
+        <span class="nt">${esc(f.note)}</span>
+        <span class="when" title="اتسجّل على السيستم">📝 ${fmtAt(f.created_at)}</span>
+        <span class="num mono ${f.kind==='income'?'pos':'neg'}">${egp(f.amount,d.currency)}</span>
+        <span class="x" onclick="event.stopPropagation();delMv('${f.id}')">✕</span></div>`).join('')
+    : `<div style="color:var(--dim);font-size:12.5px">مفيش مدفوعات ولا مصاريف على المشروع ده.</div>`;
+  h+=`<div class="addmv" onclick="event.stopPropagation()">
+      <select id="m-kind"><option value="income">مدفوع (استلمت)</option><option value="expense">مصروف (صرفت)</option></select>
+      <input type="number" id="m-amt" placeholder="${(d.currency||'EGP')==='EGP'?'المبلغ':'المبلغ بالـ'+esc(d.currency)}" step="any">
+      <input class="cat2" id="m-cat" placeholder="الفئة" list="cats" value="دفعة">
+      <datalist id="cats"><option>دفعة</option><option>سيرفر</option><option>دومين</option><option>أدوات</option><option>مقاول</option><option>إعلانات</option></datalist>
+      <input type="date" id="m-dt" value="${today()}">
+      <input class="nt2" id="m-nt" placeholder="ملاحظة">
+      <button class="btn g" style="padding:8px 14px" onclick="addMv('${d.id}')">➕ ضيف</button></div>`;
+  return h;
+}
+
+function saveExtras(id,list){
+  return fetch('/api/w/deal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,extras:JSON.stringify(list)})})
+    .then(r=>r.json()).then(()=>load());
+}
+function addExtra(id){
+  const d=D.deals.find(x=>x.id===id); if(!d)return;
+  const g=x=>document.getElementById(x).value;
+  const amount=parseFloat(g('x-amt')); const title=g('x-title').trim();
+  if(!(amount>0)){alert('اكتب مبلغ التطوير');return;}
+  const list=parseTasks(d.extras); list.push({title:title||'تطوير إضافي',amount,dt:g('x-dt')||today(),st:g('x-st')});
+  saveExtras(id,list);
+}
+// حالة التطوير الإضافي: من غير ← 🛠 شغّالين عليه ← ✅ اتعمل (المبلغ بيتحسب في الإجمالي والباقي في الحالتين)
+const XST={'':'⚪ من غير حالة','wip':'🛠 شغّالين عليه','done':'✅ اتعمل'};
+function stExtra(id,i){
+  const d=D.deals.find(x=>x.id===id); if(!d)return;
+  const list=parseTasks(d.extras); const x=list[i]; if(!x)return;
+  x.st={'':'wip','wip':'done','done':''}[x.st||'']; saveExtras(id,list);
+}
+function delExtra(id,i){
+  const d=D.deals.find(x=>x.id===id); if(!d)return;
+  const list=parseTasks(d.extras); const x=list[i]; if(!x)return;
+  if(!confirm(`تشيل «${x.title}» (${money(x.amount)}) من الإجمالي؟`))return;
+  list.splice(i,1); saveExtras(id,list);
+}
+function archive(id,v){
+  fetch('/api/w/deal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,archived:v?'1':''})})
+    .then(r=>r.json()).then(()=>{OPEN=null;load();});
+}
+function toggle(id){OPEN=(OPEN===id?null:id);draw();}
+
+/* ── فيسبوك ── */
+let ADEDIT=false;
+function adRows(){ return FIN.filter(f=>f.deal_id===GEN&&f.kind!=='income'&&isAd(f)); }
+function fbStats(){
+  const ads=adRows().filter(f=>inPer(f.dt)).reduce((s,f)=>s+(+f.amount||0),0);
+  const deals=D.deals.filter(d=>isFb(d.source)&&d.stage!=='lost');
+  const ids=new Set(deals.map(d=>d.id));
+  const got=FIN.filter(f=>ids.has(f.deal_id)&&f.kind==='income'&&inPer(f.dt)).reduce((s,f)=>s+(+f.amount||0),0);
+  const exp=deals.reduce((s,d)=>s+(+d.value||0),0);
+  return {ads,got,exp,n:deals.length};
+}
+// الرقم اللي بتكتبه = إجمالي اللي صرفته على الإعلانات. الفرق بيتسجّل على آخر حركة إعلان
+// (أو حركة جديدة لو مفيش) — عشان الدفتر يفضل مطابق للرقم.
+function saveAds(){
+  if(!ADEDIT) return; ADEDIT=false;
+  const el=document.getElementById('ad-in'); const want=parseFloat(el&&el.value)||0;
+  const rows=adRows().sort((a,b)=>(b.dt||'').localeCompare(a.dt||''));
+  const cur=rows.reduce((s,f)=>s+(+f.amount||0),0), diff=want-cur;
+  if(Math.abs(diff)<0.005){draw();return;}
+  const last=rows[0];
+  const body=last&&(+last.amount+diff)>0
+    ? {...last, amount:+last.amount+diff}
+    : {deal_id:GEN,kind:'expense',category:'إعلانات',amount:diff,dt:today(),note:'إعلانات فيسبوك'};
+  if(body.amount<=0){ alert('الرقم أقل من المسجّل — امسح حركة من سجل الدفعات الأول'); draw(); return; }
+  fetch('/api/w/finance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(r=>r.json()).then(load);
+}
+
+function lastPay(d){ return FIN.filter(f=>f.deal_id===d.id&&f.kind==='income').sort((a,b)=>(b.dt||'').localeCompare(a.dt||''))[0]; }
+
+/* ── المصاريف العامة: مش تبع مشروع (إعلانات فيسبوك، اشتراكات…) ── */
+// ===== ترتيب المشاريع: يدوي (pos من السحب) — وغير كده الأكثر نشاطًا الأول =====
+function sortDeals(list){
+  const act=(a,b)=>String(b.last_act||'').localeCompare(String(a.last_act||''));
+  if(!(D.deals||[]).some(d=>+d.pos>0)) return [...list].sort(act);
+  // مشروع جديد (مالوش مكان) بيطلع فوق، وبعده ترتيبك
+  return [...list].sort((a,b)=>{const pa=+a.pos||0, pb=+b.pos||0;
+    if(!pa||!pb) return (!pa&&!pb)?act(a,b):(!pa?-1:1);
+    return pa-pb;});
+}
+function saveOrder(){
+  // الترتيب الظاهر (ممكن يكون بفلتر) بيتدمج في الترتيب الكامل: كل مشروع ظاهر ياخد مكانه الجديد
+  const vis=[...document.querySelectorAll('#dcards .pcard')].map(el=>el.dataset.id), set=new Set(vis);
+  const full=sortDeals(D.deals.filter(d=>!+d.archived)).map(d=>d.id); let k=0;
+  const ids=full.map(id=>set.has(id)?vis[k++]:id);
+  ids.forEach((id,i)=>{const d=D.deals.find(x=>x.id===id); if(d) d.pos=i+1;});
+  fetch('/api/w/deals/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})})
+    .then(r=>r.json()).then(()=>draw()).catch(()=>load());
+}
+function resetOrder(){
+  D.deals.forEach(d=>d.pos=0);
+  fetch('/api/w/deals/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[]})})
+    .then(r=>r.json()).then(()=>draw()).catch(()=>load());
+}
+
+// ===== تبويب الفريق: الموظفين/الفريلانسرز — المشاريع اللي ماسكينها واتدفعلهم كام =====
+const _nmz=s=>String(s||'').replace(/\s+/g,'');
+const teamOf=d=>String(d.team||'').split(/[،,]/).map(x=>x.trim()).filter(Boolean);
+function staffDeals(name){ return (D.deals||[]).filter(d=>teamOf(d).some(x=>_nmz(x)===_nmz(name))); }
+function staffPays(name){ const n=_nmz(name); if(!n) return [];
+  return FIN.filter(f=>f.kind!=='income'&&_nmz(f.note).includes(n)).sort((a,b)=>(b.dt||'').localeCompare(a.dt||'')); }
+// توزيع المرتب: قواعد بتاريخ — كل قاعدة شغّالة من تاريخها لحد اللي بعدها (D.staff[].rules من السيرفر)
+function ruleAt(x,dt){ let r=null; for(const q of (x.rules||[])) if(q.from<=String(dt||'').slice(0,10)) r=q; return r; }
+function ruleText(r){ if(!r) return ''; const sp=Object.entries(r.split), t=sp.reduce((a,[,v])=>a+v,0)||1;
+  return sp.map(([id,v])=>`${esc((D.deals.find(d=>d.id===id)||{}).title||'؟')} ${Math.round(v/t*100)}٪`).join(' · '); }
+// حركة مرتب لموظف عنده قاعدة بتنقلها → [{id, egp, pct}] (نفس حساب السيرفر)، غير كده null
+function salAlloc(f){
+  if(f.kind==='income') return null;
+  const n=_nmz(f.note), x=(D.staff||[]).find(s=>s.rules&&s.rules.length&&_nmz(s.name)&&n.includes(_nmz(s.name)));
+  const r=x&&ruleAt(x,f.dt); if(!r) return null;
+  const sp=Object.entries(r.split).filter(([id])=>(D.deals||[]).some(d=>d.id===id));
+  const t=sp.reduce((a,[,v])=>a+v,0); if(!t||(sp.length===1&&sp[0][0]===f.deal_id)) return null;
+  const v=fxAmt(f); return sp.map(([id,p])=>({id,egp:v*p/t,pct:Math.round(p/t*100)}));
+}
+let ALLOC=[];
+function _allocSync(){
+  const rows=[...document.querySelectorAll('#al-box .al-row')]; if(!rows.length&&!document.getElementById('al-box')) return;
+  ALLOC=rows.map(r=>({from:r.querySelector('.al-from').value,
+    split:Object.fromEntries([...r.querySelectorAll('.al-pct')].map(i=>[i.dataset.d,parseFloat(i.value)||0]))}));
+}
+function _allocRender(){
+  const box=document.getElementById('al-box'); if(!box) return;
+  const ids=[...document.querySelectorAll('.s-prj:checked')].map(i=>i.value);
+  const nm=id=>(D.deals.find(d=>d.id===id)||{}).title||id;
+  box.innerHTML=ALLOC.map((r,i)=>`<div class="al-row mv" style="flex-wrap:wrap;gap:8px;align-items:center">
+      <span style="font-size:12px">من</span><input type="date" class="al-from" value="${r.from||today()}">
+      ${ids.map(id=>`<label style="display:flex;gap:4px;align-items:center;font-size:12px">${esc(nm(id))}
+        <input type="number" class="al-pct" data-d="${id}" min="0" step="any" value="${r.split&&r.split[id]!=null?r.split[id]:''}" placeholder="٪" style="width:62px"></label>`).join('')||'<span class="zero">علّم مشاريعه فوق الأول</span>'}
+      <span class="x" style="cursor:pointer" onclick="_allocSync();ALLOC.splice(${i},1);_allocRender()">✕</span></div>`).join('')
+    ||`<div class="hint" style="margin:2px 0 6px">مفيش توزيع — المرتب بيتحسب على المشروع اللي بيتسجّل عليه.</div>`;
+}
+function staffView(){
+  const st=D.staff||[]; const mon=today().slice(0,7);
+  if(!st.length) return `<div class="empty">مفيش موظفين لسه — دوس «➕ موظف جديد».<br><small>اختار المشاريع اللي ماسكها، ودوّنلي هيربط مرتبه بالمشاريع دي لوحده.</small></div>`;
+  return `<div class="cards">`+st.map(x=>{
+    const ds=staffDeals(x.name), ps=staffPays(x.name);
+    const tot=ps.reduce((s,f)=>s+fxAmt(f),0), thisM=ps.filter(f=>(f.dt||'').startsWith(mon)).reduce((s,f)=>s+fxAmt(f),0);
+    return `<div class="pcard">
+      <div class="pc-top"><div style="flex:1"><div class="pc-ttl">👤 ${esc(x.name)}</div>
+        <div class="pc-cl">${esc(x.role)||'—'}${x.phone?` · <span class="mono">${esc(x.phone)}</span>`:''}</div></div>
+        <button class="btn o" style="padding:5px 11px;font-size:11.5px" onclick="staffForm('${x.id}')">تعديل</button></div>
+      <div class="pc-nums">
+        <div class="pc-n"><div class="l">💵 المرتب الشهري</div><div class="v mono">${+x.salary?money(x.salary)+' <small>ج</small>':'—'}</div></div>
+        <div class="pc-n"><div class="l">اتدفعله الشهر ده</div><div class="v mono ${thisM?'neg':''}">${money(thisM)} <small>ج</small></div></div>
+        <div class="pc-n"><div class="l">اتدفعله إجمالي</div><div class="v mono neg">${money(tot)} <small>ج</small></div></div>
+        <div class="pc-n"><div class="l">آخر دفعة</div><div class="v mono" style="font-size:13px">${ps[0]?fmtD(ps[0].dt):'—'}</div></div>
+      </div>
+      <div class="pc-exp"><span>📋 ماسك: ${ds.length?ds.map(d=>`<b>${esc(d.title)}</b>`).join(' · '):'<span class="zero">مش على أي مشروع</span>'}</span></div>
+      ${(()=>{const now=ruleAt(x,today()), nx=(x.rules||[]).find(q=>q.from>today());
+        return `<div class="pc-dates"><span>🔀 مرتبه دلوقتي: <b>${now?ruleText(now):'على المشروع اللي بيتسجّل عليه'}</b>${now?` (من ${fmtD(now.from)})`:''}</span>${nx?`<span>⏭ من ${fmtD(nx.from)}: <b>${ruleText(nx)}</b></span>`:''}</div>`;})()}
+      ${ps.length?`<div class="pc-dates">${ps.slice(0,4).map(f=>`<span>${fmtD(f.dt)}: <b class="mono">${egp(f.amount,((D.deals.find(d=>d.id===f.deal_id)||{}).currency))}</b></span>`).join('')}${ps.length>4?`<span>…و${ps.length-4} كمان</span>`:''}</div>`:''}
+    </div>`;}).join('')+`</div>`;
+}
+function staffForm(id){
+  const x=(D.staff||[]).find(s=>s.id===id)||{};
+  const mine=new Set(x.name?staffDeals(x.name).map(d=>d.id):[]);
+  const ds=(D.deals||[]).filter(d=>!+d.archived||mine.has(d.id));
+  openMd(`<h3>${id?'تعديل موظف':'موظف جديد'}</h3>
+    <div class="two">
+      <div class="fld"><label>الاسم</label><input id="s-name" value="${esc(x.name)}" placeholder="عبدالرحمن"></div>
+      <div class="fld"><label>الدور</label><input id="s-role" value="${esc(x.role)}" placeholder="مطوّر / مصمم / فريلانسر…"></div>
+    </div>
+    <div class="two">
+      <div class="fld"><label>المرتب الشهري (جنيه)</label><input type="number" step="any" id="s-salary" value="${x.salary||''}" placeholder="مثلًا 15000"></div>
+      <div class="fld"><label>التليفون</label><input id="s-phone" class="mono" value="${esc(x.phone)}" placeholder="+20…"></div>
+    </div>
+    <div class="fld"><label>ماسك المشاريع دي</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:4px">${ds.map(d=>`<label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer">
+        <input type="checkbox" class="s-prj" value="${d.id}" ${mine.has(d.id)?'checked':''} onchange="_allocSync();_allocRender()"> ${esc(d.title)}</label>`).join('')||'<span class="zero">مفيش مشاريع</span>'}</div>
+      <div class="hint">دوّنلي بيربط أي مرتب أو مصروف للموظف ده بمشاريعه دي لوحده.</div></div>
+    <div class="fld"><label>🔀 توزيع المرتب على المشاريع</label>
+      <div id="al-box"></div>
+      <button class="btn o" style="padding:6px 12px;font-size:12px" onclick="_allocSync();ALLOC.push({from:today(),split:{}});_allocRender()">➕ توزيع من تاريخ</button>
+      <div class="hint">كل قاعدة شغّالة من تاريخها لحد القاعدة اللي بعدها، والمرتبات القديمة بتفضل على قاعدتها. النسب بتتقسم على مجموعها (٥٠ و٥٠ = نص ونص). مثال: «من ١٥/٧: finde ١٠٠» وبعدين «من ١/١١: finde ٥٠ · WE GSM ٥٠».</div></div>
+    <div class="fld"><label>ملاحظات</label><textarea id="s-note">${esc(x.note)}</textarea></div>
+    <div class="acts"><button class="btn" onclick="saveStaff('${id||''}')">حفظ</button>
+      <button class="btn o" onclick="closeMd()">إلغاء</button>
+      ${id?`<button class="del" onclick="killStaff('${id}')">مسح</button>`:''}</div>`);
+  ALLOC=JSON.parse(JSON.stringify(x.rules||[])); _allocRender();
+}
+function saveStaff(id){
+  const g=k=>document.getElementById(k).value;
+  const name=g('s-name').trim(); if(!name){alert('اكتب اسم الموظف');return;}
+  const b={name,role:g('s-role').trim(),salary:g('s-salary')||0,phone:g('s-phone').trim(),note:g('s-note'),
+    projects:[...document.querySelectorAll('.s-prj:checked')].map(i=>i.value)};
+  _allocSync(); b.alloc=ALLOC.filter(r=>r.from&&Object.values(r.split).some(v=>v>0));
+  if(id)b.id=id;
+  fetch('/api/w/staff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})
+    .then(r=>r.json()).then(r=>{if(r.ok===false){alert(r.error);return;}closeMd();load();});
+}
+function killStaff(id){
+  if(!confirm('تمسح الموظف؟ هيتشال من فرق المشاريع، ومرتباته اللي اتدفعت هتفضل في المصاريف.'))return;
+  fetch('/api/w/staff?id='+encodeURIComponent(id),{method:'DELETE'}).then(r=>r.json()).then(()=>{closeMd();load();});
+}
+
+// ===== تبويب المصاريف: كل المصاريف (مشاريع + عامة) في مكان واحد — بالجنيه =====
+function expView(){
+  const dOf=id=>D.deals.find(d=>d.id===id);
+  const curOf=f=>f.deal_id===GEN?'EGP':((dOf(f.deal_id)||{}).currency||'EGP');
+  const split=(D.general&&D.general.ads_split)||[];
+  const adSplit=f=>f.deal_id===GEN&&split.length&&isAd(f);   // إعلان فيسبوك → موزّع على مشاريع الإعلان
+  const nameOf=id=>id===GEN?'🧾 عام (مش تبع مشروع)':((dOf(id)||{}).title||'—');
+  const rowName=f=>{ if(adSplit(f)) return '📘 إعلانات فيسبوك — موزّعة على: '+split.map(x=>x.title).join(' · ');
+    const sa=salAlloc(f); return sa? '🔀 '+sa.map(x=>nameOf(x.id)+' '+x.pct+'٪').join(' · ') : nameOf(f.deal_id); };
+  const rows=FIN.filter(f=>f.deal_id&&f.kind!=='income'&&inPer(f.dt))
+    .sort((a,b)=>(b.dt||'').localeCompare(a.dt||'')||(b.created_at||'').localeCompare(a.created_at||''));
+  const tot=rows.reduce((s,f)=>s+fxAmt(f),0);
+  const gen=rows.filter(f=>f.deal_id===GEN&&!adSplit(f)).reduce((s,f)=>s+fxAmt(f),0);
+  const byDeal={}, byCat={};
+  rows.forEach(f=>{const v=fxAmt(f);
+    const sa=!adSplit(f)&&salAlloc(f);
+    if(adSplit(f)) split.forEach(x=>{byDeal[x.id]=(byDeal[x.id]||0)+v/split.length;});
+    else if(sa) sa.forEach(x=>{byDeal[x.id]=(byDeal[x.id]||0)+x.egp;});
+    else byDeal[f.deal_id]=(byDeal[f.deal_id]||0)+v;
+    const k=(f.category||'غير مصنّف').trim(); byCat[k]=(byCat[k]||0)+v;});
+  const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]);
+  const line=(n,v)=>`<div class="mv"><span class="cat" style="flex:1">${esc(n)}</span><span class="num mono neg">${money(v)} <small>ج</small></span></div>`;
+  let h=`<div class="kpis k3">
+      <div class="kpi d"><div class="l">💸 إجمالي المصاريف${PER==='all'?'':' في الفترة'}</div><div class="v mono">${money(tot)} <small>ج</small></div><div class="s">${rows.length} مصروف</div></div>
+      <div class="kpi f"><div class="l">📋 على المشاريع</div><div class="v mono">${money(tot-gen)} <small>ج</small></div><div class="s">${Object.keys(byDeal).filter(k=>k!==GEN).length} مشروع</div></div>
+      <div class="kpi a"><div class="l">🧾 عامة (مش تبع مشروع)</div><div class="v mono">${money(gen)} <small>ج</small></div><div class="s">${split.length?'الإعلانات متوزّعة على مشاريعها':'إعلانات · اشتراكات · أدوات…'}</div></div></div>`;
+  h+=`<div class="exp-grid">
+      <div class="exp-box"><b>حسب المشروع</b>${top(byDeal).map(([id,v])=>line(nameOf(id),v)).join('')||'<div class="zero">—</div>'}</div>
+      <div class="exp-box"><b>حسب البند</b>${top(byCat).map(([k,v])=>line(k,v)).join('')||'<div class="zero">—</div>'}</div></div>`;
+  const opts=`<option value="${GEN}">🧾 عام — مش تبع مشروع</option>`
+    +D.deals.filter(d=>!+d.archived).map(d=>`<option value="${d.id}">${esc(d.title)}${(d.currency||'EGP')!=='EGP'?' ('+esc(d.currency)+')':''}</option>`).join('');
+  const cats=[...new Set(['مرتبات','سيرفر','دومين','أدوات','اشتراكات','إعلانات فيسبوك','مقاول',...Object.keys(byCat)])];
+  h+=`<div class="addmv" id="exp-add" style="margin:14px 0">
+      <select id="e-deal">${opts}</select>
+      <input type="number" id="e-amt" placeholder="المبلغ بالجنيه" step="any">
+      <input class="cat2" id="e-cat" placeholder="البند" list="ecats">
+      <datalist id="ecats">${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</datalist>
+      <input type="date" id="e-dt" value="${today()}">
+      <input class="nt2" id="e-nt" placeholder="ملاحظة (مثلاً: مرتب عبدالرحمن)">
+      <button class="btn g" style="padding:8px 14px" onclick="addExp()">➕ ضيف مصروف</button></div>`;
+  if(!rows.length) return h+`<div class="empty">مفيش مصاريف في الفترة دي.</div>`;
+  return h+`<table><thead><tr><th>يوم</th><th>المشروع</th><th>البند</th><th>ملاحظة</th><th>المبلغ</th><th></th></tr></thead><tbody>`
+    + rows.map(f=>`<tr><td class="mono">${fmtD(f.dt)}</td><td class="ttl">${esc(rowName(f))}</td>
+        <td>${esc(f.category)||'—'}</td><td style="color:var(--mut);font-size:12px">${esc(f.note)}</td>
+        <td class="num mono neg">${egp(f.amount,curOf(f))}</td>
+        <td><span class="x" style="cursor:pointer" title="امسح" onclick="delMv('${f.id}')">✕</span></td></tr>`).join('')
+    + `</tbody></table>`;
+}
+// المبلغ بيتكتب بالجنيه؛ مشروع بالدولار بيتخزّن بعملته (زي باقي حركاته) والملاحظة بتقول السعر
+function addExp(){
+  const g=id=>document.getElementById(id);
+  const egpAmt=parseFloat(g('e-amt').value||'0'); if(!egpAmt){alert('اكتب المبلغ');return;}
+  const did=g('e-deal').value, d=D.deals.find(x=>x.id===did);
+  const fx=did===GEN?1:fxOf(d&&d.currency);
+  let note=g('e-nt').value.trim();
+  if(fx!==1) note=(note?note+' ':'')+`(${money(egpAmt)}ج بسعر ${fx})`;
+  fetch('/api/w/finance',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({deal_id:did,kind:'expense',amount:Math.round(egpAmt/fx*100)/100,
+      category:g('e-cat').value.trim()||'غير مصنّف',dt:g('e-dt').value||today(),note})})
+    .then(r=>r.json()).then(load);
+}
+
+function genBox(){
+  const rows=FIN.filter(f=>f.deal_id===GEN&&f.kind!=='income'&&inPer(f.dt)).sort((a,b)=>(b.dt||'').localeCompare(a.dt||''));
+  const tot=rows.reduce((s,f)=>s+(+f.amount||0),0);
+  const adr=rows.filter(isAd), ads=adr.reduce((s,f)=>s+(+f.amount||0),0);
+  const fbd=D.deals.filter(d=>isFb(d.source)&&LIVE.includes(d.stage)&&(PER==='all'||inPer(dStart(d))));
+  const fbv=fbd.reduce((s,d)=>s+(+d.value||0),0);
+  const fbc=fbd.reduce((s,d)=>s+(+d.collected||0),0);
+  const cats=Object.entries(rows.reduce((o,f)=>{const k=f.category||'غير مصنّف';o[k]=(o[k]||0)+(+f.amount||0);return o;},{}));
+  const op=OPEN===GEN;
+  let h=`<div class="gen ${op?'op':''}"><div class="gen-h" onclick="toggle('${GEN}')">
+      <b>🧾 مصاريف عامة</b><span style="color:var(--dim);font-size:11.5px">مش تبع مشروع — بتتخصم من صافي الربح · ${rows.length} حركة</span>
+      <span style="margin-inline-start:auto;color:var(--mut);font-size:12px">${op?'▲ اقفل':'▼ التفاصيل / ضيف مصروف'}</span></div>
+    <div class="gen-cards">
+      <div class="gc"><div class="l">إجمالي المصاريف العامة</div><div class="v mono neg">${money(tot)}</div>
+        <div class="s">${cats.map(([k,v])=>esc(k)+' '+money(v)).join(' · ')||'—'}</div></div>
+      <div class="gc fb"><div class="l">📘 صرفت على إعلانات فيسبوك</div><div class="v mono">${money(ads)}</div>
+        <div class="s">${adr.length} مرة شحن</div></div>
+      <div class="gc fb"><div class="l">🎯 العميل من الإعلان كلّفك</div><div class="v mono">${fbd.length?money(ads/fbd.length):'—'}</div>
+        <div class="s">${fbd.length} عميل جه من الإعلان</div></div>
+      <div class="gc fb"><div class="l">💰 الإعلان جاب مشاريع بـ</div><div class="v mono pos">${money(fbv)}</div>
+        <div class="s">محصّل منهم ${money(fbc)}${ads?' · كل ١ج رجّع '+(fbv/ads).toFixed(1)+'ج':''}</div></div>
+    </div>`;
+  if(op){
+    h+=`<div class="pc-det" style="margin-top:12px" onclick="event.stopPropagation()">`
+      + (rows.length? rows.map(f=>`<div class="mv">
+          <span class="k expense">مصروف</span>
+          <span class="mono" style="color:var(--dim);font-size:11px">${fmtD(f.dt)}</span>
+          <span class="cat">${esc(f.category)||'—'}</span><span class="nt">${esc(f.note)}</span>
+          <span class="when" title="اتسجّل على السيستم">📝 ${fmtAt(f.created_at)}</span>
+          <span class="num mono neg">${money(f.amount)}</span>
+          <span class="x" onclick="delMv('${f.id}')">✕</span></div>`).join('')
+        : `<div style="color:var(--dim);font-size:12.5px">مفيش مصاريف عامة في الفترة دي.</div>`)
+      + `<div class="addmv"><input type="hidden" id="m-kind" value="expense">
+          <input type="number" id="m-amt" placeholder="المبلغ" step="any">
+          <input class="cat2" id="m-cat" placeholder="الفئة" list="gcats" value="إعلانات فيسبوك">
+          <datalist id="gcats"><option>إعلانات فيسبوك</option><option>اشتراكات</option><option>أدوات</option><option>سيرفر</option><option>مواصلات</option></datalist>
+          <input type="date" id="m-dt" value="${today()}">
+          <input class="nt2" id="m-nt" placeholder="ملاحظة (مثلاً: حملة سبتمبر)">
+          <button class="btn g" style="padding:8px 14px" onclick="addMv('${GEN}')">➕ ضيف</button></div></div>`;
+  }
+  return h+`</div>`;
+}
+
+/* ── سجل الدفعات: كل فلوس دخلت أو خرجت، بتاريخها الفعلي وتاريخ تسجيلها ── */
+function logView(){
+  const name=id=>id===GEN?'🧾 مصاريف عامة':((D.deals.find(d=>d.id===id)||{}).title||'—');
+  const _sp=(D.general&&D.general.ads_split)||[];
+  const rowName=f=>(f.deal_id===GEN&&_sp.length&&isAd(f))?'📘 إعلانات فيسبوك — موزّعة على '+_sp.length+' مشروع':name(f.deal_id);
+  const rows=FIN.filter(f=>f.deal_id&&inPer(f.dt)&&(LOGK==='all'||(LOGK==='income'?f.kind==='income':f.kind!=='income')))
+    .sort((a,b)=>(b.dt||'').localeCompare(a.dt||'')||(b.created_at||'').localeCompare(a.created_at||''));
+  const inc=rows.filter(f=>f.kind==='income').reduce((s,f)=>s+fxAmt(f),0);
+  const exp=rows.filter(f=>f.kind!=='income').reduce((s,f)=>s+fxAmt(f),0);
+  const curOf=id=>(D.deals.find(d=>d.id===id)||{}).currency;
+  let h=`<div class="tabs" style="margin:0 0 12px">`+[['all','الكل'],['income','💵 مدفوعات'],['expense','💸 مصاريف']]
+      .map(([k,l])=>`<button class="tab ${LOGK===k?'on':''}" onclick="LOGK='${k}';draw()">${l}</button>`).join('')
+    +`<span style="margin-inline-start:auto;font-size:12px;color:var(--mut)">دخل <b class="pos mono">${money(inc)}</b> · خرج <b class="neg mono">${money(exp)}</b></span></div>`;
+  if(!rows.length) return h+`<div class="empty">مفيش حركات في الفترة دي.</div>`;
+  return h+`<table><thead><tr><th>اتستلم / اتصرف يوم</th><th>النوع</th><th>المشروع</th><th>الفئة</th><th>ملاحظة</th><th>المبلغ</th><th>اتسجّل على السيستم</th></tr></thead><tbody>`
+    + rows.map(f=>`<tr><td class="mono">${fmtD(f.dt)}</td>
+        <td><span class="k ${f.kind}">${f.kind==='income'?'مدفوع':'مصروف'}</span></td>
+        <td class="ttl">${esc(rowName(f))}</td><td>${esc(f.category)||'—'}</td>
+        <td style="color:var(--mut);font-size:12px">${esc(f.note)}</td>
+        <td class="num mono ${f.kind==='income'?'pos':'neg'}">${egp(f.amount,curOf(f.deal_id))}</td>
+        <td class="when">${fmtAt(f.created_at)}</td></tr>`).join('')+`</tbody></table>`;
+}
+
+function addMv(did){
+  const g=id=>document.getElementById(id);
+  const amt=parseFloat(g('m-amt').value||'0');
+  if(!amt){alert('اكتب المبلغ');return;}
+  fetch('/api/w/finance',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({deal_id:did,kind:g('m-kind').value,amount:amt,
+      category:g('m-cat').value.trim()||'غير مصنّف',dt:g('m-dt').value,note:g('m-nt').value.trim()})})
+    .then(r=>r.json()).then(load);
+}
+function linkFin(id,did){
+  if(!did)return;
+  fetch('/api/w/link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,deal_id:did})})
+    .then(r=>r.json()).then(r=>{if(r.ok===false)alert(r.error);load();});
+}
+function delMv(id){
+  if(!confirm('تمسح الحركة دي؟ هتتمسح من «الفلوس» في دوّنلي كمان.'))return;
+  fetch('/api/w/finance?id='+encodeURIComponent(id),{method:'DELETE'}).then(r=>r.json()).then(load);
+}
+
+/* ── الفورمات ─────────────────────────────────────────────────────────── */
+function openMd(html){$('#md').innerHTML=html;$('#ov').classList.add('on');}
+function closeMd(){$('#ov').classList.remove('on');}
+$('#ov').onclick=e=>{if(e.target.id==='ov')closeMd();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMd();});
+
+function clientForm(id){
+  const c=(D.clients.find(x=>x.id===id))||{};
+  openMd(`<h3>${id?'تعديل عميل':'عميل جديد'}</h3>
+    <div class="fld"><label>الاسم</label><input id="c-name" value="${esc(c.name)}"></div>
+    <div class="two">
+      <div class="fld"><label>واتساب</label><input id="c-phone" class="mono" value="${esc(c.phone)}" placeholder="+20…"></div>
+      <div class="fld"><label>البلد</label><input id="c-country" value="${esc(c.country)}" placeholder="مصر / السعودية…"></div>
+    </div>
+    <div class="fld"><label>جه منين</label><input id="c-source" value="${esc(c.source)}" list="srcs" placeholder="إعلان / القناة / إحالة…">
+      <datalist id="srcs">${SRC.map(s=>'<option>'+s+'</option>').join('')}</datalist>
+      <div class="hint">ده أهم حقل في الصفحة — بيقولك أي قناة بتجيب فلوس فعلًا.</div></div>
+    <div class="fld"><label>ملاحظات</label><textarea id="c-note">${esc(c.note)}</textarea></div>
+    <div class="acts"><button class="btn" onclick="saveClient('${id||''}')">حفظ</button>
+      <button class="btn o" onclick="closeMd()">إلغاء</button>
+      ${id?`<button class="del" onclick="killClient('${id}')">مسح</button>`:''}</div>`);
+}
+function saveClient(id){
+  const g=x=>document.getElementById(x).value;
+  const name=g('c-name').trim();
+  if(!name){alert('اكتب اسم العميل');return;}
+  const b={name,phone:g('c-phone'),country:g('c-country'),source:g('c-source'),note:g('c-note')};
+  if(id)b.id=id;
+  fetch('/api/w/client',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})
+    .then(r=>r.json()).then(()=>{closeMd();load();});
+}
+function killClient(id){
+  if(!confirm('تمسح العميل ده؟'))return;
+  fetch('/api/w/client?id='+encodeURIComponent(id),{method:'DELETE'}).then(r=>r.json())
+    .then(r=>{if(!r.ok){alert(r.error);return;}closeMd();load();});
+}
+
+let TASKS=[];   // تاسكات المشروع المفتوح في الفورم
+function parseTasks(s){ try{const a=JSON.parse(s||'[]');return Array.isArray(a)?a:[];}catch{return[];} }
+function taskRows(){
+  const sum=TASKS.reduce((s,t)=>s+(parseFloat(t.price)||0),0);
+  return TASKS.map((t,i)=>`<div class="addmv" style="margin-top:7px">
+      <input class="nt2" value="${esc(t.title)}" oninput="TASKS[${i}].title=this.value" placeholder="اسم التاسك">
+      <input type="number" step="any" value="${t.price??''}" oninput="TASKS[${i}].price=this.value" placeholder="سعرها">
+      <span class="mv x" onclick="TASKS.splice(${i},1);renderTasks()">✕</span></div>`).join('')
+    +`<div style="margin-top:8px;display:flex;gap:9px;align-items:center">
+        <button class="btn o" style="padding:6px 12px;font-size:12px" onclick="TASKS.push({title:'',price:''});renderTasks()">➕ تاسك</button>
+        ${sum?`<span class="hint" style="margin:0">مجموع التاسكات: <b class="mono">${money(sum)}</b> — يتحسب إجمالي لو سِبت الإجمالي فاضي</span>`:''}</div>`;
+}
+function renderTasks(){const el=document.getElementById('d-tasks-box');if(el)el.innerHTML=taskRows();}
+
+function dealForm(id){
+  const d=(D.deals.find(x=>x.id===id))||{stage:'lead',currency:'EGP'};
+  const cl=D.clients.find(x=>x.id===d.client_id)||{};
+  TASKS=parseTasks(d.tasks);
+  const names=[...new Set(D.clients.map(c=>c.name).filter(Boolean))];
+  openMd(`<h3>${id?'تعديل مشروع':'مشروع جديد'}</h3>
+    <div class="fld"><label>اسم المشروع</label><input id="d-title" value="${esc(d.title)}" placeholder="نظام حسابات لـ…"></div>
+    <div class="two">
+      <div class="fld"><label>العميل</label><input id="d-client" value="${esc(cl.name)}" list="clnames" placeholder="اسم العميل">
+        <datalist id="clnames">${names.map(n=>'<option>'+esc(n)+'</option>').join('')}</datalist></div>
+      <div class="fld"><label>رقم التليفون</label><input id="d-phone" class="mono" value="${esc(cl.phone)}" placeholder="+20…"></div>
+    </div>
+    <div class="two">
+      <div class="fld"><label>تاريخ دخول المشروع</label><input type="date" id="d-started" value="${dStart(d)||today()}"></div>
+      <div class="fld"><label>الدفعة المبدئية</label><input type="number" step="any" id="d-deposit" value="${d.deposit||''}" placeholder="أول دفعة"></div>
+    </div>
+    <div class="fld"><label>استلمت الدفعة المبدئية يوم</label><input type="date" id="d-depat" value="${d.deposit_at||''}">
+      <div class="hint">لو حطيت تاريخ هنا، الدفعة بتتسجّل في المدفوعات بالتاريخ ده لوحدها.</div></div>
+    <div class="two">
+      <div class="fld"><label>نوع الدفع</label><select id="d-billing" onchange="document.getElementById('d-mon-box').style.display=this.value==='monthly'?'':'none'">
+        <option value="">مرة واحدة (إجمالي)</option>
+        <option value="monthly" ${d.billing==='monthly'?'selected':''}>🔁 تجديد شهري</option></select></div>
+      <div class="fld" id="d-mon-box" style="${d.billing==='monthly'?'':'display:none'}"><label>قيمة الشهر</label>
+        <input type="number" step="any" id="d-monthly" value="${d.monthly||''}" placeholder="مثلًا 470">
+        <div class="hint">بيتحسب كل شهر في نفس يوم «تاريخ دخول المشروع» — الإجمالي بيكبر لوحده.</div></div>
+    </div>
+    <div class="two">
+      <div class="fld"><label>المبلغ الإجمالي</label><input type="number" step="any" id="d-value" value="${(d.base_value??d.value)||''}" placeholder="سيبه فاضي لو مش معروف">
+        <div class="hint">فاضي = المبلغ الإجمالي لسه مش متحدّد.${+d.extras_total>0?` الاتفاق الأصلي بس — التطويرات الإضافية (+${money(d.extras_total)}) بتتضاف لوحدها من جوّه المشروع.`:''}</div></div>
+      <div class="fld"><label>العملة</label><select id="d-currency">
+        ${['EGP','USD','SAR','AED','EUR'].map(x=>`<option ${d.currency===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    </div>
+    <div class="two">
+      <div class="fld"><label>جه منين (المصدر)</label><input id="d-source" value="${esc(d.source)}" list="srcs2" placeholder="إعلان فيسبوك مدفوع / إحالة…">
+        <datalist id="srcs2"><option>إعلان فيسبوك مدفوع</option><option>القناة</option><option>إحالة</option><option>معرفة شخصية</option></datalist></div>
+      <div class="fld"><label>لوجو (رابط صورة)</label><input id="d-logo" class="mono" value="${esc(d.logo)}" placeholder="/uploads/…"></div>
+    </div>
+    <div class="fld"><label>👥 الفريق على المشروع</label><input id="d-team" value="${esc(d.team)}" placeholder="مثلًا: عبدالرحمن، أحمد (موظفين أو فريلانسرز)">
+      <div class="hint">افصل بين الأسامي بفاصلة. دوّنلي بيربط أي مرتب أو مصروف لحد منهم بالمشروع ده لوحده.</div></div>
+    <div class="fld"><label>تاسكات العميل <span class="hint" style="display:inline">(كل واحدة ممكن سعر مختلف)</span></label>
+      <div id="d-tasks-box">${taskRows()}</div></div>
+    <div class="fld"><label>ملاحظات</label><textarea id="d-note">${esc(d.note)}</textarea></div>
+    <input type="hidden" id="d-stage" value="${d.stage||'lead'}">
+    <div class="acts"><button class="btn" onclick="saveDeal('${id||''}')">حفظ</button>
+      <button class="btn o" onclick="closeMd()">إلغاء</button>
+      ${id?`<button class="del" onclick="killDeal('${id}')">مسح</button>`:''}</div>`);
+}
+function saveDeal(id){
+  const g=x=>document.getElementById(x).value;
+  const title=g('d-title').trim();
+  if(!title){alert('اكتب اسم المشروع');return;}
+  const tasks=TASKS.filter(t=>(t.title||'').trim()||t.price).map(t=>({title:(t.title||'').trim(),price:parseFloat(t.price)||0}));
+  const send=cid=>{
+    const b={title,client_id:cid,stage:g('d-stage')||'lead',value:g('d-value')||0,
+      currency:g('d-currency'),deposit:g('d-deposit')||0,
+      note:g('d-note'),tasks:JSON.stringify(tasks),logo:g('d-logo'),source:g('d-source'),
+      started_at:g('d-started'),deposit_at:g('d-depat'),
+      billing:g('d-billing'),monthly:g('d-billing')==='monthly'?(g('d-monthly')||0):0,team:g('d-team').trim()};
+    if(id)b.id=id;
+    fetch('/api/w/deal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})
+      .then(r=>r.json()).then(()=>{closeMd();load();});
+  };
+  // العميل: لاقي بالاسم أو اعمل واحد جديد، وحدّث تليفونه
+  const name=g('d-client').trim(), phone=g('d-phone').trim();
+  if(!name){ send(''); return; }
+  const ex=D.clients.find(c=>c.name===name);
+  const cb={name,phone}; if(ex)cb.id=ex.id;
+  fetch('/api/w/client',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cb)})
+    .then(r=>r.json()).then(r=>send((r&&r.id)||(ex&&ex.id)||''));
+}
+function killDeal(id){
+  if(!confirm('تمسح المشروع ده؟ الحركات المالية مش هتتمسح — بس هتتفكّ منه.'))return;
+  fetch('/api/w/deal?id='+encodeURIComponent(id),{method:'DELETE'}).then(r=>r.json())
+    .then(()=>{OPEN=null;closeMd();load();});
+}
+
+load();
+</script>
+</body>
+</html>
