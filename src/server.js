@@ -423,7 +423,10 @@ export function startServer() {
   };
   app.get(["/projects", "/projects.html"], workPage("projects.html"));
   app.get(["/content", "/content-money.html"], workPage("content-money.html"));
-  app.get("/w-mobile.css", (req, res) => res.sendFile(join(publicDir, "w-mobile.css")));
+  app.get(["/w-mobile.css", "/w-dawenli.css", "/w-embed.js"], (req, res) => {
+    res.set("Cache-Control", "no-cache");
+    res.sendFile(join(publicDir, req.path.slice(1)));
+  });
   // لوجوهات المشاريع (اتنقلت من uploads بتاعة الماكينة)
   app.get("/uploads/:file", (req, res) => {
     const u = sessionUser(req);

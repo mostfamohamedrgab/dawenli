@@ -1,0 +1,129 @@
+/* ===========================================================================
+   صفحتين الشغل (المشاريع + ماليات المحتوى) بهوية دوّنلي «دفتر»:
+   ورق دافي + حبر + أخضر هادي، Lemonada للعناوين و Tajawal للنصوص والأرقام.
+   الصفحات جاية من الماكينة (ثيم غامق) — الملف ده بيتحمّل بعد ستايلها فبيغلبه.
+   جوّه دوّنلي (iframe) بيتشال الشريط اللي فوق والعنوان، لأن الصفحة الأم بتعرضهم.
+   =========================================================================== */
+@import url("https://fonts.googleapis.com/css2?family=Lemonada:wght@500;700&family=Tajawal:wght@400;500;700;800&display=swap");
+
+:root {
+  --bg: #F6F1E4; --bg2: #FFFCF5; --card: #FFFCF5; --card2: #F3EDDF; --line: #DFD7C4;
+  --txt: #34302A; --mut: #6E665A; --dim: #9A9082;
+  --pur: #5285A6; --pur2: #5C8A6B; --cyan: #2F7F79; --green: #527F35; --gold: #B7791F;
+  --pink: #C4543F; --orange: #C9682E; --blue: #3A647F; --glow: rgba(92,138,107,.18);
+  --paper-deep: #EFE8D6; --brand: #5C8A6B; --brand-deep: #426B52; --ink: #34302A; --hair2: #C9BFA8;
+}
+body {
+  font-family: "Tajawal", system-ui, sans-serif;
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  color: var(--txt);
+  -webkit-font-smoothing: antialiased;
+}
+.mono, .kpi input { font-family: "Tajawal", system-ui, sans-serif !important; font-weight: 800; }
+h1, h2, h3, .md h3, .rep h3 { font-family: "Lemonada", "Tajawal", sans-serif; color: var(--txt); }
+h1 { background: none; -webkit-text-fill-color: currentColor; font-weight: 700; letter-spacing: 0; }
+
+/* الشريط اللي فوق (لما الصفحة تتفتح لوحدها) */
+.osbar { background: rgba(255,252,245,.88); border-bottom: 1px solid var(--line); }
+.osbar b { font-family: "Lemonada", sans-serif; }
+.logo { background: #E4EEE6 !important; box-shadow: none !important; }
+.back { border: 1.5px solid var(--line); color: var(--mut); background: var(--card); }
+.back:hover { border-color: var(--brand); color: var(--brand-deep); }
+
+/* جوّه دوّنلي */
+html.embed body { background: transparent; min-height: 0; }
+html.embed .osbar, html.embed .wrap > h1, html.embed .wrap > .sub { display: none; }
+html.embed .wrap { max-width: none; padding: 0 0 24px; }
+
+/* الكروت */
+.kpi, .rep, .addbar, .cat, .gen, .exp-box, .pcard, table, .empty {
+  background: var(--card); border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(52,48,42,.06);
+}
+.kpi { border-radius: 20px; }
+.kpi .l { color: var(--mut); font-weight: 700; }
+.kpi .v { font-family: "Tajawal", sans-serif; font-weight: 800; }
+.kpi.drill:hover, .kpi.ed:hover { border-color: var(--brand); }
+.pcard, .gen, .rep, .cat, .addbar { border-radius: 22px; }
+.pcard:hover { border-color: var(--brand); box-shadow: 0 4px 16px rgba(52,48,42,.08); }
+.pcard.op { border-color: #C9962E; box-shadow: 0 4px 16px rgba(201,150,46,.15); }
+.pc-ttl { font-weight: 800; }
+.pc-logo { background: #fff; border: 1px solid var(--line); }
+.pc-n, .gc, .pc-exp { background: var(--bg); border-color: var(--line); }
+.empty { border: 1.5px dashed var(--hair2); border-radius: 20px; }
+.alert { background: #FBEAE5; border-color: #E0705C; color: #C4543F; }
+
+/* هوية فيسبوك على الورق */
+.kpi.fb { background: linear-gradient(160deg, #E6F0FE, #F7FAFF 75%); border-color: rgba(24,119,242,.38); }
+.kpi.fb .l { color: #1659B8; }
+.kpi.fb .v { color: #0F3E80; }
+.kpi.fb.fb2 .v { color: var(--green); }
+.kpi.fb .s { color: #5B7FB5; }
+.kpi.fb::after { filter: invert(30%) sepia(95%) saturate(2600%) hue-rotate(205deg); opacity: .09; }
+.gc.fb { background: #EEF4FE; }
+
+/* الأزرار والتابات */
+.btn {
+  background: var(--brand); color: #FFFCF5; border: 2px solid var(--brand-deep); border-radius: 14px;
+  font-family: "Tajawal", sans-serif; font-weight: 700; box-shadow: 0 4px 16px rgba(52,48,42,.08);
+}
+.btn:hover { background: var(--brand-deep); filter: none; }
+.btn.g { background: #6FA84A; border-color: #527F35; color: #FFFCF5; }
+.btn.g:hover { background: #527F35; }
+.btn.o { background: var(--card); border: 2px solid var(--ink); color: var(--ink); box-shadow: none; }
+.btn.o:hover { border-color: var(--brand); color: var(--brand-deep); }
+.tab { background: var(--card); border: 1.5px solid var(--line); color: var(--mut); font-family: "Tajawal", sans-serif; font-weight: 700; }
+.tab:hover { border-color: var(--hair2); color: var(--txt); }
+.tab.on { border-color: #6FA84A; color: #527F35; background: #EAF2E1; }
+.acts .del { border-color: rgba(196,84,63,.45); color: #C4543F; font-family: "Tajawal", sans-serif; }
+
+/* الحقول */
+input, select, textarea, .addbar select, .addbar input, .pbar input[type=date], .pbar select, .tabs select {
+  background: var(--card); border: 1.5px solid var(--hair2); border-radius: 12px; color: var(--txt); font-family: "Tajawal", sans-serif;
+}
+input:focus, select:focus, textarea:focus, .addbar input:focus, .addbar select:focus { border-color: var(--brand); }
+.tabs select option, select option { background: var(--card); color: var(--txt); }
+.kpi input { background: var(--bg); border-color: var(--blue); color: var(--txt); }
+
+/* الجداول والحركات */
+th { background: var(--card2); color: var(--mut); }
+td { border-top: 1px solid var(--line); }
+tr.d:hover td, .cathd:hover, .brandhd:hover { background: var(--bg); }
+.det td { background: var(--bg); }
+.dt td { border-bottom: 1px solid var(--line); }
+.mv { border-bottom: 1px solid var(--line); }
+.extras { border-bottom: 1px dashed var(--hair2); }
+.mv .k.income, td .k.income { background: #EAF2E1; color: #527F35; }
+.mv .k.expense, td .k.expense { background: #FBEAE5; color: #C4543F; }
+.mv .k.ex { background: #FBF0D9; color: #C07F25; }
+.xst { background: var(--card2); color: var(--mut); }
+.xst.wip { background: #FBF0D9; color: #C07F25; }
+.xst.done { background: #EAF2E1; color: #527F35; }
+.pos { color: #527F35; } .neg { color: #C4543F; }
+.ex-hint { color: #B7791F; }
+h2 .n, .cathd .cnt, .brandhd .cnt { background: var(--paper-deep); color: var(--mut); }
+
+/* المودال */
+.ov { background: rgba(52,48,42,.4); backdrop-filter: none; }
+.md { background: var(--card); border: 2px solid var(--ink); border-radius: 28px; box-shadow: 0 10px 30px rgba(52,48,42,.12); }
+.fld label { color: var(--mut); }
+
+/* ماليات المحتوى */
+.repbar .track { background: var(--paper-deep); }
+.inc .track > i { background: linear-gradient(90deg, #6FA84A, #5C8A6B); }
+.exp .track > i { background: linear-gradient(90deg, #E0705C, #E3A24A); }
+.kpi.inc .v { color: #527F35; } .kpi.exp .v { color: #C4543F; } .kpi.net .v { color: #3A647F; }
+.items { border-top: 1px solid var(--line); }
+.item { border-bottom: 1px solid var(--line); }
+.brand { border-bottom: 1px solid var(--line); }
+.bitems { background: var(--bg); }
+.section.inc > h2 { color: #527F35; } .section.exp > h2 { color: #C4543F; }
+.section.inc .item .a, .section.inc .brandhd .sum { color: #527F35; }
+.section.exp .item .a, .section.exp .brandhd .sum { color: #C4543F; }
+
+/* موبايل: كروت الأرقام عمودين (طبقة الموبايل بتاعة الماكينة كانت بتخليها عمود واحد) */
+@media (max-width: 640px) {
+  .kpis { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+  .kpi { padding: 11px 12px; border-radius: 16px; }
+  .kpi .v { font-size: 18px; }
+}

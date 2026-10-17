@@ -45,14 +45,14 @@
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></span>
             <span>الفلوس</span>
           </button>
-          <a class="nav-btn finances work-only" href="/projects" style="display:none;text-decoration:none">
+          <button class="nav-btn finances work-only" data-tab="projects" style="display:none">
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg></span>
             <span>المشاريع <span class="muted" style="font-weight:500;font-size:11px">برمجة · عملاء · فيسبوك</span></span>
-          </a>
-          <a class="nav-btn finances work-only" href="/content" style="display:none;text-decoration:none">
+          </button>
+          <button class="nav-btn finances work-only" data-tab="contentmoney" style="display:none">
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg></span>
             <span>ماليات المحتوى <span class="muted" style="font-weight:500;font-size:11px">رعايات · مونتاج · معدّات</span></span>
-          </a>
+          </button>
           <button class="nav-btn goals" data-tab="tasks">
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 9h18M9 15l2 2 4-4"/></svg></span>
             <span>المهام والتقويم</span>
@@ -470,6 +470,28 @@
           </section>
 
           <!-- ========== دفترك (هَب موحّد: يوميات/خواطر/أفكار/مشاكل) ========== -->
+          <!-- ========== 💼 المشاريع + 💸 ماليات المحتوى (لصاحب الشغل بس) — الصفحة جوّه إطار ========== -->
+          <section class="tab-panel hidden" data-panel="projects">
+            <div class="page-head">
+              <div>
+                <span class="world-pill finances">شغلك</span>
+                <h1>💼 العملاء والمشاريع</h1>
+                <p class="ph-sub">مشاريع البرمجة — كل مشروع بمدفوعاته ومصاريفه، والمتبقي بيتحسب لوحده</p>
+              </div>
+            </div>
+            <iframe class="work-frame" data-src="/projects" title="المشاريع"></iframe>
+          </section>
+          <section class="tab-panel hidden" data-panel="contentmoney">
+            <div class="page-head">
+              <div>
+                <span class="world-pill finances">قناتك</span>
+                <h1>💸 ماليات المحتوى</h1>
+                <p class="ph-sub">رعايات ومصاريف المحتوى (مونتاج، معدّات…) بالدولار — مفصولة عن مشاريع البرمجة</p>
+              </div>
+            </div>
+            <iframe class="work-frame" data-src="/content" title="ماليات المحتوى"></iframe>
+          </section>
+
           <section class="tab-panel hidden" data-panel="dafter">
             <div class="page-head">
               <div><span class="world-pill">دفترك</span><h1>دفترك</h1></div>
@@ -876,8 +898,8 @@
         <div class="more-sec">دفترك</div>
         <button class="more-item" data-tab="dafter"><span class="mi-ico">📔</span><span>دفترك (يوميات/خواطر/أفكار/مشاكل)</span></button>
         <button class="more-item" data-tab="assets"><span class="mi-ico">💎</span><span>الأصول</span></button>
-        <a class="more-item work-only" href="/projects" style="display:none;text-decoration:none;color:inherit"><span class="mi-ico">💼</span><span>المشاريع (برمجة)</span></a>
-        <a class="more-item work-only" href="/content" style="display:none;text-decoration:none;color:inherit"><span class="mi-ico">💸</span><span>ماليات المحتوى</span></a>
+        <button class="more-item work-only" data-tab="projects" style="display:none"><span class="mi-ico">💼</span><span>المشاريع (برمجة)</span></button>
+        <button class="more-item work-only" data-tab="contentmoney" style="display:none"><span class="mi-ico">💸</span><span>ماليات المحتوى</span></button>
         <div class="more-sec">أدوات</div>
         <button class="more-item" data-tab="ask"><span class="mi-ico">💬</span><span>اسأل دوّنلي</span></button>
         <button class="more-item" data-tab="files"><span class="mi-ico">📎</span><span>مركز الملفات</span></button>

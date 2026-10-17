@@ -2181,3 +2181,6 @@ select.field { cursor: pointer; }
    مش شغّالة والوعد بتاع askConfirm مابيتحلّش (التطبيق يبان واقف). */
 #confirmOverlay { z-index: 300; }
 
+
+/* ===================== 💼 المشاريع / 💸 ماليات المحتوى (إطار) ===================== */
+.work-frame { display: block; width: 100%; min-height: 420px; border: 0; background: transparent; color-scheme: light; }

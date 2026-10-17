@@ -289,6 +289,32 @@ $("editForm")?.addEventListener("submit", async (e) => {
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("editOverlay")?.classList.contains("hidden")) closeEdit(); });
 
+/* ===================== 💼 المشاريع / 💸 ماليات المحتوى (صفحات جوّه إطار) =====================
+   الصفحة بتتحمّل أول مرة التاب يتفتح، وبعد كده بتتحدّث بس. الإطار بياخد طول المحتوى (w-embed.js بيبعته)،
+   ولو مودال اتفتح جوّاه بنطلع لأول الإطار عشان يبان. */
+function openWorkFrame(tab) {
+  const f = document.querySelector(`[data-panel="${tab}"] .work-frame`);
+  if (!f) return;
+  if (!f.src) f.src = f.dataset.src;
+  else f.contentWindow?.postMessage({ type: "w-reload" }, location.origin);
+}
+let workModalScroll = null;
+window.addEventListener("message", (e) => {
+  if (e.origin !== location.origin || !e.data?.type) return;
+  const f = [...document.querySelectorAll(".work-frame")].find((x) => x.contentWindow === e.source);
+  if (!f) return;
+  if (e.data.type === "w-height") f.style.height = Math.max(420, Number(e.data.h) || 0) + "px";
+  if (e.data.type === "w-modal") {
+    if (e.data.open) {
+      if (workModalScroll === null) workModalScroll = window.scrollY;
+      window.scrollTo({ top: f.getBoundingClientRect().top + window.scrollY - 12, behavior: "smooth" });
+    } else if (workModalScroll !== null) {
+      window.scrollTo({ top: workModalScroll, behavior: "smooth" });
+      workModalScroll = null;
+    }
+  }
+});
+
 /* ===================== Navigation ===================== */
 function gotoTab(tab) {
   // حارس: أزرار زي «بلّغ عن مشكلة» و«الإعدادات» بتفتح موديل ومالهاش data-tab،
@@ -315,6 +341,7 @@ function gotoTab(tab) {
   if (tab === "habits") renderHabitsPage();
   if (tab === "goals") renderGoalsPage();
   if (tab === "finances") renderFinancesPage();
+  if (tab === "projects" || tab === "contentmoney") openWorkFrame(tab);
   if (tab === "ideas") renderIdeasPage();
   if (tab === "tasks") renderTasksPage();
   if (tab === "assets") renderAssetsPage();
