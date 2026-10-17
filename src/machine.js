@@ -9,7 +9,8 @@
 
 import { config } from "./config.js";
 import { getFinance, markFinanceSynced, financePendingMachine, normCurKey } from "./db.js";
-import { workOn, activeProjects, getProject } from "./work.js";
+import { workOn, getProject } from "./work.js";
+import { workList } from "./workpage.js";
 
 export const machineOn = (userId) => !!config.machineUrl && Number(userId) === config.machineUserId;
 
@@ -32,7 +33,20 @@ async function call(method, path, body) {
 // مكان في الماكينة فقيوده بتفضل هنا بس. الاسم machineProjects فاضل عشان باقي الكود.
 export async function machineProjects(userId) {
   if (!workOn(userId)) return [];
-  const list = activeProjects(userId);
+  // نفس أرقام صفحة المشاريع بالظبط (الإجمالي بالتطويرات، المحصّل، الباقي)
+  const w = workList(userId);
+  const nz = (s) => String(s || "").replace(/\s+/g, "");
+  const auto = new Set((w.staff || []).filter((s) => (s.rules || []).length).map((s) => nz(s.name)));
+  const list = w.deals
+    .filter((d) => d.stage !== "lost" && !+d.archived)
+    .map((d) => ({
+      id: d.id, title: d.title || "", client: d.client_name || "", stage: d.stage, currency: d.currency || "EGP",
+      value: Number(d.value) || 0, collected: Number(d.collected) || 0, due: Number(d.due) || 0,
+      monthly: d.billing === "monthly" ? Number(d.monthly) || 0 : 0, source: d.source || "",
+      team: String(d.team || "").slice(0, 120),
+      team_auto: String(d.team || "").split(/[،,]/).map((x) => x.trim()).filter((x) => x && auto.has(nz(x))).join("، "),
+      note: String(d.note || "").slice(0, 80),
+    }));
   // «مصاريف الشغل العامة» (deal_id = general) كأنها مشروع: اشتراكات الأدوات (Claude/ChatGPT/
   // Cursor…)، السيرفرات، الدومينات، إعلانات فيسبوك — مصاريف شغل مش تبع مشروع واحد.
   list.push({ id: "general", title: "🧰 مصاريف الشغل العامة", client: "", stage: "won", currency: "EGP",
@@ -62,7 +76,8 @@ const dayDiff = (a, b) => Math.abs(new Date(`${a}T00:00:00Z`) - new Date(`${b}T0
 // بيبعت قيد واحد للماكينة حسب حالته: مربوط بمشروع → يتقيّد/يتحدّث هناك، اتفك ربطه → يتشال من المشروع.
 // بيرجّع { ok, existing?, machineId?, error? } — مابيرميش أخطاء.
 export async function syncFinance(userId, financeId) {
-  if (!machineOn(userId)) return { ok: false, error: "off" };
+  // الماكينة اتشال منها الفلوس (١٧ أكتوبر ٢٠٢٦) — من غير MACHINE_URL القيد بيفضل في دوّنلي وده كفاية
+  if (!machineOn(userId)) return { ok: true, local: true };
   const f = getFinance(userId, financeId);
   if (!f) return { ok: false, error: "missing" };
   if (!f.project_id && !f.machine_id) return { ok: true }; // مالوش علاقة بالماكينة أصلًا

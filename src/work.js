@@ -95,6 +95,9 @@ export function saveClient(userId, b) {
   else db.prepare(`INSERT INTO work_clients (id, user_id, name, phone, country, source, note, created_at, updated_at) VALUES (@id,@u,@name,@phone,@country,@source,@note,@t,@t)`).run({ ...row, id, u: userId, t: now() });
   return id;
 }
+export function listWorkClients(userId) {
+  return db.prepare(`SELECT id, name FROM work_clients WHERE user_id = ?`).all(userId);
+}
 export function deleteClient(userId, id) {
   const used = db.prepare(`SELECT COUNT(*) n FROM work_projects WHERE user_id = ? AND client_id = ?`).get(userId, id).n;
   if (used) throw new Error("العميل ده عليه مشاريع — شيلها أو غيّر عميلها الأول");
