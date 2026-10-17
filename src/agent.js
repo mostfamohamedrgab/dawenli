@@ -55,6 +55,7 @@ import {
   PROBLEM_AREAS,
 } from "./db.js";
 import { machineProjects, syncFinance, forgetFinance, syncPending } from "./machine.js";
+import { openSponsorships, saveSponsorship, setFinanceWork, WORK_CATS, SPONSOR_STATUS } from "./work.js";
 
 /* ===================== الأدوات ===================== */
 
@@ -383,13 +384,20 @@ const TOOLS = [
 
 // أدوات الرسالة دي: لو المستخدم صاحب الماكينة وعنده مشاريع، log_finance بياخد project_id
 // وبتظهر أداة الربط. لأي مستخدم تاني الأدوات زي ما هي (مشاريعه مش بتبان لحد).
-function toolsFor(projects) {
+function toolsFor(projects, sponsors = []) {
   if (!projects.length) return TOOLS;
   const ids = projects.map((p) => p.id);
   const projectId = {
     type: "string",
     enum: ids,
     description: "id المشروع من projects في السياق — حطّه بس لو الحركة تبع مشروع برمجي منهم وانت متأكد",
+  };
+  // تاب «💼 الشغل»: الدفعة تبع رعاية مفتوحة، أو بند محتوى/شغل (مونتاج، معدّات، بودكاست…)
+  const workProps = {
+    ...(sponsors.length
+      ? { sponsor_id: { type: "number", enum: sponsors.map((x) => x.id), description: "id الرعاية من sponsorships — لو الدخل ده فلوس رعاية/تعاون منهم" } }
+      : {}),
+    work_cat: { type: "string", enum: WORK_CATS, description: "بند الشغل/المحتوى — حطّه لأي حركة تبع الشغل أو القناة (رعايات، مونتاج، معدّات تصوير، بودكاست، كورسات، أدسنس…). سيبه فاضي للمصاريف الشخصية" },
   };
   return [
     ...TOOLS.map((t) =>
@@ -401,7 +409,7 @@ function toolsFor(projects) {
               ...t.function,
               parameters: {
                 ...t.function.parameters,
-                properties: { ...t.function.parameters.properties, project_id: projectId },
+                properties: { ...t.function.parameters.properties, project_id: projectId, ...workProps },
               },
             },
           }
@@ -419,6 +427,28 @@ function toolsFor(projects) {
             project_id: { type: "string", enum: [...ids, "none"] },
           },
           required: ["finance_id", "project_id"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "save_sponsorship",
+        description:
+          "سجّل رعاية/تعاون جديد للقناة (براند اتفق معاه على فيديو) أو حدّث واحدة موجودة (حالتها، لينك الفيديو، المبلغ). ده **اتفاق** مش فلوس — الفلوس لما توصل تتسجّل بـ log_finance بـ sponsor_id. لو المستخدم قال «قبضت من X» ومفيش رعاية مفتوحة لـ X: اعمل save_sponsorship بـ status=paid الأول، وبعدين log_finance بالـ sponsor_id اللي رجع.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "number", description: "للتحديث بس: id الرعاية من sponsorships" },
+            brand: { type: "string", description: "اسم البراند/الشركة" },
+            amount: { type: "number", description: "المبلغ المتفق عليه" },
+            currency: { type: "string", description: "عملة الاتفاق (الرعايات غالبًا دولار)" },
+            status: { type: "string", enum: Object.keys(SPONSOR_STATUS), description: "talking بنتكلم · agreed اتفقنا · filming بيتصوّر · published اتنشر · paid اتدفع · cancelled اتلغى" },
+            video_title: { type: "string" },
+            video_url: { type: "string" },
+            publish_at: { type: "string", description: "YYYY-MM-DD ميعاد/تاريخ النشر" },
+            note: { type: "string" },
+          },
         },
       },
     },
@@ -532,6 +562,7 @@ async function linkFinanceProject(userId, financeId, project) {
   const s = await syncFinance(userId, financeId);
   if (!project)
     return { ok: true, receipt: s.ok ? `💼 اتفك ربط القيد #${financeId} من المشروع` : `💼 اتفك الربط — والماكينة هتتحدّث أول ما ترجع` };
+  if (s.local) return { ok: true, receipt: `💼 اتسجّلت على مشروع ${where} (تاب الشغل)` };
   if (!s.ok) return { ok: true, receipt: `💼 على مشروع ${where} — الماكينة مش متاحة دلوقتي، هتتقيّد أول ما ترجع` };
   return {
     ok: true,
@@ -630,6 +661,11 @@ async function executeTool(ctx, name, args) {
       // الإيصال لازم يقول الحقيقة: لو القيد كان موجود أصلًا (نفس المبلغ والوصف) ماتسجّلش تاني
       const receipts = [saved.duplicate ? `💰 ↩️ متسجّلة قبل كده (#${saved.id}) فماكرّرتهاش: ${line}` : `💰 ${sign}: ${line}`];
       const project = args.project_id && ctx.projects?.find((p) => p.id === args.project_id);
+      const sponsor = args.sponsor_id && ctx.sponsors?.find((x) => x.id === Number(args.sponsor_id));
+      if (!saved.duplicate && (sponsor || (args.work_cat && WORK_CATS.includes(args.work_cat)))) {
+        setFinanceWork(userId, saved.id, sponsor ? { sponsorId: sponsor.id, workCat: args.work_cat || "رعايات" } : { workCat: args.work_cat });
+        if (sponsor) receipts.push(`🤝 على رعاية «${sponsor.brand}»`);
+      }
       if (project) {
         const l = await linkFinanceProject(userId, saved.id, project);
         if (!(l.old && saved.duplicate)) receipts.push(l.receipt); // قيد قديم متكرّر: كفاية إيصال «متسجّلة قبل كده»
@@ -638,7 +674,7 @@ async function executeTool(ctx, name, args) {
       // قاعدة البرومبت لوحدها ماكانتش كفاية: «قبضت ٣٠٠ دولار دفعة من شغل» اتسجّلت من غير سؤال)
       const looksLikeWork =
         finDir === "income" && !saved.duplicate && (args.category === "شغل" || /دفع|مشروع|عميل|عربون|شغل|project|client/i.test(args.note || ""))
-        && !/رعاي|سبونسر|sponsor|تعاون|كورس|سينتاكس|syntax|اكاديمي|أكاديمي/i.test(args.note || "");
+        && !sponsor && !/رعاي|سبونسر|sponsor|تعاون|كورس|سينتاكس|syntax|اكاديمي|أكاديمي/i.test(args.note || "");
       const hint = !project && ctx.projects?.length && looksLikeWork
         ? `الدخل ده شكله من شغل ومش مربوط بمشروع. لو واضح من الكلام إنه تبع مشروع من projects → link_finance_project بالـ id ${saved.id}. لو مش واضح → لازم تسأل المستخدم في ردّك سؤال قصير: «الـ ${fmtNum(amount)} دي تبع أنهي مشروع؟» وسمّيله أقرب مشروعين. لو مش مشروع برمجي (رعاية/كورس) سيبه.`
         : undefined;
@@ -656,6 +692,23 @@ async function executeTool(ctx, name, args) {
       if (ok) await forgetFinance(userId, row); // لو كان متقيّد في الماكينة يتشال من هناك كمان
       // amount: المبلغ اللي اتقال في «امسح الـ ٣٠٠» اتعامل معاه — مايتعدّش «ماتسجّلش»
       return { result: { ok }, receipt: ok ? `🗑️ اتمسح قيد مالي غلط (#${id})` : `⚠️ ملقيتش القيد #${id}`, amount: ok ? row?.amount : undefined };
+    }
+    case "save_sponsorship": {
+      if (!args.id && !args.brand) return { result: { ok: false, error: "محتاج brand (أو id للتحديث)" } };
+      const known = args.id ? ctx.sponsors?.find((x) => x.id === Number(args.id)) : null;
+      if (args.id && !known) return { result: { ok: false, error: "id مش من sponsorships" } };
+      try {
+        const sid = saveSponsorship(userId, { ...args, ...(args.id ? {} : { agreed_at: localToday() }) });
+        const b = args.brand || known?.brand || "";
+        if (!known) ctx.sponsors?.push({ id: sid, brand: b, amount: Number(args.amount) || 0, currency: args.currency || "USD", status: args.status || "agreed" });
+        const st = args.status ? ` · ${SPONSOR_STATUS[args.status] || args.status}` : "";
+        return {
+          result: { ok: true, id: sid },
+          receipt: `🤝 ${args.id ? "اتحدّثت رعاية" : "رعاية جديدة"}: ${b}${args.amount ? ` · ${fmtNum(Number(args.amount))} ${args.currency || "دولار"}` : ""}${st}`,
+        };
+      } catch (e) {
+        return { result: { ok: false, error: e.message } };
+      }
     }
     case "link_finance_project": {
       const id = Number(args.finance_id);
@@ -918,7 +971,7 @@ const STAGE_AR = { lead: "محتمل", meeting: "ميتنج", proposal: "عرض 
 const finProject = (f) => (f.project_title ? ` · 💼 ${f.project_title}` : "");
 
 // لقطة سريعة من بيانات المستخدم — بتتبني مع كل رسالة عشان الـ agent يكون فاهم وضعه
-function buildSnapshot(userId, projects = []) {
+function buildSnapshot(userId, projects = [], sponsors = []) {
   const today = localToday();
   // آخر ٣ أيام — عشان الـ agent يشوف قيود امبارح كمان ومايعيدش تسجيل نفس اليوم بتاريخ تاني
   const since3 = new Date(new Date(today + "T00:00:00Z").getTime() - 2 * 86400000).toISOString().slice(0, 10);
@@ -980,6 +1033,10 @@ function buildSnapshot(userId, projects = []) {
               : `${p.id} — ${p.title}${p.client && !p.title.includes(p.client) ? " · العميل: " + p.client : ""}${p.note ? " · " + p.note : ""} · ${STAGE_AR[p.stage] || p.stage} · ${p.team ? `👥 الفريق: ${p.team}${p.team_auto ? ` (🔀 مرتب ${p.team_auto} بيتوزّع لوحده)` : ""} · ` : ""}${p.monthly ? `🔁 اشتراك شهري ${fmtNum(p.monthly)} ${p.currency} · ` : ""}اتحصّل ${fmtNum(p.collected)} من ${fmtNum(p.value)} ${p.currency}`
           ),
         }
+      : {}),
+    // رعايات القناة المفتوحة (تاب «💼 الشغل») — للربط بـ sponsor_id لما الفلوس توصل
+    ...(projects.length
+      ? { sponsorships: sponsors.map((x) => `${x.id} — ${x.brand}${x.video ? " · " + x.video : ""} · ${SPONSOR_STATUS[x.status] || x.status} · اتدفع ${fmtNum(x.paid || 0)} من ${fmtNum(x.amount || 0)} ${x.currency}`) }
       : {}),
     goals: goals.map((g) => {
       const base = `${g.title}: ${g.current}${g.unit ? " " + g.unit : ""}${g.target ? ` من ${g.target}` : ""}`;
@@ -1063,6 +1120,8 @@ const PROJECTS_PROMPT = `# مشاريع الشغل (projects) — الربط ب�
 - **متأكد؟** حط project_id على طول. **مش متأكد** — الحركة شكلها شغل (دفعة، عميل، دولار من شغل، سيرفر) بس ممكن تبقى تبع أكتر من مشروع أو الاسم مش واضح → سجّلها من غير project_id، واسأل سؤال واحد قصير بالاسم: «الـ ٥٠٠$ دي تبع مشروع WE GSM؟». لما يأكّد → **link_finance_project** بالـ id بتاع القيد (من finance_today) — **ماتسجّلش القيد تاني**.
 - لو قال إن الربط غلط («لا ده مش تبع wegsm» / «ده تبع مشروع الطاقة») → link_finance_project بالمشروع الصح، أو project_id="none" لو مالوش مشروع.
 - **مالهاش project_id:** المصاريف الشخصية (أكل، بيت، علاج، مواصلات)، ورعايات وتعاونات القناة (Kimi، Aisa، Creao…)، ودخل سينتاكس أكاديمي والكورسات — دي مش مشاريع برمجية، إلا لو فيه مشروع بنفس الاسم في projects.
+- **🤝 رعايات القناة (sponsorships في سياقك):** فلوس رعاية/تعاون من براند (Kimi، Whacka، Hostinger…) → log_finance بـ direction=income و category="شغل" و **sponsor_id** الرعاية بتاعته لو موجودة مفتوحة، و work_cat="رعايات". **مفيش رعاية مفتوحة للبراند ده** → save_sponsorship (brand، المبلغ، status=paid) الأول، وبعدين log_finance بالـ sponsor_id اللي رجع. اتفاق جديد من غير فلوس لسه («اتفقت مع X على فيديو بـ ٥٠٠$») → save_sponsorship بس (status=agreed) **من غير log_finance**. «الفيديو بتاع X نزل» → save_sponsorship بالـ id و status=published.
+- **📒 بنود المحتوى (work_cat):** أي مصروف/دخل تبع القناة أو الشغل ومش مشروع برمجي — مونتاج، بودكاست، معدّات تصوير (مايك/كاميرا/إضاءة)، سوفتوير، فريلانسرز، كورسات، أدسنس، ريفيوهات — حط work_cat المناسب (مع category="شغل"). ده بيظهر في تقرير المحتوى في تاب الشغل.
 - دخل من شغل برمجي **مش موجود** في projects → سجّله عادي، وقوله في جملة إن المشروع ده مش في الماكينة (يضيفه في تاب الشغل الأول لو عايزه يتحسب هناك).
 - القيد المربوط بيبان في finance_today/finance_recent وجنبه «💼 اسم المشروع» — ماتربطهوش تاني.
 - **link_finance_project بس للقيد اللي بتتكلموا عنه دلوقتي** (اللي لسه متسجّل أو اللي سألت عليه والمستخدم أكّد). **ماتربطش قيود قديمة من نفسك** — حتى لو شايف في income_recent دفعة قديمة مش مربوطة، دي غالبًا متقيّدة في الماكينة من زمان وربطها بيكرّرها.
@@ -1093,10 +1152,11 @@ export async function runAgent({ user, text, kind = "text" }) {
   touchUser(userId); // حدّث آخر ظهور مع كل نشاط فعلي
   syncPending(userId).catch(() => {}); // قيود مستنية تتبعت للماكينة (لو كانت مقفولة)
   const seenFinance = new Set(); // حاجز تكرار للفلوس داخل نفس الرسالة
-  const projects = await machineProjects(userId); // [] لأي مستخدم مش صاحب الماكينة
-  const snapshot = buildSnapshot(userId, projects);
+  const projects = await machineProjects(userId); // [] لأي مستخدم مش صاحب الشغل
+  const sponsors = projects.length ? openSponsorships(userId) : [];
+  const snapshot = buildSnapshot(userId, projects, sponsors);
   const history = recentConversations(userId, HISTORY_LIMIT);
-  const tools = toolsFor(projects);
+  const tools = toolsFor(projects, sponsors);
 
   // المبالغ اللي في الكلام — عشان نتأكد في الآخر إن كل واحد اتسجّل. المبالغ اللي ليها قيد
   // بنفس الرقم في آخر ٣ أيام ممكن تبقى إعادة سرد، فمابنزنّش عليها — بس بنقول للمستخدم.
@@ -1176,7 +1236,7 @@ export async function runAgent({ user, text, kind = "text" }) {
       } catch {}
       let out;
       try {
-        out = await executeTool({ userId, sourceText: text, seenFinance, projects }, tc.function.name, args);
+        out = await executeTool({ userId, sourceText: text, seenFinance, projects, sponsors }, tc.function.name, args);
       } catch (err) {
         // اللوج ده بيطلع في pm2 logs — أهم حاجة للتشخيص على السيرفر
         console.error(`❌ tool ${tc.function.name} failed with args ${JSON.stringify(args)}:`, err);

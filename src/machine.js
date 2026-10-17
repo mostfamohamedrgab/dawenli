@@ -9,6 +9,7 @@
 
 import { config } from "./config.js";
 import { getFinance, markFinanceSynced, financePendingMachine, normCurKey } from "./db.js";
+import { workOn, activeProjects, getProject } from "./work.js";
 
 export const machineOn = (userId) => !!config.machineUrl && Number(userId) === config.machineUserId;
 
@@ -26,44 +27,18 @@ async function call(method, path, body) {
 
 /* ===== المشاريع ===== */
 
-let cache = { at: 0, list: [] };
-// مشاريع الشغل (من غير الخسرانة) — كاش دقيقة، ولو الماكينة مقفولة بنرجّع آخر نسخة نعرفها
+// المشاريع بقت في دوّنلي نفسه (تاب «💼 الشغل» — src/work.js). المشاريع اللي اتنقلت من الماكينة
+// محتفظة بنفس الـ id (machine = 1) فدفعاتها لسه بتتبعت هناك؛ أي مشروع جديد اتعمل في دوّنلي مالوش
+// مكان في الماكينة فقيوده بتفضل هنا بس. الاسم machineProjects فاضل عشان باقي الكود.
 export async function machineProjects(userId) {
-  if (!machineOn(userId)) return [];
-  if (Date.now() - cache.at < 60_000) return cache.list;
-  try {
-    const w = await call("GET", "/api/work");
-    // الموظفين اللي ليهم قاعدة توزيع مرتب (تبويب الفريق) — مرتبهم بيتقسم على مشاريعهم في الماكينة لوحده
-    const nz = (s) => String(s || "").replace(/\s+/g, "");
-    const auto = new Set((w.staff || []).filter((s) => (s.rules || []).length).map((s) => nz(s.name)));
-    cache = {
-      at: Date.now(),
-      list: (w.deals || [])
-        .filter((d) => d.stage !== "lost")
-        .map((d) => ({
-          id: d.id,
-          title: d.title || "",
-          client: d.client_name || "",
-          stage: d.stage,
-          currency: d.currency || "EGP",
-          value: Number(d.value) || 0,
-          collected: Number(d.collected) || 0,
-          monthly: d.billing === "monthly" ? Number(d.monthly) || 0 : 0, // تجديد شهري: قيمة الشهر
-          team: String(d.team || "").slice(0, 120), // موظفين/فريلانسرز على المشروع — لربط مرتباتهم
-          team_auto: String(d.team || "").split(/[،,]/).map((x) => x.trim()).filter((x) => x && auto.has(nz(x))).join("، "),
-          note: String(d.note || "").slice(0, 80),
-        })),
-    };
-    // «مصاريف الشغل العامة» في الماكينة (deal_id = general) كأنها مشروع: اشتراكات الأدوات (Claude/ChatGPT/
-    // Cursor…)، السيرفرات، الدومينات، إعلانات فيسبوك — مصاريف شغل مش تبع مشروع واحد. الماكينة بتخصمها من
-    // صافي الربح (والإعلانات بتتوزّع على مشاريع فيسبوك لوحدها).
-    cache.list.push({ id: "general", title: "🧰 مصاريف الشغل العامة", client: "", stage: "won", currency: "EGP",
-      value: 0, collected: 0, monthly: 0, team: "", team_auto: "", general: true,
-      note: "اشتراك Claude دايمًا — وأي مصروف شغل عام تاني بعد ما المستخدم يأكّد إنه للشغل" });
-  } catch (e) {
-    console.error("⚠️ الماكينة مش متاحة (المشاريع):", e.message);
-  }
-  return cache.list;
+  if (!workOn(userId)) return [];
+  const list = activeProjects(userId);
+  // «مصاريف الشغل العامة» (deal_id = general) كأنها مشروع: اشتراكات الأدوات (Claude/ChatGPT/
+  // Cursor…)، السيرفرات، الدومينات، إعلانات فيسبوك — مصاريف شغل مش تبع مشروع واحد.
+  list.push({ id: "general", title: "🧰 مصاريف الشغل العامة", client: "", stage: "won", currency: "EGP",
+    value: 0, collected: 0, monthly: 0, team: "", team_auto: "", general: true, machine: true,
+    note: "اشتراك Claude دايمًا — وأي مصروف شغل عام تاني بعد ما المستخدم يأكّد إنه للشغل" });
+  return list;
 }
 
 /* ===== التحويل لعملة المشروع ===== */
@@ -91,13 +66,22 @@ export async function syncFinance(userId, financeId) {
   const f = getFinance(userId, financeId);
   if (!f) return { ok: false, error: "missing" };
   if (!f.project_id && !f.machine_id) return { ok: true }; // مالوش علاقة بالماكينة أصلًا
+  // machine_id = "skip": قيد قديم اتربط بمشروع وقت النقل/من تاب الشغل وهو متقيّد في الماكينة بطريقة تانية
+  // (عربون/دفعة بالإيد) — بيتحسب في دوّنلي بس ومابيتبعتش عشان مايتكرّرش هناك
+  if (f.machine_id === "skip") {
+    markFinanceSynced(userId, f.id, "skip");
+    return { ok: true, local: true };
+  }
+  // مشروع اتعمل في دوّنلي ومش موجود في الماكينة → القيد بيفضل هنا بس (ولو كان متقيّد هناك على
+  // مشروع تاني قبل كده، يتشال من هناك زي فك الربط)
+  const local = f.project_id && f.project_id !== "general" && !getProject(userId, f.project_id)?.machine;
   try {
-    if (!f.project_id) {
+    if (!f.project_id || local) {
       // اتفك الربط: اللي احنا عملناه يتمسح، واللي هو كاتبه بإيده يفضل بس من غير مشروع
       if (f.machine_id?.startsWith("fdw")) await call("DELETE", `/api/finance?id=${encodeURIComponent(f.machine_id)}`);
       else if (f.machine_id) await call("POST", "/api/finance", { ...(await machineRow(f.machine_id)), deal_id: "" });
       markFinanceSynced(userId, f.id, null);
-      return { ok: true };
+      return { ok: true, ...(local ? { local: true } : {}) };
     }
 
     const deal = (await machineProjects(userId)).find((d) => d.id === f.project_id);

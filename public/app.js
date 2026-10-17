@@ -315,6 +315,7 @@ function gotoTab(tab) {
   if (tab === "habits") renderHabitsPage();
   if (tab === "goals") renderGoalsPage();
   if (tab === "finances") renderFinancesPage();
+  if (tab === "work") window.renderWorkPage?.();
   if (tab === "ideas") renderIdeasPage();
   if (tab === "tasks") renderTasksPage();
   if (tab === "assets") renderAssetsPage();
@@ -3435,6 +3436,8 @@ async function loadAll(rerender = true) {
   $("userName").textContent = state.me?.name || "صاحب الدفتر";
   // إعدادات التطبيق (الذكاء + التحديثات) لصاحب التطبيق بس
   for (const el of document.querySelectorAll(".owner-only")) el.style.display = state.me?.isOwner ? "" : "none";
+  // تاب «💼 الشغل» لصاحبه بس
+  for (const el of document.querySelectorAll(".work-only")) el.style.display = state.me?.work ? "" : "none";
   fillCategorySelect();
 
   if (!rerender) return;
@@ -3446,6 +3449,7 @@ async function loadAll(rerender = true) {
   if (active === "habits") renderHabitsPage();
   if (active === "goals") renderGoalsPage();
   if (active === "finances") renderFinancesPage();
+  if (active === "work") window.renderWorkPage?.();
   if (active === "ideas") renderIdeasPage();
   if (active === "tasks") renderTasksPage();
   if (active === "assets") renderAssetsPage();

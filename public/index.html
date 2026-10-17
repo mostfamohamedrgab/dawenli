@@ -45,6 +45,10 @@
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></span>
             <span>الفلوس</span>
           </button>
+          <button class="nav-btn finances work-only" data-tab="work" style="display:none">
+            <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg></span>
+            <span>الشغل <span class="muted" style="font-weight:500;font-size:11px">مشاريع · رعايات · محتوى</span></span>
+          </button>
           <button class="nav-btn goals" data-tab="tasks">
             <span class="nb-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 9h18M9 15l2 2 4-4"/></svg></span>
             <span>المهام والتقويم</span>
@@ -462,6 +466,26 @@
           </section>
 
           <!-- ========== دفترك (هَب موحّد: يوميات/خواطر/أفكار/مشاكل) ========== -->
+          <!-- ========== 💼 الشغل (لصاحب الشغل بس) ========== -->
+          <section class="tab-panel hidden" data-panel="work">
+            <div class="page-head">
+              <div>
+                <span class="world-pill finances">شغلك</span>
+                <h1>💼 الشغل</h1>
+                <p class="ph-sub">المشاريع والرعايات ومصاريف المحتوى — كلها من فلوسك المتسجّلة، مفيش رقم بيتكتب مرتين</p>
+              </div>
+            </div>
+            <div class="stat-grid" id="workStats" style="margin-bottom:18px"></div>
+            <div class="seg-bar" id="workSeg">
+              <button class="seg-btn" data-sub="projects">💼 المشاريع</button>
+              <button class="seg-btn" data-sub="sponsors">🤝 الرعايات</button>
+              <button class="seg-btn" data-sub="content">📒 المحتوى</button>
+              <button class="seg-btn" data-sub="team">👥 الفريق والعملاء</button>
+              <button class="seg-btn" data-sub="unlinked">📥 مش متصنّفة<span class="ws-count"></span></button>
+            </div>
+            <div id="workMount"></div>
+          </section>
+
           <section class="tab-panel hidden" data-panel="dafter">
             <div class="page-head">
               <div><span class="world-pill">دفترك</span><h1>دفترك</h1></div>
@@ -868,6 +892,7 @@
         <div class="more-sec">دفترك</div>
         <button class="more-item" data-tab="dafter"><span class="mi-ico">📔</span><span>دفترك (يوميات/خواطر/أفكار/مشاكل)</span></button>
         <button class="more-item" data-tab="assets"><span class="mi-ico">💎</span><span>الأصول</span></button>
+        <button class="more-item work-only" data-tab="work" style="display:none"><span class="mi-ico">💼</span><span>الشغل (مشاريع · رعايات · محتوى)</span></button>
         <div class="more-sec">أدوات</div>
         <button class="more-item" data-tab="ask"><span class="mi-ico">💬</span><span>اسأل دوّنلي</span></button>
         <button class="more-item" data-tab="files"><span class="mi-ico">📎</span><span>مركز الملفات</span></button>
@@ -922,6 +947,18 @@
       </div>
     </div>
 
+    <!-- ===================== مودال فورم الشغل ===================== -->
+    <div id="workOverlay" class="modal-overlay hidden">
+      <div class="modal" role="dialog" aria-modal="true" style="text-align:right;max-width:480px;max-height:90vh;overflow:auto">
+        <div class="edit-head">
+          <h3 class="modal-title" id="workFormTitle" style="margin:0"></h3>
+          <button class="icon-btn" type="button" onclick="document.getElementById('workOverlay').classList.add('hidden')" aria-label="إغلاق">✕</button>
+        </div>
+        <form id="workForm" class="edit-form"></form>
+      </div>
+    </div>
+
     <script src="/app.js"></script>
+    <script src="/work.js"></script>
   </body>
 </html>

@@ -35,4 +35,6 @@ export const config = {
   machineUrl: (process.env.MACHINE_URL || "").replace(/\/+$/, ""), // مثلاً http://127.0.0.1:8823
   machineUserId: Number(process.env.MACHINE_USER_ID || 0),
   machineUsdRate: Number(process.env.MACHINE_USD_RATE || 50), // دولار → جنيه لما المشروع بالجنيه
+  // صاحب تاب «💼 الشغل» (مشاريع/رعايات/محتوى/فريق) — مستخدم واحد بس يشوفه
+  workUserId: Number(process.env.WORK_USER_ID || process.env.MACHINE_USER_ID || 0),
 };

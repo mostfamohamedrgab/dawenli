@@ -2180,3 +2180,54 @@ select.field { cursor: pointer; }
    z-index، فترتيب الـDOM كان بيخلّيها تغطّي التأكيد → الشاشة تسوّد والزراير
    مش شغّالة والوعد بتاع askConfirm مابيتحلّش (التطبيق يبان واقف). */
 #confirmOverlay { z-index: 300; }
+
+/* ===================== 💼 الشغل ===================== */
+.wk-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.wk-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.wk-filters .chip { cursor: pointer; }
+.wk-list { display: flex; flex-direction: column; gap: 12px; }
+.wk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.wk-card { padding: 16px 18px; }
+.wk-card > summary { list-style: none; cursor: pointer; display: flex; flex-direction: column; gap: 10px; }
+.wk-card > summary::-webkit-details-marker { display: none; }
+.wk-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.wk-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wk-title b { font-size: var(--text-lg); overflow-wrap: anywhere; }
+.wk-title .muted { font-size: var(--text-sm); }
+.wk-head .chip { white-space: nowrap; flex-shrink: 0; }
+.wk-prog { height: 8px; background: var(--paper-deep); border-radius: 99px; overflow: hidden; }
+.wk-prog span { display: block; height: 100%; background: var(--finances); border-radius: 99px; }
+.wk-nums { display: flex; gap: 14px; flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-muted); }
+.wk-nums b { color: var(--ink); }
+.wk-nums b.wk-due { color: var(--habits-deep); }
+.wk-body { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--hairline); display: flex; flex-direction: column; gap: 8px; }
+.wk-sub { font-size: var(--text-sm); }
+.wk-note { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--habits-wash); color: var(--habits-deep); font-size: var(--text-sm); }
+.wk-h4 { margin: 14px 0 8px; font: var(--type-label); color: var(--ink-muted); }
+.wk-pays { display: flex; flex-direction: column; gap: 6px; }
+.wk-pay { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface-card); border: 1px solid var(--hairline); border-radius: var(--radius-sm); font-size: var(--text-sm); }
+.wk-pay-main { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.wk-pay b { white-space: nowrap; }
+.wk-dir.income { color: var(--finances-deep); }
+.wk-dir.expense { color: var(--danger-deep); }
+.wk-un { flex-wrap: wrap; }
+.wk-x { border: none; background: transparent; color: var(--ink-faint); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 6px; }
+.wk-x:hover { background: var(--health-wash); color: var(--danger-deep); }
+.wk-sel { padding: 6px 10px; font-size: var(--text-sm); max-width: 100%; flex-basis: 220px; }
+.wk-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.wk-sp { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.wk-link { font-size: var(--text-sm); color: var(--goals-deep); font-weight: 700; text-decoration: none; }
+.wk-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.wk-cat { padding: 12px 14px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: var(--surface-card); display: flex; flex-direction: column; gap: 6px; }
+.wk-cat-top { display: flex; justify-content: space-between; font-size: var(--text-sm); }
+.wk-barrow { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); }
+.wk-barrow span { height: 8px; border-radius: 99px; min-width: 4px; }
+.wk-barrow b { white-space: nowrap; margin-inline-start: auto; }
+.wk-bar-in { background: var(--finances); }
+.wk-bar-out { background: var(--danger); }
+.wk-err { color: var(--danger-deep); font-size: var(--text-sm); margin: 0; min-height: 1em; }
+@media (max-width: 760px) {
+  .wk-pay { flex-wrap: wrap; }
+  .wk-pay-main { flex-basis: calc(100% - 30px); }
+  .wk-grid, .wk-cats { grid-template-columns: 1fr; }
+}

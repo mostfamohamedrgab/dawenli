@@ -120,6 +120,9 @@ import { versionStatus, pullUpdate, scheduleRestart } from "./updater.js";
 import { buildReportData } from "./report.js";
 import { runAgent } from "./agent.js";
 import { syncFinance, forgetFinance } from "./machine.js";
+import { setFinanceProject, markFinanceSynced } from "./db.js";
+import { workOn, workSummary, saveProject, deleteProject, saveClient, deleteClient, saveSponsorship, deleteSponsorship,
+  saveStaff, deleteStaff, setFinanceWork, getProject } from "./work.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
@@ -410,6 +413,9 @@ export function startServer() {
   app.get("/app.js", (req, res) =>
     sessionUser(req) ? res.sendFile(join(publicDir, "app.js")) : res.status(401).end()
   );
+  app.get("/work.js", (req, res) =>
+    sessionUser(req) ? res.sendFile(join(publicDir, "work.js")) : res.status(401).end()
+  );
 
   app.get("/", (req, res) => {
     // الزائر الجديد يشوف صفحة الهبوط (وفيها «نزّل التطبيق») أول حاجة؛ المسجّل يدخل الداشبورد.
@@ -616,6 +622,7 @@ export function startServer() {
       id: user.id,
       name: user.name,
       isOwner: !!user.is_owner,
+      work: workOn(user.id), // تاب «💼 الشغل» لصاحبه بس
       today: localToday(),
     });
   });
@@ -1281,6 +1288,72 @@ export function startServer() {
       note,
     });
     res.json({ ok: true, id });
+  });
+
+  /* ===== 💼 الشغل: مشاريع · عملاء · رعايات · فريق (لصاحب الشغل بس) ===== */
+  const workGate = (req, res) => {
+    const user = gate(req, res);
+    if (!user) return null;
+    if (!workOn(user.id)) {
+      res.status(403).json({ error: "الصفحة دي لصاحب الشغل بس" });
+      return null;
+    }
+    return user;
+  };
+  const WORK_SAVE = { projects: saveProject, clients: saveClient, sponsors: saveSponsorship, staff: saveStaff };
+  const WORK_DEL = { projects: deleteProject, clients: deleteClient, sponsors: (u, id) => deleteSponsorship(u, Number(id)), staff: deleteStaff };
+  app.get("/api/work", (req, res) => {
+    const user = workGate(req, res);
+    if (!user) return;
+    res.json(workSummary(user.id));
+  });
+  // ربط قيد مالي بمشروع / رعاية / بند محتوى (أي حقل مش مبعوت = مايتغيّرش، "" = فك)
+  app.post("/api/work/link", async (req, res) => {
+    const user = workGate(req, res);
+    if (!user) return;
+    const { financeId, projectId, sponsorId, workCat } = req.body || {};
+    const fid = Number(financeId);
+    const before = getFinance(user.id, fid);
+    if (!before) return res.status(404).json({ error: "القيد مش موجود" });
+    if (projectId !== undefined && (projectId || null) !== (before.project_id || null)) {
+      const pid = projectId || null;
+      const title = pid === "general" ? "🧰 مصاريف الشغل العامة" : pid ? getProject(user.id, pid)?.title : null;
+      if (pid && !title) return res.status(400).json({ error: "المشروع مش موجود" });
+      setFinanceProject(user.id, fid, { projectId: pid, projectTitle: title });
+      // قيد قديم بيتربط بمشروع من الماكينة: غالبًا متقيّد هناك من زمان (عربون/دفعة بالإيد) — منبعتوش
+      // عشان مايتكرّرش، ويتحسب هنا بس. الجديد بيتبعت عادي.
+      const old = Date.now() - Date.parse(before.created_at) > 48 * 3600 * 1000;
+      if (pid && old && !before.machine_id) markFinanceSynced(user.id, fid, "skip");
+      else await syncFinance(user.id, fid).catch(() => {});
+    }
+    if (sponsorId !== undefined || workCat !== undefined)
+      setFinanceWork(user.id, fid, {
+        ...(sponsorId !== undefined ? { sponsorId } : {}),
+        ...(workCat !== undefined ? { workCat } : sponsorId ? { workCat: "رعايات" } : {}),
+      });
+    res.json({ ok: true });
+  });
+  app.post("/api/work/:kind", (req, res) => {
+    const user = workGate(req, res);
+    if (!user) return;
+    const fn = WORK_SAVE[req.params.kind];
+    if (!fn) return res.status(404).json({ error: "مش موجود" });
+    try {
+      res.json({ ok: true, id: fn(user.id, req.body || {}) });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+  app.delete("/api/work/:kind/:id", (req, res) => {
+    const user = workGate(req, res);
+    if (!user) return;
+    const fn = WORK_DEL[req.params.kind];
+    if (!fn) return res.status(404).json({ error: "مش موجود" });
+    try {
+      res.json({ ok: fn(user.id, req.params.id) });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
   });
 
   /* ===== صحة: إضافة يدوية ===== */
