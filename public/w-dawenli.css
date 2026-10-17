@@ -127,3 +127,11 @@ h2 .n, .cathd .cnt, .brandhd .cnt { background: var(--paper-deep); color: var(--
   .kpi { padding: 11px 12px; border-radius: 16px; }
   .kpi .v { font-size: 18px; }
 }
+
+/* كروت الأرقام في صفحة المشاريع (٤ + ٣ فيسبوك) في سطر واحد على الشاشة العريضة */
+@media (min-width: 860px) {
+  .kpis:has(.kpi.fb) { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; gap: 10px; }
+  .kpis:has(.kpi.fb) .kpi { padding: 12px 13px; }
+  .kpis:has(.kpi.fb) .kpi .l { font-size: 11.5px; }
+  .kpis:has(.kpi.fb) .kpi .v { font-size: 19px; }
+}
