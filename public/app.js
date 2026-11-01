@@ -19,6 +19,7 @@ const state = {
   profile: [],
   categories: [],
   finFilter: { dir: "all", cat: "all", q: "", range: "all", limit: 40 },
+  finMonth: null, // شهر مختار من «دخلك شهريًا» (YYYY-MM) — null = الشهر الحالي
   finBudget: { month: "", budget: null, goal: null },
   fileFilter: "all",
   pageDate: null,
@@ -1796,11 +1797,16 @@ function renderFinancesPage() {
   const data = state.finance;
   const isEGP = (f) => !f.currency || f.currency === "جنيه";
   const week = lastNDays(7); // للأعمدة اليومية
-  const monthStart = TODAY().slice(0, 8) + "01";
+  // الشهر اللي بنعرضه: المختار من «دخلك شهريًا» أو الحالي
+  const curMonthKey = TODAY().slice(0, 7);
+  const selMonth = state.finMonth || curMonthKey, isCur = selMonth === curMonthKey;
+  const monthStart = selMonth + "-01", monthEnd = selMonth + "-31";
+  const inSel = (f) => f.entry_date >= monthStart && f.entry_date <= monthEnd;
   const weekStart = weekStartISO(); // من أول الأسبوع (السبت) مش آخر ٧ أيام
   const weekExpense = data.filter((f) => f.direction === "expense" && f.entry_date >= weekStart && isEGP(f)).reduce((a, f) => a + f.amount, 0);
-  const mExpense = data.filter((f) => f.direction === "expense" && f.entry_date >= monthStart && isEGP(f)).reduce((a, f) => a + f.amount, 0);
-  const dayOfMonth = Math.max(1, Number(TODAY().slice(8, 10)));
+  const mExpense = data.filter((f) => f.direction === "expense" && inSel(f) && isEGP(f)).reduce((a, f) => a + f.amount, 0);
+  const [sy, sm] = selMonth.split("-").map(Number);
+  const dayOfMonth = isCur ? Math.max(1, Number(TODAY().slice(8, 10))) : new Date(sy, sm, 0).getDate();
   const avgDay = Math.round(mExpense / dayOfMonth);
 
   // ===== الدخل: محوّل للجنيه بسعر اليوم + تجميع شهري للمقارنة =====
@@ -1809,37 +1815,51 @@ function renderFinancesPage() {
     const mk = (f.entry_date || "").slice(0, 7);
     if (mk) incomeByMonth[mk] = (incomeByMonth[mk] || 0) + finToEgp(f);
   }
-  const curMonthKey = TODAY().slice(0, 7);
-  const monthIncome = Math.round(incomeByMonth[curMonthKey] || 0);
+  // المصاريف بكل العملات (محوّلة) لكل شهر — للصافي
+  const expenseByMonth = {};
+  for (const f of data.filter((f) => f.direction === "expense")) {
+    const mk = (f.entry_date || "").slice(0, 7);
+    if (mk) expenseByMonth[mk] = (expenseByMonth[mk] || 0) + finToEgp(f);
+  }
+  const monthIncome = Math.round(incomeByMonth[selMonth] || 0);
+  const monthNet = Math.round((incomeByMonth[selMonth] || 0) - (expenseByMonth[selMonth] || 0));
+  const mName = isCur ? "الشهر" : monthShortKey(selMonth) + " " + sy;
   const CUR_NAME = { USD: "دولار", "دولار": "دولار", EUR: "يورو", "يورو": "يورو", SAR: "ريال", AED: "درهم", GBP: "إسترليني", EGP: "جنيه", "جنيه": "جنيه" };
   const incCur = {};
-  for (const f of data.filter((f) => f.direction === "income" && (f.entry_date || "").slice(0, 7) === curMonthKey)) {
+  for (const f of data.filter((f) => f.direction === "income" && (f.entry_date || "").slice(0, 7) === selMonth)) {
     const cu = CUR_NAME[f.currency] || f.currency || "جنيه"; incCur[cu] = (incCur[cu] || 0) + f.amount;
   }
   const incCurStr = Object.entries(incCur).map(([cu, v]) => `${arNum(v)} ${cu}`).join(" · ");
 
-  $("finStats").innerHTML = [
+  const netCard = { label: `صافي ${mName}`, value: (monthNet < 0 ? "-" : "") + arNum(Math.abs(monthNet)), unit: MONEY, ico: "📈", delta: "الدخل − كل المصاريف", trend: monthNet >= 0 ? "pos" : "" };
+  $("finStats").innerHTML = (isCur ? [
     { label: "دخل الشهر", value: arNum(monthIncome), unit: MONEY, ico: "💰", delta: incCurStr || "مفيش دخل لسه", trend: "pos" },
     { label: "مصاريف الأسبوع", value: arNum(weekExpense), unit: MONEY, ico: "💸", delta: "من أول الأسبوع (السبت)", trend: "" },
     { label: "مصاريف الشهر", value: arNum(mExpense), unit: MONEY, ico: "🧾", delta: "من يوم ١ في الشهر", trend: "" },
+    netCard,
     { label: "متوسط اليوم", value: arNum(avgDay), unit: MONEY, ico: "📊", delta: "في المتوسط", trend: "" },
-  ].map((s) => `
+  ] : [
+    { label: `دخل ${mName}`, value: arNum(monthIncome), unit: MONEY, ico: "💰", delta: incCurStr || "مفيش دخل", trend: "pos" },
+    { label: `مصاريف ${mName}`, value: arNum(mExpense), unit: MONEY, ico: "🧾", delta: "الشهر كله", trend: "" },
+    netCard,
+    { label: "متوسط اليوم", value: arNum(avgDay), unit: MONEY, ico: "📊", delta: `على ${arNum(dayOfMonth)} يوم`, trend: "" },
+  ]).map((s) => `
     <div class="stat-card finances">
       <div class="sc-top"><span class="sc-ico">${s.ico}</span><span class="sc-label">${s.label}</span></div>
       <div class="sc-value"><b>${s.value}</b><span class="sc-unit">${s.unit}</span></div>
       <div class="sc-delta ${s.trend}">${s.delta}</div>
     </div>`).join("");
-  renderFinIncome(incomeByMonth, curMonthKey);
+  renderFinIncome(incomeByMonth, curMonthKey, selMonth, expenseByMonth);
 
   // الفلوس بتروح فين — بنود مصاريف الشهر (من يوم ١) كـ boxes
   const byCatMonth = {};
-  for (const f of data.filter((f) => f.direction === "expense" && f.entry_date >= monthStart && isEGP(f))) {
+  for (const f of data.filter((f) => f.direction === "expense" && inSel(f) && isEGP(f))) {
     const c = f.category || "أخرى";
     byCatMonth[c] = (byCatMonth[c] || 0) + f.amount;
   }
   const catRows = Object.entries(byCatMonth).sort((a, b) => b[1] - a[1]);
   const catTotal = catRows.reduce((a, [, v]) => a + v, 0);
-  if ($("finCatMonth")) $("finCatMonth").textContent = `الشهر ده · إجمالي ${arNum(catTotal)} ${MONEY}`;
+  if ($("finCatMonth")) $("finCatMonth").textContent = `${isCur ? "الشهر ده" : mName} · إجمالي ${arNum(catTotal)} ${MONEY}`;
   if ($("finCatBoxes")) {
     $("finCatBoxes").innerHTML = catRows.length
       ? catRows.map(([c, v]) => {
@@ -1895,21 +1915,32 @@ function renderFinancesPage() {
 const AR_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
 const monthShortKey = (k) => AR_MONTHS[Number((k || "").split("-")[1]) - 1] || k;
 // مقارنة الدخل آخر ٦ شهور (بالجنيه)
-function renderFinIncome(incomeByMonth, curKey) {
+function renderFinIncome(incomeByMonth, curKey, selKey = curKey, expenseByMonth = {}) {
   const el = $("finIncome"); if (!el) return;
   const keys = [];
   let [y, m] = curKey.split("-").map(Number);
   for (let i = 0; i < 6; i++) { keys.unshift(`${y}-${String(m).padStart(2, "0")}`); m--; if (m < 1) { m = 12; y--; } }
+  if (!keys.includes(selKey)) keys.unshift(selKey);
   const vals = keys.map((k) => Math.round(incomeByMonth[k] || 0));
   const max = Math.max(1, ...vals);
-  const last = keys.length - 1;
+  const selInc = Math.round(incomeByMonth[selKey] || 0), selNet = Math.round(selInc - (expenseByMonth[selKey] || 0));
   el.innerHTML = `
-    <div class="inc-now"><span class="inc-now-val">${arNum(vals[last])} ${MONEY}</span><span class="muted">دخل شهر ${monthShortKey(curKey)}</span></div>
+    <div class="inc-now"><span class="inc-now-val">${arNum(selInc)} ${MONEY}</span>
+      <span class="muted">دخل شهر ${monthShortKey(selKey)} · صافي <b style="color:${selNet >= 0 ? "var(--finances-deep, #527F35)" : "#c0392b"}">${selNet < 0 ? "-" : ""}${arNum(Math.abs(selNet))}</b></span>
+      ${selKey !== curKey ? `<button class="btn ghost sm" style="margin-inline-start:auto" onclick="selFinMonth(null)">↺ الشهر الحالي</button>` : ""}</div>
     <div class="inc-bars">${keys.map((k, i) => {
       const h = Math.round((vals[i] / max) * 100);
-      return `<div class="inc-col"><span class="inc-col-val">${vals[i] ? arNum(vals[i]) : "—"}</span><div class="inc-bar-track"><div class="inc-bar-fill${i === last ? " now" : ""}" style="height:${Math.max(2, h)}%"></div></div><span class="inc-col-lbl">${monthShortKey(k)}</span></div>`;
-    }).join("")}</div>`;
+      return `<div class="inc-col" style="cursor:pointer" title="دوس تشوف ${monthShortKey(k)}" onclick="selFinMonth('${k}')"><span class="inc-col-val">${vals[i] ? arNum(vals[i]) : "—"}</span><div class="inc-bar-track"><div class="inc-bar-fill${k === selKey ? " now" : ""}" style="height:${Math.max(2, h)}%"></div></div><span class="inc-col-lbl" style="${k === selKey ? "font-weight:800;color:var(--ink)" : ""}">${monthShortKey(k)}</span></div>`;
+    }).join("")}</div>
+    <div class="muted" style="font-size:var(--text-xs);margin-top:6px">دوس على أي شهر تشوف دخله ومصاريفه وصافيه في الكروت اللي فوق.</div>`;
 }
+// اختيار شهر من «دخلك شهريًا» — الكروت اللي فوق وبنود المصاريف بتتحوّل له
+function selFinMonth(k) {
+  state.finMonth = !k || k === TODAY().slice(0, 7) ? null : k;
+  renderFinancesPage();
+  $("finStats")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+window.selFinMonth = selFinMonth;
 
 /* ---- قائمة العمليات: فلاتر + تحميل المزيد ---- */
 function finRowHtml(f) {
