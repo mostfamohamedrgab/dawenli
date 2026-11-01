@@ -269,6 +269,21 @@ db.exec(`
     UNIQUE(user_id, month)
   );
 
+  -- مصاريف/دخل متكرّر كل شهر في يوم معيّن (مثلاً مصاريف البيت يوم ١١) — بيتسجّل لوحده
+  CREATE TABLE IF NOT EXISTS recurring_finance (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    direction   TEXT NOT NULL DEFAULT 'expense',
+    amount      REAL NOT NULL,
+    currency    TEXT DEFAULT 'جنيه',
+    category    TEXT DEFAULT 'أخرى',
+    note        TEXT,
+    day         INTEGER NOT NULL,          -- يوم الشهر (لو الشهر أقصر بيتقصّ لآخر يوم)
+    active      INTEGER NOT NULL DEFAULT 1,
+    last_month  TEXT DEFAULT '',            -- YYYY-MM آخر شهر اتسجّل فيه
+    created_at  TEXT NOT NULL
+  );
+
   -- محادثة "اسأل دوّنلي" — بنحفظها عشان تفضل موجودة لو رجعنا ليها بعد الريلود.
   CREATE TABLE IF NOT EXISTS ask_messages (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -664,6 +679,7 @@ export const FINANCE_CATEGORIES = [
   "بيت",
   "شغل",
   "تعليم",
+  "صدقات",
   "أخرى",
 ];
 
@@ -695,6 +711,44 @@ const findDupFinanceStmt = db.prepare(
   `SELECT id, note FROM finance WHERE user_id = ? AND direction = ? AND amount = ? AND entry_date >= ? AND entry_date <= ?`
 );
 // زي addFinance بس بيقول كمان لو القيد كان موجود أصلًا ({ id, duplicate }) — عشان الإيصال مايكدبش
+/* ===== مصاريف/دخل متكرّر كل شهر ===== */
+const _monthLast = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+const _addMonth = (ym, n) => { const [y, m] = ym.split("-").map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1)); return d.toISOString().slice(0, 7); };
+// القاعدة بتبدأ من أقرب ميعاد جاي: لو يومها لسه ماجاش الشهر ده → الشهر ده، غير كده الشهر الجاي
+export function addRecurring({ userId, direction, amount, currency, category, note, day }) {
+  const d = Math.min(31, Math.max(1, Math.round(Number(day) || 1)));
+  const today = localToday(), ym = today.slice(0, 7);
+  const passed = Number(today.slice(8, 10)) >= Math.min(d, _monthLast(ym));
+  const info = db.prepare(`INSERT INTO recurring_finance (user_id, direction, amount, currency, category, note, day, last_month, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(userId, direction === "income" ? "income" : "expense", Number(amount) || 0,
+    currency || "جنيه", category || "أخرى", note || null, d, passed ? ym : "", now());
+  return Number(info.lastInsertRowid);
+}
+export function listRecurring(userId) {
+  const today = localToday(), ym = today.slice(0, 7);
+  return db.prepare(`SELECT * FROM recurring_finance WHERE user_id = ? ORDER BY day, id`).all(userId).map((r) => {
+    const m = (r.last_month || "") >= ym ? _addMonth(ym, 1) : ym;   // الشهر اللي عليه الدور
+    return { ...r, next_date: `${m}-${String(Math.min(r.day, _monthLast(m))).padStart(2, "0")}` };
+  });
+}
+export function deleteRecurring(userId, id) {
+  return db.prepare(`DELETE FROM recurring_finance WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+}
+// بيتنادى من الـ scheduler كل يوم (ومع تشغيل السيرفر): أي قاعدة جه يومها ولسه مااتسجّلتش الشهر ده → تتسجّل
+export function runDueRecurring(today = localToday()) {
+  const ym = today.slice(0, 7), d = Number(today.slice(8, 10)), last = _monthLast(ym), out = [];
+  for (const r of db.prepare(`SELECT * FROM recurring_finance WHERE active = 1 AND COALESCE(last_month, '') < ?`).all(ym)) {
+    const day = Math.min(Math.max(1, r.day), last);
+    if (d < day) continue;
+    const entryDate = `${ym}-${String(day).padStart(2, "0")}`;
+    const saved = addFinanceChecked({ userId: r.user_id, entryDate, direction: r.direction, amount: r.amount,
+      currency: r.currency, category: r.category, note: r.note });
+    db.prepare(`UPDATE recurring_finance SET last_month = ? WHERE id = ?`).run(ym, r.id);
+    out.push({ ...r, entryDate, financeId: saved.id, duplicate: saved.duplicate });
+  }
+  return out;
+}
+
 export function addFinanceChecked({ userId, entryDate, direction, amount, currency, category, note }) {
   const eDate = entryDate || today();
   const dir = direction === "income" ? "income" : "expense";

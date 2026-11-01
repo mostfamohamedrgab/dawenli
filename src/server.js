@@ -102,6 +102,9 @@ import {
   updateHabitFields,
   getFinanceBudget,
   setFinanceBudget,
+  addRecurring,
+  listRecurring,
+  deleteRecurring,
   addAskMessage,
   listAskMessages,
   clearAskMessages,
@@ -1220,6 +1223,26 @@ export function startServer() {
     const { month, budget, goal } = req.body || {};
     const m = /^\d{4}-\d{2}$/.test(String(month || "")) ? month : localToday().slice(0, 7);
     res.json({ ok: true, budget: setFinanceBudget(user.id, m, { budget, goal }) });
+  });
+
+  /* ===== 🔁 مصاريف/دخل متكرّر كل شهر ===== */
+  app.get("/api/recurring", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json(listRecurring(user.id));
+  });
+  app.post("/api/recurring", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    const { direction, amount, currency, category, note, day } = req.body || {};
+    if (!(Number(amount) > 0)) return res.status(400).json({ error: "المبلغ مطلوب" });
+    if (!(Number(day) >= 1 && Number(day) <= 31)) return res.status(400).json({ error: "اليوم من ١ لـ ٣١" });
+    res.json({ ok: true, id: addRecurring({ userId: user.id, direction, amount, currency, category, note, day }) });
+  });
+  app.delete("/api/recurring/:id", (req, res) => {
+    const user = gate(req, res);
+    if (!user) return;
+    res.json({ ok: deleteRecurring(user.id, Number(req.params.id)) });
   });
 
   /* ===== الأصول (دهب / كاش / أصول تانية) + أسعار حيّة ===== */

@@ -14,6 +14,7 @@ import {
   listEntries,
   entriesSince,
   addFinanceChecked,
+  addRecurring,
   deleteFinance,
   getFinance,
   setFinanceProject,
@@ -131,6 +132,26 @@ const TOOLS = [
           id: { type: "number", description: "id القيد المالي اللي هيتمسح (من get_data)" },
         },
         required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "add_recurring_finance",
+      description:
+        "ضيف مصروف (أو دخل) **بيتكرّر كل شهر في يوم معيّن** — زي «مصاريف البيت ١٥ ألف كل شهر يوم ١١»، «الإيجار أول كل شهر». بيتسجّل لوحده في يومه كل شهر. استخدمه بس لما المستخدم يقول إنه متكرّر/كل شهر/شهري. ده مش بيسجّل قيد النهارده — لو قال إنه دفع الشهر ده كمان، سجّل قيد عادي بـ log_finance جنبه.",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: { type: "number", description: "المبلغ كل شهر" },
+          day: { type: "number", description: "يوم كام في الشهر (١-٣١)" },
+          note: { type: "string", description: "الوصف (مثلاً: مصاريف بيت حفصة)" },
+          category: { type: "string", enum: FINANCE_CATEGORIES },
+          currency: { type: "string", description: "العملة لو مش جنيه" },
+          direction: { type: "string", enum: ["expense", "income"] },
+        },
+        required: ["amount", "day", "note"],
       },
     },
   },
@@ -690,6 +711,13 @@ async function executeTool(ctx, name, args) {
         receipt: receipts.join("\n"),
         amount,
       };
+    }
+    case "add_recurring_finance": {
+      const amount = Number(args.amount), day = Number(args.day);
+      if (!(amount > 0) || !(day >= 1 && day <= 31)) return { result: { ok: false, error: "محتاج مبلغ ويوم من ١ لـ ٣١" } };
+      const id = addRecurring({ userId, direction: args.direction, amount, currency: args.currency || "جنيه",
+        category: args.category || "أخرى", note: args.note, day });
+      return { result: { ok: true, id }, receipt: `🔁 مصروف متكرّر: ${fmtNum(amount)} ${args.currency || "جنيه"} · ${args.note} — كل شهر يوم ${day}` };
     }
     case "delete_finance": {
       const id = Number(args.id);

@@ -6,7 +6,7 @@
 import { config } from "./config.js";
 import { analyzeEntries } from "./openai.js";
 import { composeCheckin } from "./agent.js";
-import { entriesSince, dueTaskReminders, markTaskReminded, activeUsers, activeUsersWithoutEntry } from "./db.js";
+import { entriesSince, dueTaskReminders, markTaskReminded, activeUsers, activeUsersWithoutEntry, runDueRecurring } from "./db.js";
 import { notifyUser } from "./push.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -16,9 +16,30 @@ export function startScheduler() {
   let lastWeekly = "";
   let lastReminderMinute = "";
   let lastJournalReminder = "";
+  let lastRecurring = "";
+
+  // 🔁 المصاريف المتكرّرة: مرة في اليوم (ومع تشغيل السيرفر — لو كان واقف يوم الميعاد بتتسجّل أول ما يقوم)
+  const runRecurring = async () => {
+    try {
+      for (const r of runDueRecurring(cairoParts().date)) {
+        if (r.duplicate) continue;
+        await notifyUser(r.user_id, {
+          title: "🔁 اتسجّل مصروف متكرّر",
+          body: `${r.note || r.category}: ${r.amount} ${r.currency || "جنيه"} (${r.entryDate})`,
+          url: "/#finances",
+          icon: "🔁",
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.error("recurring error:", err);
+    }
+  };
+  setTimeout(runRecurring, 20_000);
 
   setInterval(async () => {
     const c = cairoParts();
+
+    if (lastRecurring !== c.date) { lastRecurring = c.date; await runRecurring(); }
 
     // تذكير المهام: كل دقيقة نشوف فيه مهام معادها وصل
     const minuteKey = `${c.date} ${c.hhmm}`;

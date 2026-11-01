@@ -403,6 +403,18 @@
               </form>
             </div>
 
+            <div class="card" id="recurCard" style="margin-bottom:20px">
+              <div class="card-head"><h3>🔁 مصاريف متكرّرة كل شهر</h3><span class="muted" style="font-size:var(--text-sm)">بتتسجّل لوحدها في يومها</span></div>
+              <div id="recurList"></div>
+              <form id="recurForm" class="inline-form" style="margin-top:12px;flex-wrap:wrap">
+                <input id="recurNote" class="field" placeholder="الوصف (مثلاً: مصاريف البيت)" />
+                <input id="recurAmount" type="number" step="any" class="field" placeholder="المبلغ" style="max-width:130px" />
+                <select id="recurCategory" class="field" style="max-width:150px"></select>
+                <input id="recurDay" type="number" min="1" max="31" class="field" placeholder="يوم كام في الشهر" style="max-width:150px" />
+                <button type="submit" class="btn finances sm">➕ ضيف</button>
+              </form>
+            </div>
+
             <div class="grid-2-side">
               <div class="stack">
                 <div class="card">

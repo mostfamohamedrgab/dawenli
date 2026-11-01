@@ -50,7 +50,7 @@ function moodInfo(mood = "") {
 
 const CAT_ICONS = {
   "أكل": "🍔", "مواصلات": "🚌", "فواتير": "🧾", "صحة": "💊", "تسوق": "🛍️",
-  "ترفيه": "🎮", "بيت": "🏠", "شغل": "💼", "تعليم": "📚", "أخرى": "📦",
+  "ترفيه": "🎮", "بيت": "🏠", "شغل": "💼", "تعليم": "📚", "صدقات": "🤲", "أخرى": "📦",
 };
 const HEALTH_ICON = { "تمرين": "🏃", "دواء": "💊", "أكل": "🍽️", "عرض": "🤒", "نوم": "😴", "نفسية": "🧠", "ملاحظة": "📝" };
 
@@ -1888,6 +1888,7 @@ function renderFinancesPage() {
 
   // ميزانية/هدف الشهر + قائمة العمليات بفلاتر وتحميل المزيد
   renderBudget();
+  renderRecurring();
   fillFinFilterCat();
   renderFinList();
 }
@@ -3889,3 +3890,36 @@ function initSyntaxBrain() {
   });
 }
 initSyntaxBrain();
+
+
+/* ===================== 🔁 مصاريف متكرّرة كل شهر ===================== */
+async function renderRecurring() {
+  const box = $("recurList"); if (!box) return;
+  const sel = $("recurCategory");
+  if (sel && !sel.options.length) {
+    const cats = state.categories?.length ? state.categories : Object.keys(CAT_ICONS);
+    sel.innerHTML = cats.map((c) => `<option value="${escAttr(c)}" ${c === "بيت" ? "selected" : ""}>${CAT_ICONS[c] || ""} ${escapeHtml(c)}</option>`).join("");
+  }
+  let list = [];
+  try { list = await api("/api/recurring").then((r) => r.json()); } catch { return; }
+  box.innerHTML = list.length
+    ? list.map((r) => `<div class="tl-row">
+        <span class="tl-text" style="flex:1">${CAT_ICONS[r.category] || "🔁"} ${escapeHtml(r.note || r.category)}
+          <span class="muted" style="font-size:var(--text-sm)"> · كل شهر يوم ${arNum(r.day)} · الجاي ${fmtShort(r.next_date)}</span></span>
+        <span class="l-amount neg">${arNum(r.amount)} ${r.currency && r.currency !== "جنيه" ? escapeHtml(r.currency) : MONEY}</span>
+        <button class="icon-btn" onclick="delRecurring(${r.id})" title="وقّف التكرار">🗑️</button></div>`).join("")
+    : `<span class="muted" style="font-size:var(--text-sm)">مفيش مصاريف متكرّرة — ضيف مثلًا «مصاريف البيت ١٥٠٠٠ يوم ١١».</span>`;
+}
+async function delRecurring(id) {
+  if (!confirm("توقّف المصروف المتكرّر ده؟ (اللي اتسجّل قبل كده بيفضل زي ما هو)")) return;
+  await api(`/api/recurring/${id}`, { method: "DELETE" });
+  renderRecurring();
+}
+window.delRecurring = delRecurring;
+$("recurForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = { note: $("recurNote").value.trim(), amount: $("recurAmount").value, category: $("recurCategory").value, day: $("recurDay").value, direction: "expense" };
+  if (!(Number(body.amount) > 0) || !(Number(body.day) >= 1 && Number(body.day) <= 31)) { alert("اكتب المبلغ واليوم (من ١ لـ ٣١)"); return; }
+  const r = await api("/api/recurring", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((x) => x.json());
+  if (r.ok) { $("recurForm").reset(); renderRecurring(); } else alert(r.error || "حصل خطأ");
+});
