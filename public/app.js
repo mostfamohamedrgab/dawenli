@@ -1889,7 +1889,7 @@ function renderFinancesPage() {
   $("catBars").innerHTML = rows.length
     ? rows.map(([c, v], i) => {
         const pct = total ? Math.round((v / total) * 100) : 0;
-        return `<div class="cat-bar ${accents[i] || ""}">
+        return `<div class="cat-bar ${accents[i] || ""}" data-cat="${escapeHtml(c)}" style="cursor:pointer" title="دوس تشوف عمليات ${escapeHtml(c)}">
           <div class="cb-top">
             <span>${CAT_ICONS[c] || "📦"} ${escapeHtml(c)}</span>
             <span class="cb-amount">${arNum(v)} ${MONEY} · ${arNum(pct)}٪</span>
@@ -2004,9 +2004,9 @@ $("finFilterCat")?.addEventListener("change", (e) => { state.finFilter.cat = e.t
 $("finFilterQ")?.addEventListener("input", (e) => { state.finFilter.q = e.target.value; state.finFilter.limit = 40; renderFinList(); });
 $("finFilterRange")?.addEventListener("change", (e) => { state.finFilter.range = e.target.value; state.finFilter.limit = 40; renderFinList(); });
 $("finLoadMore")?.addEventListener("click", (e) => { if (e.target.id === "finMoreBtn") { state.finFilter.limit += 40; renderFinList(); } });
-// الضغط على بوكس بند = فلتر القايمة على البند ده
-$("finCatBoxes")?.addEventListener("click", (e) => {
-  const box = e.target.closest(".cat-box"); if (!box) return;
+// الضغط على بوكس بند (أو بند في «على ماذا تُنفق») = فلتر القايمة على البند ده
+function onCatClick(e) {
+  const box = e.target.closest(".cat-box, .cat-bar"); if (!box) return;
   state.finFilter.cat = box.dataset.cat || "all";
   state.finFilter.dir = "expense";
   state.finFilter.limit = 40;
@@ -2014,7 +2014,9 @@ $("finCatBoxes")?.addEventListener("click", (e) => {
   if ($("finFilterDir")) $("finFilterDir").value = "expense";
   renderFinList();
   $("finList")?.scrollIntoView({ behavior: "smooth", block: "center" });
-});
+}
+$("finCatBoxes")?.addEventListener("click", onCatClick);
+$("catBars")?.addEventListener("click", onCatClick);
 
 /* ---- ميزانية وهدف الشهر ---- */
 function monthLabel(m) {
