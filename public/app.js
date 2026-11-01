@@ -1927,7 +1927,7 @@ function renderFinIncome(incomeByMonth, curKey, selKey = curKey, expenseByMonth 
   el.innerHTML = `
     <div class="inc-now"><span class="inc-now-val">${arNum(selInc)} ${MONEY}</span>
       <span class="muted">دخل شهر ${monthShortKey(selKey)} · صافي <b style="color:${selNet >= 0 ? "var(--finances-deep, #527F35)" : "#c0392b"}">${selNet < 0 ? "-" : ""}${arNum(Math.abs(selNet))}</b></span>
-      ${selKey !== curKey ? `<button class="btn ghost sm" style="margin-inline-start:auto" onclick="selFinMonth(null)">↺ الشهر الحالي</button>` : ""}</div>
+      ${state.finMonth ? `<button class="btn ghost sm" style="margin-inline-start:auto" onclick="selFinMonth(null)">↺ رجوع لكل الشهور</button>` : ""}</div>
     <div class="inc-bars">${keys.map((k, i) => {
       const h = Math.round((vals[i] / max) * 100);
       return `<div class="inc-col" style="cursor:pointer" title="دوس تشوف ${monthShortKey(k)}" onclick="selFinMonth('${k}')"><span class="inc-col-val">${vals[i] ? arNum(vals[i]) : "—"}</span><div class="inc-bar-track"><div class="inc-bar-fill${k === selKey ? " now" : ""}" style="height:${Math.max(2, h)}%"></div></div><span class="inc-col-lbl" style="${k === selKey ? "font-weight:800;color:var(--ink)" : ""}">${monthShortKey(k)}</span></div>`;
@@ -1936,7 +1936,8 @@ function renderFinIncome(incomeByMonth, curKey, selKey = curKey, expenseByMonth 
 }
 // اختيار شهر من «دخلك شهريًا» — الكروت اللي فوق وبنود المصاريف بتتحوّل له
 function selFinMonth(k) {
-  state.finMonth = !k || k === TODAY().slice(0, 7) ? null : k;
+  state.finMonth = k || null; // null = رجوع: الشهر الحالي في الكروت وكل العمليات في القائمة
+  state.finFilter.limit = 40;
   renderFinancesPage();
   $("finStats")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1967,6 +1968,8 @@ function fillFinFilterCat() {
 function applyFinFilter() {
   const f = state.finFilter;
   let rows = state.finance;
+  // شهر مختار من «دخلك شهريًا» → عمليات الشهر ده بس
+  if (state.finMonth) rows = rows.filter((r) => (r.entry_date || "").slice(0, 7) === state.finMonth);
   if (f.dir !== "all") rows = rows.filter((r) => r.direction === f.dir);
   if (f.cat !== "all") rows = rows.filter((r) => (r.category || "أخرى") === f.cat);
   const q = (f.q || "").trim();
@@ -1991,7 +1994,7 @@ function renderFinList() {
   const exp = all.filter((r) => r.direction === "expense").reduce((a, r) => a + r.amount, 0);
   const inc = all.filter((r) => r.direction === "income").reduce((a, r) => a + r.amount, 0);
   const meta = $("finFilterMeta");
-  if (meta) meta.innerHTML = all.length ? `${arNum(all.length)} عملية · صرف ${arNum(exp)} ${MONEY}${inc ? ` · دخل ${arNum(inc)} ${MONEY}` : ""}` : "";
+  if (meta) meta.innerHTML = all.length ? `${state.finMonth ? `شهر ${monthShortKey(state.finMonth)} · ` : ""}${arNum(all.length)} عملية · صرف ${arNum(exp)} ${MONEY}${inc ? ` · دخل ${arNum(inc)} ${MONEY}` : ""}` : "";
   el.innerHTML = shown.length ? shown.map(finRowHtml).join("") : `<div class="empty sm">${DOODLE}<p>مفيش عمليات بالفلاتر دي.</p></div>`;
   const lm = $("finLoadMore");
   if (lm) lm.innerHTML = all.length > shown.length ? `<button class="btn secondary sm" id="finMoreBtn">تحميل المزيد (${arNum(all.length - shown.length)} فاضلين)</button>` : "";
