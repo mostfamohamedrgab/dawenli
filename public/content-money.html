@@ -96,6 +96,30 @@
   .bitems{display:none;background:rgba(0,0,0,.16)}
   .brand.open .bitems{display:block}
   .bitems .item{padding-inline-start:36px}
+  /* الشهر ده مفصّل */
+  .month{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:24px}
+  .month .mhd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .month .mhd h2{margin:0;font-size:18px;font-weight:900}
+  .month .nav{margin-inline-start:auto;display:flex;gap:6px}
+  .month .nav button{background:#0c0c14;border:1px solid var(--line);border-radius:9px;color:var(--txt);font-family:inherit;font-size:13px;padding:5px 11px;cursor:pointer}
+  .month .nav button:hover{border-color:var(--cyan)}
+  .month .nav button:disabled{opacity:.35;cursor:default}
+  .mk{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+  .mk div{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:9px 12px}
+  .mk span{display:block;font-size:11.5px;color:var(--mut)}
+  .mk b{font-size:21px;font-weight:900;font-family:'JetBrains Mono',monospace}
+  .mk .i b{color:var(--green)} .mk .e b{color:var(--pink)} .mk .n b{color:var(--cyan)}
+  .mchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .mchips span{font-size:11.5px;border-radius:100px;padding:3px 10px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+  .mchips .i{color:var(--green)} .mchips .e{color:var(--pink)}
+  .mrow{display:grid;grid-template-columns:82px 130px 1fr auto auto;gap:10px;align-items:center;padding:8px 2px;border-top:1px solid rgba(255,255,255,.05);font-size:13px}
+  .mrow .dt{font-size:11.5px;color:var(--dim);font-family:'JetBrains Mono',monospace}
+  .mrow .c{font-size:11.5px;color:var(--mut)}
+  .mrow .a{font-family:'JetBrains Mono',monospace;font-weight:800;min-width:76px;text-align:end}
+  .mrow.income .a{color:var(--green)} .mrow.expense .a{color:var(--pink)}
+  .mrow .x{background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;padding:2px 4px}
+  .mrow .x:hover{color:var(--pink)}
+  @media(max-width:640px){.mk{grid-template-columns:1fr}.mrow{grid-template-columns:70px 1fr auto auto}.mrow .c{display:none}}
 </style>
   <link rel="stylesheet" href="/w-mobile.css">
   <link rel="stylesheet" href="/w-dawenli.css">
@@ -118,6 +142,8 @@ const $=s=>document.querySelector(s);
 const money=n=>(Math.round((n||0)*100)/100).toLocaleString('en-US');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let DATA=null;
+const thisMonth=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;};
+let MONTH=thisMonth();
 
 function load(){
   fetch('/api/w/content').then(r=>r.json()).then(d=>{DATA=d;draw();})
@@ -186,12 +212,37 @@ function catBlock(g,kindCls){
     +`<div class="items">${inner}</div></div>`;
 }
 
+// أول حاجة في الصفحة: الشهر المختار بكل بنوده
+function monthLabel(m){const [y,mo]=m.split('-').map(Number);return new Date(y,mo-1,1).toLocaleDateString('ar-EG-u-nu-latn',{month:'long',year:'numeric'});}
+function shiftMonth(step){const [y,mo]=MONTH.split('-').map(Number);const d=new Date(y,mo-1+step,1);
+  MONTH=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;draw();}
+function monthBlock(rows){
+  const mr=rows.filter(r=>(r.dt||'').startsWith(MONTH)).sort((a,b)=>(a.dt<b.dt?1:-1));
+  const sum=k=>mr.filter(r=>r.kind===k).reduce((s,r)=>s+(r.amount||0),0);
+  const inc=sum('income'), exp=sum('expense');
+  const chips=[...groupBy(mr,'income').map(g=>`<span class="i">${esc(g.cat)} ${money(g.total)}$</span>`),
+    ...groupBy(mr,'expense').map(g=>`<span class="e">${esc(g.cat)} ${money(g.total)}$</span>`)].join('');
+  const list=mr.map(r=>`<div class="mrow ${r.kind==='income'?'income':'expense'}"><span class="dt">${r.dt||''}</span>`
+    +`<span class="c">${esc(r.category)}</span><span>${esc(r.note||'—')}</span>`
+    +`<span class="a">${r.kind==='income'?'+':'−'}${money(r.amount)}</span>`
+    +`<button class="x" title="امسح" onclick="del('${r.id}')">🗑️</button></div>`).join('');
+  return `<div class="month"><div class="mhd"><h2>📅 ${esc(monthLabel(MONTH))}</h2>`
+    +`<div class="nav"><button onclick="shiftMonth(-1)">‹ اللي قبله</button>`
+    +`<button onclick="shiftMonth(1)" ${MONTH>=thisMonth()?'disabled':''}>اللي بعده ›</button></div></div>`
+    +`<div class="mk"><div class="i"><span>دخل الشهر</span><b>${money(inc)}$</b></div>`
+    +`<div class="e"><span>مصاريف الشهر</span><b>${money(exp)}$</b></div>`
+    +`<div class="n"><span>صافي الشهر</span><b>${money(inc-exp)}$</b></div></div>`
+    +(chips?`<div class="mchips">${chips}</div>`:'')
+    +(list||'<div class="empty">مفيش بنود محتوى في الشهر ده لسه</div>')+`</div>`;
+}
+
 function draw(){
   const t=DATA.totals, rows=DATA.rows;
   const inc=groupBy(rows,'income'), exp=groupBy(rows,'expense');
   const cats=[...new Set(rows.map(r=>r.category))];
-  let h='';
-  // ملخّص
+  let h=monthBlock(rows);
+  // ملخّص كل الوقت
+  h+=`<h2 style="font-size:15px;font-weight:800;color:var(--mut);margin:0 0 10px">كل الوقت</h2>`;
   h+=`<div class="kpis">`
     +`<div class="kpi inc"><div class="l">الدخل</div><div class="v">${money(t.income)}<small>$</small></div></div>`
     +`<div class="kpi exp"><div class="l">المصاريف</div><div class="v">${money(t.expense)}<small>$</small></div></div>`
