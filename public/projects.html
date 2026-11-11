@@ -28,7 +28,12 @@
     background:linear-gradient(100deg,#fff 20%,var(--gold) 70%,var(--orange));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
   .sub{color:var(--mut);font-size:13px;margin-bottom:20px}
 
-  .kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:18px}
+  .kpis{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin-bottom:18px}
+  /* كارت سقف الإعلانات: شريط بيوضّح وصلنا فين، والشرطة البيضا = حد الـ١٥٪ قبل الائتماني */
+  .kpi.fbb{background:linear-gradient(160deg,rgba(52,211,153,.2),rgba(24,119,242,.06) 70%);border-color:rgba(52,211,153,.5)}
+  .adbar{position:relative;height:5px;border-radius:99px;background:rgba(255,255,255,.1);margin:7px 0 2px;overflow:hidden}
+  .adbar i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:99px;transition:width .3s}
+  .adbar u{position:absolute;inset-block:-1px;width:2px;background:rgba(255,255,255,.8);text-decoration:none}
   /* هوية فيسبوك — أزرق #1877F2 + لوجو f الحقيقي، عشان تتميّز من أول نظرة */
   .kpi.fb{background:linear-gradient(160deg,rgba(24,119,242,.26),rgba(24,119,242,.07) 70%);border-color:rgba(24,119,242,.55);position:relative;overflow:hidden}
   .kpi.fb::after{content:'';position:absolute;inset:auto auto -18px -14px;width:74px;height:74px;opacity:.10;
@@ -230,6 +235,23 @@ const FBW=FBI.replace('fill="#1877F2"','fill="#fff"').replace('<path fill="#fff"
 const LIVE=['won','delivering','delivered'];
 const isFb=src=>/فيس|face|fb|meta|إعلان|اعلان/i.test(src||'');
 const isAd=f=>/إعلان|اعلان|فيس|facebook|meta|ads/i.test((f.category||'')+' '+(f.note||''));
+// ===== سقف ميزانية الإعلانات =====
+// القاعدة: الإعلان بيتموّل من الفلوس اللي الإعلان نفسه جابها — نسبة من المحصّل من عملاء
+// الإعلان، وفوقيها حد ائتماني ثابت نقدر نتحرّك فيه قبل ما الفلوس توصل. الحسبة تراكمية
+// على كل الوقت (مش بفلتر الفترة) — لأن السقف ده حد كلي مش شهري.
+const AD_PCT=0.15, AD_CREDIT=10000;
+// «15%» جوّه نص عربي بتتقلب وتبان «%15» — نعزلها باتجاه LTR (U+2066…U+2069).
+// ممنوع نحلّها بأرقام هندية: الخط هنا مش شايلها وبتطلع مشوّهة.
+const PCTL=()=>'⁦'+Math.round(AD_PCT*100)+'%⁩';
+function adBudget(){
+  const spent=adRows().reduce((s,f)=>s+(+f.amount||0),0);
+  const ids=new Set((D.deals||[]).filter(d=>isFb(d.source)&&d.stage!=='lost').map(d=>d.id));
+  const got=FIN.filter(f=>ids.has(f.deal_id)&&f.kind==='income').reduce((s,f)=>s+fxAmt(f),0);
+  const cap=got*AD_PCT, ceiling=cap+AD_CREDIT;
+  return {spent,got,cap,ceiling,left:ceiling-spent,
+    inCredit:spent>cap,pct:ceiling?Math.min(100,spent/ceiling*100):0,
+    capAt:ceiling?Math.min(100,cap/ceiling*100):0};
+}
 const dStart=d=>d.started_at||d.deposit_at||(d.created_at||'').slice(0,10);
 function fmtD(s){ if(!s)return '—'; const [y,m,d]=s.slice(0,10).split('-'); return `${+d}/${+m}/${y}`; }
 function fmtAt(s){ if(!s)return ''; return fmtD(s)+(s.length>11?' '+s.slice(11,16):''); }
@@ -303,6 +325,25 @@ function kpiDetail(kind){
     +`<div class="acts"><button class="btn o" onclick="closeMd()">تمام</button></div>`);
 }
 
+// 💳 سقف الإعلانات — الحسبة كاملة عشان الرقم ما يبقاش صندوق أسود
+function adBudgetDetail(){
+  const b=adBudget();
+  const P=PCTL();
+  const rows=_kRow('المحصّل من عملاء الإعلان','كل الوقت — الأساس اللي النسبة بتتحسب منه',b.got,'EGP')
+    +_kRow(`حد الـ${P}`,`${P} من ${money(Math.round(b.got))}ج`,b.cap,'EGP')
+    +_kRow('حد ائتماني','ثابت — مساحة نتحرّك فيها قبل ما الفلوس توصل',AD_CREDIT,'EGP')
+    +_kRow('السقف الكلي',`حد الـ${P} + الائتماني`,b.ceiling,'EGP')
+    +_kRow('اللي صرفناه فعلًا','كل حركات الإعلانات في المصاريف العامة',b.spent,'EGP',true);
+  const note=b.left<0
+    ? `🛑 عدّينا السقف بـ${money(Math.round(-b.left))}ج — وقّف الصرف لحد ما يدخل تحصيل جديد.`
+    : b.inCredit
+      ? `⚠️ إحنا جوّه الحد الائتماني. حد الـ${P} خلص، وباقي ${money(Math.round(b.left))}ج من الائتماني بس.`
+      : `✅ لسه في حد الـ${P}. كل ⁦100ج⁩ تحصيل جديد من الإعلان بيزوّد الميزانية ⁦${Math.round(AD_PCT*100)}ج⁩.`;
+  openMd(`<h3>💳 متاح للإعلانات</h3>${_kTable(rows,'متاح نصرفه',b.left)}`
+    +`<div class="sub" style="margin-top:10px">${note}</div>`
+    +`<div class="acts"><button class="btn o" onclick="closeMd()">تمام</button></div>`);
+}
+
 let _lastLoad=0;
 function load(){
   Promise.all([fetch('/api/w/work').then(r=>r.json()),fetch('/api/w/finance').then(r=>r.json())])
@@ -360,6 +401,13 @@ function draw(){
         <div class="s">${fb.n} عميل من الإعلان</div></div>`
     +`<div class="kpi fb"><div class="l">${FBI} المتوقع من فيسبوك</div><div class="v mono">${money(fb.exp)}</div>
         <div class="s">${fb.ads?'كل ١ج إعلان = '+(fb.exp/fb.ads).toFixed(1)+'ج':'&nbsp;'}</div></div>`
+    +(()=>{const b=adBudget();
+        const col=b.left<0?'var(--pink)':b.inCredit?'var(--gold)':'var(--green)';
+        return `<div class="kpi fb fbb drill" onclick="adBudgetDetail()" title="دوس تشوف الحسبة كاملة">
+          <span class="pen">🔎</span><div class="l">💳 متاح للإعلانات</div>
+          <div class="v mono" style="color:${col}">${money(Math.round(b.left))}</div>
+          <div class="adbar"><i style="width:${b.pct.toFixed(1)}%;background:${col}"></i><u style="inset-inline-start:${b.capAt.toFixed(1)}%"></u></div>
+          <div class="s">صرفنا ${money(Math.round(b.spent))} من ${money(Math.round(b.ceiling))}${b.left<0?' — عدّينا السقف':b.inCredit?' — في الائتماني':''}</div></div>`;})()
     +'</div>';
 
 
@@ -559,8 +607,9 @@ function fbStats(){
   const ads=adRows().filter(f=>inPer(f.dt)).reduce((s,f)=>s+(+f.amount||0),0);
   const deals=D.deals.filter(d=>isFb(d.source)&&d.stage!=='lost');
   const ids=new Set(deals.map(d=>d.id));
-  const got=FIN.filter(f=>ids.has(f.deal_id)&&f.kind==='income'&&inPer(f.dt)).reduce((s,f)=>s+(+f.amount||0),0);
-  const exp=deals.reduce((s,d)=>s+(+d.value||0),0);
+  // بالجنيه دايمًا — مشروع بالدولار/الريال بيتحوّل بسعر السيرفر، زي باقي كروت الصفحة
+  const got=FIN.filter(f=>ids.has(f.deal_id)&&f.kind==='income'&&inPer(f.dt)).reduce((s,f)=>s+fxAmt(f),0);
+  const exp=deals.reduce((s,d)=>s+(+d.value||0)*fxOf(d.currency),0);
   return {ads,got,exp,n:deals.length};
 }
 // الرقم اللي بتكتبه = إجمالي اللي صرفته على الإعلانات. الفرق بيتسجّل على آخر حركة إعلان
