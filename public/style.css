@@ -819,6 +819,15 @@ a { color: inherit; }
 .at-breakdown { display: flex; gap: 14px; flex-wrap: wrap; font-size: var(--text-sm); color: var(--ink-muted); margin-top: 8px; }
 .assets-market { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: var(--text-sm); color: var(--ink-muted); padding: 0 4px; }
 .assets-market b { color: var(--ink); }
+.mk-delta { font-size: 12px; font-weight: 700; white-space: nowrap; margin-inline-start: 4px; }
+.mk-up { color: #16a34a; }
+.mk-down { color: #dc2626; }
+.mk-flat { color: var(--ink-muted); }
+.at-change { margin-top: 2px; font-size: var(--text-sm); }
+.mk-history { margin-top: 10px; font-size: var(--text-sm); }
+.mk-history summary { cursor: pointer; color: var(--ink-muted); }
+.mk-history table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.mk-history th, .mk-history td { text-align: start; padding: 4px 6px; border-bottom: 1px solid rgba(127,127,127,.2); }
 .asset-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .asset-form .field { flex: 1; min-width: 110px; }
 .assets-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }

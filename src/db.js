@@ -317,6 +317,13 @@ db.exec(`
     data        TEXT,
     updated_at  TEXT
   );
+
+  -- سجل كل تحديث للأسعار (علشان نعرف مين طلع ومين نزل)
+  CREATE TABLE IF NOT EXISTS asset_market_history (
+    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    at    TEXT NOT NULL,
+    data  TEXT
+  );
 `);
 
 /* ===================== Migrations ===================== */
@@ -1939,23 +1946,41 @@ export function deleteAsset(userId, id) {
   return db.prepare(`DELETE FROM assets WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
 }
 
-/* أسعار السوق (دهب/جرام عيار ٢٤ + أسعار العملات) — صف واحد مشترك */
-export function getAssetMarket() {
-  const row = db.prepare(`SELECT data, updated_at FROM asset_market WHERE id = 1`).get();
-  if (!row) return { goldG24Egp: null, rates: {}, updatedAt: null };
+/* أسعار السوق (دهب/جرام عيار ٢٤ + أسعار العملات) — صف واحد مشترك + سجل بكل تحديث */
+const MARKET_KEYS = ["goldG24Egp", "goldSource", "goldLocal", "goldIntlG24Egp"];
+function parseMarket(json) {
   try {
-    const d = JSON.parse(row.data || "{}");
-    return { goldG24Egp: d.goldG24Egp ?? null, rates: d.rates || {}, updatedAt: row.updated_at };
+    const d = JSON.parse(json || "{}");
+    const out = { rates: d.rates || {} };
+    for (const k of MARKET_KEYS) out[k] = d[k] ?? null;
+    return out;
   } catch {
-    return { goldG24Egp: null, rates: {}, updatedAt: row.updated_at };
+    return { goldG24Egp: null, rates: {} };
   }
 }
-export function setAssetMarket({ goldG24Egp, rates }) {
-  const data = JSON.stringify({ goldG24Egp: goldG24Egp ?? null, rates: rates || {} });
+export function getAssetMarket() {
+  const row = db.prepare(`SELECT data, updated_at FROM asset_market WHERE id = 1`).get();
+  if (!row) return { goldG24Egp: null, rates: {}, updatedAt: null, prev: null, history: [] };
+  const hist = db.prepare(`SELECT at, data FROM asset_market_history ORDER BY id DESC LIMIT 15`).all()
+    .map((h) => ({ at: h.at, ...parseMarket(h.data) }));
+  // «قبل كده» = آخر تحديث قبل الحالي (السجل أوله هو الحالي)
+  const prev = hist[0] && hist[0].at === row.updated_at ? hist[1] || null : hist[0] || null;
+  return { ...parseMarket(row.data), updatedAt: row.updated_at, prev, history: hist };
+}
+export function setAssetMarket(m) {
+  const data = { rates: m.rates || {} };
+  for (const k of MARKET_KEYS) data[k] = m[k] ?? null;
+  const json = JSON.stringify(data);
+  const at = now();
+  const old = db.prepare(`SELECT data, updated_at FROM asset_market WHERE id = 1`).get();
+  const histCount = db.prepare(`SELECT COUNT(*) AS n FROM asset_market_history`).get().n;
+  // أول مرة: السعر القديم اللي قبل السجل يتحفظ برضه علشان نقارن بيه
+  if (!histCount && old?.data) db.prepare(`INSERT INTO asset_market_history (at, data) VALUES (?, ?)`).run(old.updated_at || at, old.data);
   db.prepare(`
     INSERT INTO asset_market (id, data, updated_at) VALUES (1, ?, ?)
     ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
-  `).run(data, now());
+  `).run(json, at);
+  db.prepare(`INSERT INTO asset_market_history (at, data) VALUES (?, ?)`).run(at, json);
   return getAssetMarket();
 }
 

@@ -1252,6 +1252,24 @@ export function startServer() {
     res.json({ assets: listAssets(user.id), market: getAssetMarket() });
   });
   // أسعار السوق لوحدها (للتحويل في صفحة الفلوس مثلاً)
+  // أسعار الدهب في مصر من egypt.gold-price-today.com (جدول: العيار — سعر البيع — سعر الشراء)
+  async function fetchEgyptGold() {
+    const html = await fetch("https://egypt.gold-price-today.com/", {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+      signal: AbortSignal.timeout(10000),
+    }).then((r) => r.text());
+    const text = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    const i = text.indexOf("سعر البيع سعر الشراء");
+    if (i < 0) return null;
+    const chunk = text.slice(i, i + 600);
+    const num = (x) => Number(String(x).replace(/,/g, ""));
+    const out = {};
+    for (const m of chunk.matchAll(/عيار (24|21|18|14) ([\d,]+) جنيه ([\d,]+) جنيه/g)) {
+      if (!out["k" + m[1]]) out["k" + m[1]] = { sell: num(m[2]), buy: num(m[3]) };
+    }
+    if (!out.k24 || !out.k24.buy) return null;
+    return { ...out, source: "egypt.gold-price-today.com" };
+  }
   app.get("/api/market", (req, res) => {
     const user = gate(req, res);
     if (!user) return;
@@ -1282,14 +1300,30 @@ export function startServer() {
         }
       }
     } catch (e) { console.error("rates fetch failed:", e?.message); }
+    let goldIntlG24Egp = null;
     try {
       const g = await fetch("https://api.gold-api.com/price/XAU", { signal: AbortSignal.timeout(8000) }).then((r) => r.json());
       const usdPerOz = g?.price;
       const usdEgp = rates.USD || prev.rates?.USD;
-      if (usdPerOz && usdEgp) goldG24Egp = (usdPerOz / 31.1035) * usdEgp; // جرام عيار ٢٤ بالجنيه
+      if (usdPerOz && usdEgp) goldIntlG24Egp = (usdPerOz / 31.1035) * usdEgp; // السعر العالمي — للمرجع بس
     } catch (e) { console.error("gold fetch failed:", e?.message); }
+    // سعر مصر: سعر الشراء عند الصاغة (اللي بيدفعوه لك لما تبيع) — هو اللي بنحسب بيه الثروة
+    let goldLocal = null;
+    try {
+      goldLocal = await fetchEgyptGold();
+      const ref = goldIntlG24Egp || prev.goldG24Egp;
+      if (goldLocal && ref && (goldLocal.k24.buy < ref * 0.7 || goldLocal.k24.buy > ref * 1.5)) {
+        console.error("egypt gold price looks wrong:", goldLocal.k24, "ref", ref);
+        goldLocal = null;
+      }
+    } catch (e) { console.error("egypt gold fetch failed:", e?.message); }
+    if (goldLocal) goldG24Egp = goldLocal.k24.buy;
+    else if (goldIntlG24Egp) goldG24Egp = goldIntlG24Egp;
     const market = setAssetMarket({
       goldG24Egp: goldG24Egp ?? prev.goldG24Egp,
+      goldSource: goldLocal ? "egypt" : goldIntlG24Egp ? "intl" : prev.goldSource,
+      goldLocal: goldLocal || null,
+      goldIntlG24Egp: goldIntlG24Egp ?? null,
       rates: Object.keys(rates).length ? { ...prev.rates, ...rates } : prev.rates,
     });
     res.json(market);
@@ -1299,8 +1333,11 @@ export function startServer() {
     if (!user) return;
     const prev = getAssetMarket();
     const { goldG24Egp, rates } = req.body || {};
+    const manual = goldG24Egp != null && goldG24Egp !== "";
     res.json(setAssetMarket({
-      goldG24Egp: goldG24Egp != null && goldG24Egp !== "" ? Number(goldG24Egp) : prev.goldG24Egp,
+      ...prev,
+      goldSource: manual ? "manual" : prev.goldSource,
+      goldG24Egp: manual ? Number(goldG24Egp) : prev.goldG24Egp,
       rates: { ...prev.rates, ...(rates || {}) },
     }));
   });

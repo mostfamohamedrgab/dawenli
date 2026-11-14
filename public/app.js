@@ -2367,9 +2367,16 @@ function renderTasksPage() {
 const ASSET_ICON = { gold: "🪙", cash: "💵", other: "🏷️", liability: "📉" };
 const KARATS = [24, 22, 21, 18, 14];
 // قيمة قطعة دهب (جرام × عدد × سعر الجرام × العيار) بالجنيه
-function goldItemEgp(it, g24) {
+// سعر جرام العيار ده: سعر مصر (اللي الصاغة بتشتري بيه) لو موجود، وإلا نسبة من عيار ٢٤
+function goldGramEgp(k, g24, market) {
+  const m = market || state.market;
+  const loc = m && m.goldSource === "egypt" && m.goldLocal && m.goldLocal["k" + (Number(k) || 24)];
+  if (loc && loc.buy) return loc.buy;
+  return g24 ? g24 * ((Number(k) || 24) / 24) : null;
+}
+function goldItemEgp(it, g24, market) {
   if (!g24) return null;
-  return (Number(it.g) || 0) * (Number(it.n) || 0) * g24 * ((Number(it.k) || 24) / 24);
+  return (Number(it.g) || 0) * (Number(it.n) || 0) * goldGramEgp(it.k, g24, market);
 }
 // قيمة الأصل بالجنيه حسب أسعار السوق
 function assetValueEgp(a, market) {
@@ -2378,9 +2385,9 @@ function assetValueEgp(a, market) {
     const g24 = market && market.goldG24Egp;
     if (!g24) return null;
     if (Array.isArray(a.items) && a.items.length)
-      return a.items.reduce((s, it) => s + (goldItemEgp(it, g24) || 0), 0);
+      return a.items.reduce((s, it) => s + (goldItemEgp(it, g24, market) || 0), 0);
     if (!a.quantity) return null;
-    return a.quantity * g24 * ((a.karat || 24) / 24);
+    return a.quantity * goldGramEgp(a.karat || 24, g24, market);
   }
   if (a.type === "cash" || a.type === "liability") {
     // الكاش والالتزام: مبلغ بعملة (بنحوّله للجنيه بسعر اليوم — بيتحدّث مع تحديث الأسعار)
@@ -2401,14 +2408,54 @@ async function renderAssetsPage() {
   } catch {}
   renderAssets();
 }
+// سهم ▲/▼ والفرق والنسبة (لو مفيش رقم قديم نقارن بيه مايظهرش حاجة)
+function mkDelta(cur, old, { dec = 0 } = {}) {
+  if (cur == null || old == null || !Number(old)) return "";
+  const d = cur - old;
+  if (Math.abs(d) < (dec ? 0.005 : 0.5)) return `<span class="mk-delta mk-flat">= زي ما هو</span>`;
+  const up = d > 0;
+  const abs = dec ? Math.abs(d).toFixed(dec) : Math.round(Math.abs(d));
+  const pct = Math.abs((d / old) * 100).toFixed(1);
+  return `<span class="mk-delta ${up ? "mk-up" : "mk-down"}">${up ? "▲" : "▼"} ${arNum(abs)} (${up ? "+" : "−"}${arNum(pct)}٪)</span>`;
+}
+// سجل التحديثات: كل مرة دوست «حدّث الأسعار»
+function renderMarketHistory(market) {
+  const h = (market && market.history) || [];
+  if (h.length < 2) return "";
+  const arrow = (a, b) => (a == null || b == null || !b || Math.abs(a - b) < 0.005 ? "" : a > b ? `<span class="mk-up">▲</span>` : `<span class="mk-down">▼</span>`);
+  const rows = h.map((x, i) => {
+    const older = h[i + 1];
+    const u = x.rates && x.rates.USD ? Number(x.rates.USD) : null;
+    const sameSrc = older && (older.goldSource || "intl") === (x.goldSource || "intl");
+    const src = x.goldSource === "egypt" ? "مصر" : x.goldSource === "manual" ? "يدوي" : "عالمي";
+    return `<tr><td>${fmtNotifTime(x.at)}</td>
+      <td>${x.goldG24Egp ? arNum(Math.round(x.goldG24Egp)) : "—"} ${sameSrc ? arrow(x.goldG24Egp, older.goldG24Egp) : ""} <span class="muted">${src}</span></td>
+      <td>${u ? arNum(u.toFixed(2)) : "—"} ${older ? arrow(u, older.rates && Number(older.rates.USD)) : ""}</td></tr>`;
+  }).join("");
+  return `<details class="mk-history"><summary>📜 سجل الأسعار (${arNum(h.length)} تحديث)</summary>
+    <table><thead><tr><th>امتى</th><th>جرام ع٢٤</th><th>الدولار</th></tr></thead><tbody>${rows}</tbody></table></details>`;
+}
 function renderAssets() {
   const market = state.market || {};
+  const prev = market.prev || null;
+  const sameGoldSource = !!prev && (prev.goldSource || "intl") === (market.goldSource || "intl");
   const mEl = $("assetsMarket");
   if (mEl) {
-    const gold = market.goldG24Egp ? `${arNum(Math.round(market.goldG24Egp))} ج/جرام (ع٢٤)` : "—";
-    const usd = market.rates && market.rates.USD ? `${arNum(Number(market.rates.USD).toFixed(2))} ج/دولار` : "—";
+    const g24 = market.goldG24Egp;
+    const gold = g24 ? `${arNum(Math.round(g24))} ج/جرام (ع٢٤)` : "—";
+    const usdNow = market.rates && market.rates.USD ? Number(market.rates.USD) : null;
+    const usd = usdNow ? `${arNum(usdNow.toFixed(2))} ج/دولار` : "—";
     const when = market.updatedAt ? fmtNotifTime(market.updatedAt) : "لسه ماتحدّثش";
-    mEl.innerHTML = `<span>🪙 الدهب: <b>${gold}</b></span><span>💵 الدولار: <b>${usd}</b></span><span class="muted">آخر تحديث: ${when}</span>`;
+    const srcLbl = market.goldSource === "egypt" ? "سعر مصر: اللي الصاغة بتشتري بيه"
+      : market.goldSource === "manual" ? "سعر كتبته بإيدك" : "سعر عالمي";
+    const gDelta = sameGoldSource ? mkDelta(g24, prev.goldG24Egp) : "";
+    const uDelta = prev ? mkDelta(usdNow, prev.rates && Number(prev.rates.USD), { dec: 2 }) : "";
+    const loc = market.goldSource === "egypt" && market.goldLocal;
+    const k21 = loc && loc.k21 ? ` <span class="muted">· ع٢١: ${arNum(loc.k21.buy)}</span>` : "";
+    mEl.innerHTML = `<span>🪙 الدهب: <b>${gold}</b> ${gDelta} <span class="muted">· ${srcLbl}</span>${k21}</span>
+      <span>💵 الدولار: <b>${usd}</b> ${uDelta}</span>
+      <span class="muted">آخر تحديث: ${when}${prev ? ` · المقارنة بتحديث ${fmtNotifTime(prev.at)}` : ""}</span>
+      ${prev && !sameGoldSource ? `<span class="muted">دي أول مرة بسعر مصر، فالدهب مش هيتقارن المرة دي. من التحديث الجاي هيظهر طلع ولا نزل.</span>` : ""}`;
   }
   const withVal = (state.assets || []).map((a) => ({ ...a, _val: assetValueEgp(a, market) }));
   const sumType = (t) => withVal.filter((a) => a.type === t).reduce((s, a) => s + (a._val || 0), 0);
@@ -2416,17 +2463,28 @@ function renderAssets() {
   const assetsSum = sumType("gold") + sumType("cash") + sumType("other");
   const total = assetsSum - liabilities;            // صافي الثروة (بعد خصم الالتزامات)
   const liquid = sumType("gold") + sumType("cash"); // من غير الأصول التانية (سائل)
+  // نفس الأصول بأسعار التحديث اللي فات، فالفرق ده جاي من الأسعار بس
+  let pGold = null, pCash = null, pLiquid = null, pTotal = null;
+  if (sameGoldSource) {
+    const pv = (state.assets || []).map((a) => ({ type: a.type, v: assetValueEgp(a, prev) || 0 }));
+    const ps = (t) => pv.filter((x) => x.type === t).reduce((s, x) => s + x.v, 0);
+    pGold = ps("gold"); pCash = ps("cash");
+    pLiquid = pGold + pCash;
+    pTotal = pLiquid + ps("other") - ps("liability");
+  }
   const tEl = $("assetsTotal");
   if (tEl) {
     tEl.innerHTML = `
       <div class="at-main"><span class="at-label">صافي ثروتك التقريبي</span><span class="at-value">${arNum(Math.round(total))} ${MONEY}</span></div>
-      <div class="at-sub-main"><span class="at-label">صافي الثروة من غير الأصول التانية <span class="muted">(دهب + كاش)</span></span><span class="at-value2">${arNum(Math.round(liquid))} ${MONEY}</span></div>
+      ${pTotal != null ? `<div class="at-change">${mkDelta(total, pTotal)} <span class="muted">من آخر تحديث، بسبب تغيّر الأسعار</span></div>` : ""}
+      <div class="at-sub-main"><span class="at-label">صافي الثروة من غير الأصول التانية <span class="muted">(دهب + كاش)</span></span><span class="at-value2">${arNum(Math.round(liquid))} ${MONEY} ${pLiquid != null ? mkDelta(liquid, pLiquid) : ""}</span></div>
       <div class="at-breakdown">
-        <span>🪙 دهب: ${arNum(Math.round(sumType("gold")))}</span>
-        <span>💵 كاش: ${arNum(Math.round(sumType("cash")))}</span>
+        <span>🪙 دهب: ${arNum(Math.round(sumType("gold")))} ${pGold != null ? mkDelta(sumType("gold"), pGold) : ""}</span>
+        <span>💵 كاش: ${arNum(Math.round(sumType("cash")))} ${pCash != null ? mkDelta(sumType("cash"), pCash) : ""}</span>
         <span>🏷️ أصول تانية: ${arNum(Math.round(sumType("other")))}</span>
         ${liabilities ? `<span class="at-neg">📉 التزامات: −${arNum(Math.round(liabilities))}</span>` : ""}
-      </div>`;
+      </div>
+      ${renderMarketHistory(market)}`;
   }
   const el = $("assetsList");
   if (!el) return;
