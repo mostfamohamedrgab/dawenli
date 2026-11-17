@@ -319,6 +319,20 @@ db.exec(`
   );
 
   -- سجل كل تحديث للأسعار (علشان نعرف مين طلع ومين نزل)
+  -- سجل تغييرات الأصول: كل إضافة/تعديل/حذف بالقيمة قبل وبعد (JSON) — مابيتمسحش مع الأصل
+  CREATE TABLE IF NOT EXISTS asset_log (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    at        TEXT NOT NULL,
+    user_id   INTEGER NOT NULL,
+    asset_id  INTEGER NOT NULL,
+    action    TEXT NOT NULL,   -- add | update | delete
+    type      TEXT,
+    name      TEXT,
+    before    TEXT,            -- JSON للحقول اللي اتغيّرت (قبل)
+    after     TEXT             -- JSON للحقول اللي اتغيّرت (بعد)
+  );
+  CREATE INDEX IF NOT EXISTS idx_asset_log_user ON asset_log(user_id, id);
+
   CREATE TABLE IF NOT EXISTS asset_market_history (
     id    INTEGER PRIMARY KEY AUTOINCREMENT,
     at    TEXT NOT NULL,
@@ -687,8 +701,15 @@ export const FINANCE_CATEGORIES = [
   "شغل",
   "تعليم",
   "صدقات",
+  "ادخار",
   "أخرى",
 ];
+
+// «ادخار» = فلوس اتجمّدت في أصل ليك (دهب، دولار، شهادة…) — تحويل مش صرف.
+// بتتسجل وبتبان في العمليات، بس مابتدخلش في أي مجموع مصاريف.
+export const SAVING_CATEGORY = "ادخار";
+export const isSpend = (f) => f.direction === "expense" && f.category !== SAVING_CATEGORY;
+export const isSaving = (f) => f.direction === "expense" && f.category === SAVING_CATEGORY;
 
 // تطبيع نص للمقارنة (شيل المسافات الزيادة + حروف صغيرة) — لكشف التكرار.
 // تطبيع الملاحظة للمقارنة: تشكيل/تطويل + صور الألف والياء والتاء المربوطة والهمزة
@@ -1896,6 +1917,40 @@ function goldGramsFromItems(itemsJson) {
   catch { return null; }
 }
 
+// الحقول اللي بنتابع تغييرها في السجل
+const ASSET_LOG_FIELDS = ["type", "name", "quantity", "karat", "currency", "manual_value", "goal", "note", "items"];
+const assetSnap = (a) => {
+  const o = {};
+  for (const k of ASSET_LOG_FIELDS) o[k] = a && a[k] != null ? a[k] : null;
+  return o;
+};
+const insertAssetLogStmt = db.prepare(
+  `INSERT INTO asset_log (at, user_id, asset_id, action, type, name, before, after) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+);
+// بيسجّل بس الحقول اللي اتغيّرت فعلاً. السجل عمره ما يوقّع العملية الأصلية لو حصل فيه خطأ.
+function logAssetChange(userId, assetId, action, beforeRow, afterRow) {
+  try {
+    const b = beforeRow ? assetSnap(beforeRow) : null, a = afterRow ? assetSnap(afterRow) : null;
+    let bo = b, ao = a;
+    if (action === "update") {
+      bo = {}; ao = {};
+      for (const k of ASSET_LOG_FIELDS) {
+        if (JSON.stringify(b[k]) !== JSON.stringify(a[k])) { bo[k] = b[k]; ao[k] = a[k]; }
+      }
+      if (!Object.keys(ao).length) return; // مفيش تغيير حقيقي
+    }
+    const ref = afterRow || beforeRow || {};
+    insertAssetLogStmt.run(now(), Number(userId), Number(assetId), action, ref.type || null, ref.name || null,
+      bo ? JSON.stringify(bo) : null, ao ? JSON.stringify(ao) : null);
+  } catch (e) { console.error("asset_log:", e.message); }
+}
+export function listAssetLog(userId, limit = 100) {
+  const parse = (x) => { try { return x ? JSON.parse(x) : null; } catch { return null; } };
+  return db.prepare(`SELECT id, at, asset_id, action, type, name, before, after FROM asset_log WHERE user_id = ? ORDER BY at DESC, id DESC LIMIT ?`)
+    .all(Number(userId), Number(limit) || 100)
+    .map((r) => ({ ...r, before: parse(r.before), after: parse(r.after) }));
+}
+
 const insertAssetStmt = db.prepare(`
   INSERT INTO assets (created_at, updated_at, user_id, type, name, quantity, karat, currency, manual_value, goal, note, items)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1915,7 +1970,14 @@ export function addAsset({ userId, type, name, quantity, karat, currency, manual
     note || null,
     itemsJson
   );
-  return getAsset(Number(info.lastInsertRowid));
+  const created = getAsset(Number(info.lastInsertRowid));
+  logAssetChange(userId, created.id, "add", null, created);
+  return created;
+}
+// صف الأصل بتاع المستخدم ده (والبنود متفكوكة) — للسجل
+function getOwnedAsset(userId, id) {
+  const a = getAsset(Number(id));
+  return a && a.user_id === Number(userId) ? a : null;
 }
 function getAsset(id) {
   const a = db.prepare(`SELECT * FROM assets WHERE id = ?`).get(id);
@@ -1940,10 +2002,16 @@ export function updateAsset(userId, id, patch) {
   for (const c of cols) if (p[c] !== undefined) { sets.push(`${c} = ?`); vals.push(p[c]); }
   if (!sets.length) return false;
   vals.push(Number(userId), Number(id));
-  return db.prepare(`UPDATE assets SET ${sets.join(", ")} WHERE user_id = ? AND id = ?`).run(...vals).changes > 0;
+  const before = getOwnedAsset(userId, id);
+  const ok = db.prepare(`UPDATE assets SET ${sets.join(", ")} WHERE user_id = ? AND id = ?`).run(...vals).changes > 0;
+  if (ok && before) logAssetChange(userId, id, "update", before, getOwnedAsset(userId, id));
+  return ok;
 }
 export function deleteAsset(userId, id) {
-  return db.prepare(`DELETE FROM assets WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+  const before = getOwnedAsset(userId, id);
+  const ok = db.prepare(`DELETE FROM assets WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+  if (ok && before) logAssetChange(userId, id, "delete", before, null);
+  return ok;
 }
 
 /* أسعار السوق (دهب/جرام عيار ٢٤ + أسعار العملات) — صف واحد مشترك + سجل بكل تحديث */

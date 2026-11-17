@@ -6,6 +6,7 @@ import {
   entriesSince,
   healthSince,
   financeSince,
+  isSpend,
   listGoals,
   listHabits,
   listTasks,
@@ -20,9 +21,10 @@ export function buildReportData(userId, days = 30) {
 
   const finance = financeSince(userId, from);
   const income = finance.filter((f) => f.direction === "income").reduce((a, f) => a + f.amount, 0);
-  const expense = finance.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
+  // «ادخار» (شراء دهب/دولار لنفسه) تحويل لأصل — مش داخل في المصاريف
+  const expense = finance.filter(isSpend).reduce((a, f) => a + f.amount, 0);
   const byCategory = {};
-  for (const f of finance.filter((f) => f.direction === "expense")) {
+  for (const f of finance.filter(isSpend)) {
     const c = f.category || "أخرى";
     byCategory[c] = (byCategory[c] || 0) + f.amount;
   }

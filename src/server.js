@@ -111,6 +111,7 @@ import {
   recentIdenticalConversation,
   addAsset,
   listAssets,
+  listAssetLog,
   updateAsset,
   deleteAsset,
   getAssetMarket,
@@ -1249,7 +1250,7 @@ export function startServer() {
   app.get("/api/assets", (req, res) => {
     const user = gate(req, res);
     if (!user) return;
-    res.json({ assets: listAssets(user.id), market: getAssetMarket() });
+    res.json({ assets: listAssets(user.id), market: getAssetMarket(), log: listAssetLog(user.id, 100) });
   });
   // أسعار السوق لوحدها (للتحويل في صفحة الفلوس مثلاً)
   // أسعار الدهب في مصر من egypt.gold-price-today.com (جدول: العيار — سعر البيع — سعر الشراء)

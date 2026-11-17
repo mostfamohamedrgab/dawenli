@@ -51,8 +51,12 @@ function moodInfo(mood = "") {
 
 const CAT_ICONS = {
   "أكل": "🍔", "مواصلات": "🚌", "فواتير": "🧾", "صحة": "💊", "تسوق": "🛍️",
-  "ترفيه": "🎮", "بيت": "🏠", "شغل": "💼", "تعليم": "📚", "صدقات": "🤲", "أخرى": "📦",
+  "ترفيه": "🎮", "بيت": "🏠", "شغل": "💼", "تعليم": "📚", "صدقات": "🤲", "ادخار": "🏦", "أخرى": "📦",
 };
+// «ادخار» = فلوس اتجمّدت في أصل ليك (دهب، دولار…) — تحويل مش صرف، فمابتدخلش في أي مجموع مصاريف
+const SAVING_CAT = "ادخار";
+const isSpend = (f) => f.direction === "expense" && f.category !== SAVING_CAT;
+const isSaving = (f) => f.direction === "expense" && f.category === SAVING_CAT;
 const HEALTH_ICON = { "تمرين": "🏃", "دواء": "💊", "أكل": "🍽️", "عرض": "🤒", "نوم": "😴", "نفسية": "🧠", "ملاحظة": "📝" };
 
 // حرف اليوم زي التصميم: س ح ن ث ر خ ج
@@ -1115,7 +1119,7 @@ function renderOverview() {
   const monthStart = TODAY().slice(0, 8) + "01";
   const monthFin = state.finance.filter((f) => f.entry_date >= monthStart);
   const isEGP = (f) => !f.currency || f.currency === "جنيه";
-  const mExpense = monthFin.filter((f) => f.direction === "expense" && isEGP(f)).reduce((a, f) => a + f.amount, 0);
+  const mExpense = monthFin.filter((f) => isSpend(f) && isEGP(f)).reduce((a, f) => a + f.amount, 0);
 
   const worlds = [
     {
@@ -1803,8 +1807,8 @@ function renderFinancesPage() {
   const monthStart = selMonth + "-01", monthEnd = selMonth + "-31";
   const inSel = (f) => f.entry_date >= monthStart && f.entry_date <= monthEnd;
   const weekStart = weekStartISO(); // من أول الأسبوع (السبت) مش آخر ٧ أيام
-  const weekExpense = data.filter((f) => f.direction === "expense" && f.entry_date >= weekStart && isEGP(f)).reduce((a, f) => a + f.amount, 0);
-  const mExpense = data.filter((f) => f.direction === "expense" && inSel(f) && isEGP(f)).reduce((a, f) => a + f.amount, 0);
+  const weekExpense = data.filter((f) => isSpend(f) && f.entry_date >= weekStart && isEGP(f)).reduce((a, f) => a + f.amount, 0);
+  const mExpense = data.filter((f) => isSpend(f) && inSel(f) && isEGP(f)).reduce((a, f) => a + f.amount, 0);
   const [sy, sm] = selMonth.split("-").map(Number);
   const dayOfMonth = isCur ? Math.max(1, Number(TODAY().slice(8, 10))) : new Date(sy, sm, 0).getDate();
   const avgDay = Math.round(mExpense / dayOfMonth);
@@ -1817,10 +1821,13 @@ function renderFinancesPage() {
   }
   // المصاريف بكل العملات (محوّلة) لكل شهر — للصافي
   const expenseByMonth = {};
-  for (const f of data.filter((f) => f.direction === "expense")) {
+  for (const f of data.filter(isSpend)) {
     const mk = (f.entry_date || "").slice(0, 7);
     if (mk) expenseByMonth[mk] = (expenseByMonth[mk] || 0) + finToEgp(f);
   }
+  // اللي اتحوّل لأصول (دهب/دولار…) في الشهر — بيبان لوحده ومش محسوب صرف
+  const mSaved = Math.round(data.filter((f) => isSaving(f) && inSel(f)).reduce((a, f) => a + finToEgp(f), 0));
+  const savedTxt = mSaved ? ` · 🏦 ادّخرت ${arNum(mSaved)}` : "";
   const monthIncome = Math.round(incomeByMonth[selMonth] || 0);
   const monthNet = Math.round((incomeByMonth[selMonth] || 0) - (expenseByMonth[selMonth] || 0));
   const mName = isCur ? "الشهر" : monthShortKey(selMonth) + " " + sy;
@@ -1831,7 +1838,7 @@ function renderFinancesPage() {
   }
   const incCurStr = Object.entries(incCur).map(([cu, v]) => `${arNum(v)} ${cu}`).join(" · ");
 
-  const netCard = { label: `صافي ${mName}`, value: (monthNet < 0 ? "-" : "") + arNum(Math.abs(monthNet)), unit: MONEY, ico: "📈", delta: "الدخل − كل المصاريف", trend: monthNet >= 0 ? "pos" : "" };
+  const netCard = { label: `صافي ${mName}`, value: (monthNet < 0 ? "-" : "") + arNum(Math.abs(monthNet)), unit: MONEY, ico: "📈", delta: "الدخل − كل المصاريف" + savedTxt, trend: monthNet >= 0 ? "pos" : "" };
   $("finStats").innerHTML = (isCur ? [
     { label: "دخل الشهر", value: arNum(monthIncome), unit: MONEY, ico: "💰", delta: incCurStr || "مفيش دخل لسه", trend: "pos" },
     { label: "مصاريف الأسبوع", value: arNum(weekExpense), unit: MONEY, ico: "💸", delta: "من أول الأسبوع (السبت)", trend: "" },
@@ -1853,7 +1860,7 @@ function renderFinancesPage() {
 
   // الفلوس بتروح فين — بنود مصاريف الشهر (من يوم ١) كـ boxes
   const byCatMonth = {};
-  for (const f of data.filter((f) => f.direction === "expense" && inSel(f) && isEGP(f))) {
+  for (const f of data.filter((f) => isSpend(f) && inSel(f) && isEGP(f))) {
     const c = f.category || "أخرى";
     byCatMonth[c] = (byCatMonth[c] || 0) + f.amount;
   }
@@ -1872,14 +1879,14 @@ function renderFinancesPage() {
   // أعمدة الأسبوع — مرسومة باليد على canvas
   const weekData = week.map((d) => ({
     label: DAY_LETTER[new Date(d + "T00:00:00").getDay()],
-    value: data.filter((f) => f.entry_date === d && f.direction === "expense" && isEGP(f)).reduce((a, f) => a + f.amount, 0),
+    value: data.filter((f) => f.entry_date === d && isSpend(f) && isEGP(f)).reduce((a, f) => a + f.amount, 0),
   }));
   drawSketchBars($("finBars"), weekData, "finances", 200);
 
   // على إيه بتصرف — آخر ٣٠ يوم
   const month = lastNDays(30);
   const byCat = {};
-  for (const f of data.filter((f) => f.direction === "expense" && month.includes(f.entry_date) && isEGP(f))) {
+  for (const f of data.filter((f) => isSpend(f) && month.includes(f.entry_date) && isEGP(f))) {
     const c = f.category || "أخرى";
     byCat[c] = (byCat[c] || 0) + f.amount;
   }
@@ -1947,11 +1954,11 @@ window.selFinMonth = selFinMonth;
 function finRowHtml(f) {
   return `<div class="list-row">
     <div class="lm">
-      <span class="l1">${f.direction === "income" ? "➕ دخل" : "➖ صرف"} · ${fmtShort(f.entry_date)}${f.category ? ` · ${CAT_ICONS[f.category] || ""} ${escapeHtml(f.category)}` : ""}</span>
+      <span class="l1">${f.direction === "income" ? "➕ دخل" : isSaving(f) ? "🔁 تحويل لأصل" : "➖ صرف"} · ${fmtShort(f.entry_date)}${f.category ? ` · ${CAT_ICONS[f.category] || ""} ${escapeHtml(f.category)}` : ""}</span>
       <span class="l2">${escapeHtml(f.note || "—")}${f.project_title ? ` · <span title="${f.machine_sync === "ok" ? "متقيّدة في الماكينة على المشروع" : "مستنية تتقيّد في الماكينة"}">💼 ${escapeHtml(f.project_title)}${f.machine_sync === "ok" ? "" : " ⏳"}</span>` : ""}</span>
     </div>
     <div class="row-actions">
-      <span class="l-amount ${f.direction === "income" ? "pos" : "neg"}">${arNum(f.amount)} ${curLabel(f)}</span>
+      <span class="l-amount ${f.direction === "income" ? "pos" : isSaving(f) ? "" : "neg"}"${isSaving(f) ? ' title="تحويل لأصل — مش محسوب في المصاريف"' : ""}>${arNum(f.amount)} ${curLabel(f)}</span>
       <button class="icon-btn" onclick="openEdit('finance', ${f.id})" title="تعديل">✏️</button>
       <button class="icon-btn" onclick="del('finance', ${f.id})" title="حذف">🗑️</button>
     </div>
@@ -1991,10 +1998,11 @@ function renderFinList() {
   if (!el) return;
   const all = applyFinFilter();
   const shown = all.slice(0, state.finFilter.limit);
-  const exp = all.filter((r) => r.direction === "expense").reduce((a, r) => a + r.amount, 0);
+  const exp = all.filter(isSpend).reduce((a, r) => a + r.amount, 0);
+  const sav = all.filter(isSaving).reduce((a, r) => a + r.amount, 0);
   const inc = all.filter((r) => r.direction === "income").reduce((a, r) => a + r.amount, 0);
   const meta = $("finFilterMeta");
-  if (meta) meta.innerHTML = all.length ? `${state.finMonth ? `شهر ${monthShortKey(state.finMonth)} · ` : ""}${arNum(all.length)} عملية · صرف ${arNum(exp)} ${MONEY}${inc ? ` · دخل ${arNum(inc)} ${MONEY}` : ""}` : "";
+  if (meta) meta.innerHTML = all.length ? `${state.finMonth ? `شهر ${monthShortKey(state.finMonth)} · ` : ""}${arNum(all.length)} عملية · صرف ${arNum(exp)} ${MONEY}${sav ? ` · 🏦 ادخار ${arNum(sav)} ${MONEY}` : ""}${inc ? ` · دخل ${arNum(inc)} ${MONEY}` : ""}` : "";
   el.innerHTML = shown.length ? shown.map(finRowHtml).join("") : `<div class="empty sm">${DOODLE}<p>مفيش عمليات بالفلاتر دي.</p></div>`;
   const lm = $("finLoadMore");
   if (lm) lm.innerHTML = all.length > shown.length ? `<button class="btn secondary sm" id="finMoreBtn">تحميل المزيد (${arNum(all.length - shown.length)} فاضلين)</button>` : "";
@@ -2029,7 +2037,7 @@ function renderBudget() {
   const monthStart = monthStr + "-01";
   const isEGP = (f) => !f.currency || f.currency === "جنيه";
   const monthFin = state.finance.filter((f) => f.entry_date >= monthStart && isEGP(f));
-  const spent = monthFin.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
+  const spent = monthFin.filter(isSpend).reduce((a, f) => a + f.amount, 0);
   // الدخل بيحسب كل العملات محوّلة للجنيه (عشان الدولار يسمع برضه)
   const income = state.finance.filter((f) => f.direction === "income" && f.entry_date >= monthStart).reduce((a, f) => a + finToEgp(f), 0);
   const incomeR = Math.round(income);
@@ -2405,6 +2413,7 @@ async function renderAssetsPage() {
     const d = await api("/api/assets").then((r) => r.json());
     state.assets = d.assets || [];
     state.market = d.market || state.market;
+    state.assetLog = d.log || [];
   } catch {}
   renderAssets();
 }
@@ -2434,6 +2443,53 @@ function renderMarketHistory(market) {
   }).join("");
   return `<details class="mk-history"><summary>📜 سجل الأسعار (${arNum(h.length)} تحديث)</summary>
     <table><thead><tr><th>امتى</th><th>جرام ع٢٤</th><th>الدولار</th></tr></thead><tbody>${rows}</tbody></table></details>`;
+}
+// سجل تغييرات الأصول: كل إضافة/تعديل/حذف — من كام لكام وامتى
+function renderAssetLog() {
+  const log = state.assetLog || [];
+  if (!log.length) return "";
+  const curName = (c) => ({ EGP: "جنيه", USD: "دولار", EUR: "يورو", SAR: "ريال", AED: "درهم", GBP: "إسترليني" }[c] || c || "جنيه");
+  const itemsTxt = (arr) => Array.isArray(arr) && arr.length
+    ? arr.map((it) => `${arNum(it.g)}ج ع${arNum(it.k || 24)} ×${arNum(it.n)}`).join(" + ") : "—";
+  const TYPE_NAME = { gold: "دهب", cash: "كاش", other: "أصل", liability: "التزام" };
+  const FIELD = { type: "النوع", name: "الاسم", quantity: "الكمية", karat: "العيار", currency: "العملة", manual_value: "القيمة", goal: "الهدف", note: "ملاحظة", items: "القطع" };
+  const fmt = (k, v, r, side) => {
+    if (v == null || v === "") return "—";
+    if (k === "items") return itemsTxt(v);
+    if (k === "type") return TYPE_NAME[v] || v;
+    if (k === "currency") return curName(v);
+    if (k === "quantity") {
+      const live = (state.assets || []).find((x) => x.id === r.asset_id);
+      const cur = (side && side.currency) || (live && live.currency) || null;
+      return arNum(v) + (r.type === "gold" ? " جرام" : cur ? " " + curName(cur) : "");
+    }
+    return typeof v === "number" ? arNum(v) : escapeHtml(String(v));
+  };
+  const rows = log.map((r) => {
+    const nm = `${ASSET_ICON[r.type] || "🏷️"} ${escapeHtml(r.name || TYPE_NAME[r.type] || "أصل")}`;
+    let what = "";
+    if (r.action === "update") {
+      const b = r.before || {}, a = r.after || {};
+      what = Object.keys(a).map((k) => {
+        let diff = "";
+        if (k === "quantity" && typeof b[k] === "number" && typeof a[k] === "number") {
+          const d = a[k] - b[k];
+          if (d) diff = ` <span class="${d > 0 ? "mk-up" : "mk-down"}">(${d > 0 ? "+" : "−"}${arNum(Math.abs(Math.round(d * 100) / 100))})</span>`;
+        }
+        return `<div><span class="muted">${FIELD[k] || k}:</span> ${fmt(k, b[k], r, b)} ← <b>${fmt(k, a[k], r, a)}</b>${diff}</div>`;
+      }).join("");
+    } else {
+      const s = (r.action === "add" ? r.after : r.before) || {};
+      const parts = [];
+      if (s.quantity != null) parts.push(fmt("quantity", s.quantity, r, s));
+      if (s.manual_value != null) parts.push(`${arNum(s.manual_value)} ${MONEY}`);
+      if (s.items) parts.push(itemsTxt(s.items));
+      what = `<div>${r.action === "add" ? "➕ اتضاف" : "🗑️ اتمسح"}${parts.length ? " · " + parts.join(" · ") : ""}</div>`;
+    }
+    return `<tr><td>${fmtNotifTime(r.at)}</td><td>${nm}</td><td>${what}</td></tr>`;
+  }).join("");
+  return `<details class="mk-history asset-log"><summary>🧾 سجل تغييرات الأصول (${arNum(log.length)})</summary>
+    <table><thead><tr><th>امتى</th><th>الأصل</th><th>التغيير</th></tr></thead><tbody>${rows}</tbody></table></details>`;
 }
 function renderAssets() {
   const market = state.market || {};
@@ -2484,7 +2540,8 @@ function renderAssets() {
         <span>🏷️ أصول تانية: ${arNum(Math.round(sumType("other")))}</span>
         ${liabilities ? `<span class="at-neg">📉 التزامات: −${arNum(Math.round(liabilities))}</span>` : ""}
       </div>
-      ${renderMarketHistory(market)}`;
+      ${renderMarketHistory(market)}
+      ${renderAssetLog()}`;
   }
   const el = $("assetsList");
   if (!el) return;

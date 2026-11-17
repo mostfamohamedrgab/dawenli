@@ -23,6 +23,8 @@ import {
   financeSince,
   financeBetween,
   FINANCE_CATEGORIES,
+  isSpend,
+  isSaving,
   addHealth,
   healthSince,
   healthBetween,
@@ -112,7 +114,7 @@ const TOOLS = [
           direction: { type: "string", enum: ["expense", "income"] },
           amount: { type: "number", description: "المبلغ — رقم موجب" },
           currency: { type: "string", description: "حطّها بس لو المستخدم ذكر عملة صراحةً (زي دولار، ريال، درهم). للمصاريف العادية سيبها فاضية." },
-          category: { type: "string", enum: FINANCE_CATEGORIES, description: "بند الصرف" },
+          category: { type: "string", enum: FINANCE_CATEGORIES, description: "بند الصرف. «ادخار» = اشترى أصل لنفسه (دهب، دولار، شهادة…) — تحويل مش صرف ومابيتحسبش في المصاريف" },
           note: { type: "string", description: "وصف قصير (مثلاً: غدا مع أصحابي)" },
           date: { type: "string", description: "YYYY-MM-DD" },
         },
@@ -985,13 +987,16 @@ async function executeTool(ctx, name, args) {
         case "finance": {
           const rows = financeBetween(userId, from, to);
           const income = rows.filter((r) => r.direction === "income").reduce((a, r) => a + r.amount, 0);
-          const expense = rows.filter((r) => r.direction === "expense").reduce((a, r) => a + r.amount, 0);
+          // «ادخار» (شراء دهب/دولار لنفسه) تحويل لأصل مش صرف — بيتجمع لوحده
+          const expense = rows.filter(isSpend).reduce((a, r) => a + r.amount, 0);
+          const saved = rows.filter(isSaving).reduce((a, r) => a + r.amount, 0);
           const byCat = {};
-          for (const r of rows.filter((r) => r.direction === "expense"))
+          for (const r of rows.filter(isSpend))
             byCat[r.category || "أخرى"] = (byCat[r.category || "أخرى"] || 0) + r.amount;
           return {
             result: {
               from, to, income, expense, net: income - expense,
+              saved_to_assets: saved, // اتحوّل لأصول (دهب/دولار…) — مش محسوب في expense
               expense_by_category: byCat,
               items: rows.slice(-25).map((r) => ({ id: r.id, date: r.entry_date, dir: r.direction, amount: r.amount, category: r.category, note: r.note })),
             },
@@ -1064,7 +1069,7 @@ function buildSnapshot(userId, projects = [], sponsors = []) {
   // ذكرها تاني بعد كذا يوم (سياق الـ 3 أيام فوق مبيوصلهاش، وده كان بيعمل تكرار).
   const since45 = new Date(new Date(today + "T00:00:00Z").getTime() - 44 * 86400000).toISOString().slice(0, 10);
   const recentIncome = financeSince(userId, since45).filter((f) => f.direction === "income");
-  const spentToday = todayFinance.filter((f) => f.direction === "expense").reduce((a, f) => a + f.amount, 0);
+  const spentToday = todayFinance.filter(isSpend).reduce((a, f) => a + f.amount, 0);
   const goals = listGoals(userId).slice(0, 10);
   const metrics = listMetricsWithStats(userId);
   const habits = listHabits(userId);
@@ -1145,6 +1150,7 @@ const SYSTEM_PROMPT = `انت "دوّنلي" — رفيق تدوين شخصي ذ
 # قواعد الاستخراج
 - استخرج **كل** اللي في الكلام: مصاريف ودخل (بالبند)، صحة ونفسية، أكل، عادات، أهداف، مهام بمواعيدها، وتدوينة اليوميات.
 - **🔴 كل مبلغ في رسالة المستخدم الحالية = قيد (أهم قاعدة في الفلوس):** رسالة فيها ٣ مصاريف = ٣ نداءات log_finance — **ابعتهم كلهم مع بعض في نفس الرد** (نداءات متوازية)، كل مبلغ بوصفه وبنده. ممنوع تسجّل واحد وتسيب الباقي، وممنوع تقول «هتأكد إنه مش متسجّل» وتقف — انت شايف اللي اتسجّل في finance_today و finance_recent و income_recent: **لو مبلغ من الرسالة الحالية مش موجود هناك يبقى مش متسجّل، سجّله دلوقتي من غير سؤال.** (ده حصل فعلًا: «صرفت ٤٠٠ عشا، ١٣٠ شاور جيل، ٢٠٠ جاتوه» اتسجّل منها الـ ٤٠٠ بس، والمستخدم اضطر يرجع يقول «مسجلتش ليه؟».) **المبالغ اللي في رسايله القديمة في المحادثة اتعامل معاها خلاص — ماتسجّلهاش تاني** إلا لو هو بيطلب ده دلوقتي صراحةً («مسجلتش ليه الـ…؟»).
+- **شراء أصل لنفسه = «ادخار» مش صرف:** لو المستخدم اشترى **لنفسه** دهب (سبيكة/جنيه/أونصة/مشغولات للادخار)، دولار أو عملة، شهادة/وديعة، أسهم… → log_finance بـ direction=expense و **category="ادخار"** (الفلوس اتجمّدت في أصل، ماتصرفتش — فمابتتحسبش في المصاريف). لو نفس الحاجة **لحد تاني** (دهب لأمه/مراته، هدية) → ده صرف حقيقي ببند عادي (تسوق/أخرى) مش «ادخار».
 - **الفلوس اللي بتتصرف على حد تاني = مصروف المستخدم نفسه:** علاج أو تحاليل لمراته، مصاريف بيت، حاجة لابنه، هدية لحد — كلها **مصروفه هو** وبتتسجّل بـ log_finance عادي بالبند المناسب واسم الشخص في note. قاعدة «صحة حد تاني ماتسجّلهاش» تخص log_health بس، مش الفلوس.
 - **اليوم الصح لكل حاجة (مهم):** المستخدم ساعات بيحكي عن يوم فات — "امبارح عملت كذا"، "أول امبارح"، "يوم التلات اللي فات"، "من ٣ أيام"، أو حتى وسط الكلام. لو الحدث حصل في يوم فات → سجّله **بتاريخ اليوم ده مش النهاردة**: حِط \`date\` على **كل** أداة تسجيل (save_journal / log_finance / log_health / log_meal / log_habit / log_metric) بالتاريخ المحسوب من **past_days** اللي في السياق (مثلاً لو النهاردة الجمعة و"امبارح" يبقى الخميس بتاريخه). **🔴 لو المستخدم ماذكرش أي يوم صراحةً (ولا «امبارح» ولا اسم يوم ولا تاريخ) → التاريخ = النهاردة (today من السياق) حتمًا. متفترضش «امبارح» أو أي يوم فات من نفسك، ومتقولش في ردّك «أمس» أو «امبارح» طول ما هو ماقالهاش** — ده كان بيحصل مع رسايل قصيرة زي «+500$ مشروع كذا» فتتسجّل غلط بتاريخ امبارح. الرسالة الواحدة ممكن تبقى فيها حاجات لأيام مختلفة — **كل واحدة بتاريخها هي**.
 - **🔴 توجيه عام للتاريخ (ركّز جدًا):** لو المستخدم قال في أول أو وسط كلامه إن **التدوينة كلها عن يوم فات** — زي «ده تدوين امبارح»، «التدوين ده بتاع امبارح»، «أنا بتكلم عن يوم الأربع»، «ده كان يوم كذا» — يبقى ده **التاريخ الافتراضي لكل البنود في الرسالة دي** (يوميات + فلوس + أكل + صحة + متتبِّعات + عادات). حِط نفس الـ\`date\` ده على كل نداء تسجيل، **إلا** لو بند معيّن قال صراحةً يوم تاني. متسجّلش أي حاجة على النهاردة طول ما التوجيه العام قال يوم فات. احسب التاريخ من past_days (لو قال يوم أسبوع أو "امبارح")، أو من التاريخ الحالي في السياق لو قال تاريخ صريح زي "٢ يوليو". لو حصل تضارب في كلامه (قال أكتر من يوم) خُد أول يوم صريح قاله للتدوينة.
