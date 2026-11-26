@@ -17,7 +17,7 @@ const STAGES = ["lead", "meeting", "proposal", "won", "delivering", "delivered",
 {
   const cols = db.prepare(`PRAGMA table_info(work_projects)`).all().map((c) => c.name);
   for (const [c, def] of [["deposit", "REAL DEFAULT 0"], ["deposit_at", "TEXT DEFAULT ''"], ["tasks", "TEXT DEFAULT ''"],
-    ["next_action", "TEXT DEFAULT ''"], ["next_date", "TEXT DEFAULT ''"]])
+    ["next_action", "TEXT DEFAULT ''"], ["next_date", "TEXT DEFAULT ''"], ["ad_pct", "TEXT DEFAULT ''"]])
     if (!cols.includes(c)) db.exec(`ALTER TABLE work_projects ADD COLUMN ${c} ${def}`);
 }
 
@@ -252,7 +252,7 @@ function unlinkedWork(userId) {
 
 /* ===== الحفظ (نفس سلوك الماكينة) ===== */
 const DEAL_FIELDS = ["client_id", "title", "stage", "value", "currency", "deposit", "deposit_at", "deadline", "next_action", "next_date",
-  "note", "tasks", "logo", "source", "started_at", "archived", "extras", "billing", "monthly", "team", "pos"];
+  "note", "tasks", "logo", "source", "ad_pct", "started_at", "archived", "extras", "billing", "monthly", "team", "pos"];
 const NUMS = new Set(["value", "deposit", "monthly", "salary", "pos"]);
 
 function merge(table, fields, it, prefix, userId) {

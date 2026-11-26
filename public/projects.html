@@ -243,12 +243,20 @@ const AD_PCT=0.15, AD_CREDIT=10000;
 // «15%» جوّه نص عربي بتتقلب وتبان «%15» — نعزلها باتجاه LTR (U+2066…U+2069).
 // ممنوع نحلّها بأرقام هندية: الخط هنا مش شايلها وبتطلع مشوّهة.
 const PCTL=()=>'⁦'+Math.round(AD_PCT*100)+'%⁩';
+const dealAdPct=d=>(d.ad_pct!==''&&d.ad_pct!=null&&!isNaN(+d.ad_pct))?Math.min(100,Math.max(0,+d.ad_pct))/100:AD_PCT;
+const pctL=p=>'⁦'+Math.round(p*100)+'%⁩';
 function adBudget(){
   const spent=adRows().reduce((s,f)=>s+(+f.amount||0),0);
-  const ids=new Set((D.deals||[]).filter(d=>isFb(d.source)&&d.stage!=='lost').map(d=>d.id));
-  const got=FIN.filter(f=>ids.has(f.deal_id)&&f.kind==='income').reduce((s,f)=>s+fxAmt(f),0);
-  const cap=got*AD_PCT, ceiling=cap+AD_CREDIT;
-  return {spent,got,cap,ceiling,left:ceiling-spent,
+  // كل مشروع من الإعلان بنسبته: الافتراضي AD_PCT، ولو المشروع ليه «نسبة للإعلانات» خاصة (مثلًا ١٠٠٪ لتاسك بسيط) بتتحسب هي
+  const fbd=(D.deals||[]).filter(d=>isFb(d.source)&&d.stage!=='lost');
+  let got=0,cap=0; const custom=[];
+  fbd.forEach(d=>{
+    const g=FIN.filter(f=>f.deal_id===d.id&&f.kind==='income').reduce((s,f)=>s+fxAmt(f),0);
+    const p=dealAdPct(d); got+=g; cap+=g*p;
+    if(p!==AD_PCT&&g)custom.push({d,g,p});
+  });
+  const ceiling=cap+AD_CREDIT;
+  return {spent,got,cap,custom,ceiling,left:ceiling-spent,
     inCredit:spent>cap,pct:ceiling?Math.min(100,spent/ceiling*100):0,
     capAt:ceiling?Math.min(100,cap/ceiling*100):0};
 }
@@ -330,7 +338,10 @@ function adBudgetDetail(){
   const b=adBudget();
   const P=PCTL();
   const rows=_kRow('المحصّل من عملاء الإعلان','كل الوقت — الأساس اللي النسبة بتتحسب منه',b.got,'EGP')
-    +_kRow(`حد الـ${P}`,`${P} من ${money(Math.round(b.got))}ج`,b.cap,'EGP')
+    +(b.custom.length
+      ? b.custom.map(c=>_kRow(`${pctL(c.p)} من ${c.d.title}`,`نسبة خاصة بالمشروع — من ${money(Math.round(c.g))}ج`,c.g*c.p,'EGP')).join('')
+        +_kRow(`حد الـ${P} من الباقي`,`${P} من ${money(Math.round(b.got-b.custom.reduce((s,c)=>s+c.g,0)))}ج`,b.cap-b.custom.reduce((s,c)=>s+c.g*c.p,0),'EGP')
+      : _kRow(`حد الـ${P}`,`${P} من ${money(Math.round(b.got))}ج`,b.cap,'EGP'))
     +_kRow('حد ائتماني','ثابت — مساحة نتحرّك فيها قبل ما الفلوس توصل',AD_CREDIT,'EGP')
     +_kRow('السقف الكلي',`حد الـ${P} + الائتماني`,b.ceiling,'EGP')
     +_kRow('اللي صرفناه فعلًا','كل حركات الإعلانات في المصاريف العامة',b.spent,'EGP',true);
@@ -991,6 +1002,7 @@ function dealForm(id){
         <datalist id="srcs2"><option>إعلان فيسبوك مدفوع</option><option>القناة</option><option>إحالة</option><option>معرفة شخصية</option></datalist></div>
       <div class="fld"><label>لوجو (رابط صورة)</label><input id="d-logo" class="mono" value="${esc(d.logo)}" placeholder="/uploads/…"></div>
     </div>
+    <div class="fld"><label>💳 نسبة التحصيل اللي تروح «متاح للإعلانات» (لو من الإعلان)</label><input id="d-adpct" type="number" min="0" max="100" step="any" value="${esc(d.ad_pct??'')}" placeholder="فاضي = ${Math.round(AD_PCT*100)} (الافتراضي) — ١٠٠ = كله للإعلانات"></div>
     <div class="fld"><label>👥 الفريق على المشروع</label><input id="d-team" value="${esc(d.team)}" placeholder="مثلًا: عبدالرحمن، أحمد (موظفين أو فريلانسرز)">
       <div class="hint">افصل بين الأسامي بفاصلة. دوّنلي بيربط أي مرتب أو مصروف لحد منهم بالمشروع ده لوحده.</div></div>
     <div class="fld"><label>تاسكات العميل <span class="hint" style="display:inline">(كل واحدة ممكن سعر مختلف)</span></label>
@@ -1009,7 +1021,7 @@ function saveDeal(id){
   const send=cid=>{
     const b={title,client_id:cid,stage:g('d-stage')||'lead',value:g('d-value')||0,
       currency:g('d-currency'),deposit:g('d-deposit')||0,
-      note:g('d-note'),tasks:JSON.stringify(tasks),logo:g('d-logo'),source:g('d-source'),
+      note:g('d-note'),tasks:JSON.stringify(tasks),logo:g('d-logo'),source:g('d-source'),ad_pct:g('d-adpct'),
       started_at:g('d-started'),deposit_at:g('d-depat'),
       billing:g('d-billing'),monthly:g('d-billing')==='monthly'?(g('d-monthly')||0):0,team:g('d-team').trim()};
     if(id)b.id=id;
